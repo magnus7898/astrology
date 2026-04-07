@@ -172,7 +172,7 @@ function searchCity(){
     const city=document.getElementById('city').value;
     if(city.length<2) return;
     try {
-      const r=await fetch('/geocode',{method:'POST',
+      const r=await fetch('https://astrology-production-a014.up.railway.app/geocode',{method:'POST',
         headers:{'Content-Type':'application/json'},body:JSON.stringify({city})});
       if(r.ok){
         const d=await r.json();
@@ -205,7 +205,7 @@ async function generateChart(){
     lat:+lat, lon:+lon,
     tz_name:document.getElementById('tz_name').value
   };
-  const r=await fetch('/chart',{method:'POST',
+  const r=await fetch('https://astrology-production-a014.up.railway.app/chart',{method:'POST',
     headers:{'Content-Type':'application/json'},body:JSON.stringify(payload)});
   const data=await r.json();
   document.getElementById('chart-area').style.display='block';
