@@ -13,12 +13,15 @@ swe.set_ephe_path(EPHE_PATH)
 
 # ── IMPORTS ─────────────────────────────────────────────────────
 from flask import Flask, render_template, request, jsonify
+from flask_cors import CORS   # 👈 ADD THIS
 from geopy.geocoders import Nominatim
 from timezonefinder import TimezoneFinder
 from datetime import datetime
 import pytz
 
+
 app = Flask(__name__)
+CORS(app)
 
 # ── CONSTANTS ───────────────────────────────────────────────────
 ZODIAC_SIGNS = [
