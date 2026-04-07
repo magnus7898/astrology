@@ -1,6 +1,0 @@
-Flask
-swisseph
-geopy
-timezonefinder
-pytz
-gunicorn
