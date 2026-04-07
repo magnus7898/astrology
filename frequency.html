@@ -1,0 +1,696 @@
+<!DOCTYPE html>
+<html lang="ka">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>სიხშირეების გენერატორი</title>
+<link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,300;0,400;0,600;1,300;1,400&family=Josefin+Sans:wght@100;300;400&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --bg: #04060f;
+    --surface: rgba(255,255,255,0.03);
+    --border: rgba(255,255,255,0.07);
+    --text: #e8e4f0;
+    --muted: rgba(232,228,240,0.4);
+    --accent: #c8b4ff;
+  }
+
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+  body {
+    background: var(--bg);
+    color: var(--text);
+    font-family: 'Josefin Sans', sans-serif;
+    min-height: 100vh;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    padding: 48px 20px 80px;
+    position: relative;
+    overflow-x: hidden;
+  }
+
+  /* Ambient background orbs */
+  body::before {
+    content: '';
+    position: fixed;
+    width: 700px; height: 700px;
+    border-radius: 50%;
+    background: radial-gradient(circle, rgba(100,60,200,0.12) 0%, transparent 70%);
+    top: -200px; left: -200px;
+    pointer-events: none;
+  }
+  body::after {
+    content: '';
+    position: fixed;
+    width: 500px; height: 500px;
+    border-radius: 50%;
+    background: radial-gradient(circle, rgba(40,120,180,0.1) 0%, transparent 70%);
+    bottom: -100px; right: -100px;
+    pointer-events: none;
+  }
+
+  /* Visualizer canvas */
+  #visualizer {
+    position: fixed;
+    top: 0; left: 0;
+    width: 100%; height: 100%;
+    pointer-events: none;
+    opacity: 0.18;
+    z-index: 0;
+  }
+
+  .wrap {
+    position: relative;
+    z-index: 1;
+    width: 100%;
+    max-width: 560px;
+  }
+
+  /* Header */
+  header {
+    text-align: center;
+    margin-bottom: 52px;
+  }
+  .eyebrow {
+    font-family: 'Josefin Sans', sans-serif;
+    font-weight: 100;
+    font-size: 10px;
+    letter-spacing: 5px;
+    text-transform: uppercase;
+    color: var(--muted);
+    margin-bottom: 12px;
+  }
+  h1 {
+    font-family: 'Cormorant Garamond', serif;
+    font-weight: 300;
+    font-size: clamp(32px, 6vw, 52px);
+    letter-spacing: 1px;
+    line-height: 1;
+    background: linear-gradient(135deg, #fff 0%, var(--accent) 60%, #8ad4ff 100%);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    background-clip: text;
+  }
+  .tagline {
+    font-size: 11px;
+    letter-spacing: 3px;
+    color: var(--muted);
+    margin-top: 10px;
+    font-weight: 100;
+  }
+
+  /* Frequency display */
+  .freq-display {
+    text-align: center;
+    margin-bottom: 44px;
+    position: relative;
+  }
+  .freq-number {
+    font-family: 'Cormorant Garamond', serif;
+    font-size: clamp(64px, 15vw, 110px);
+    font-weight: 300;
+    font-style: italic;
+    line-height: 1;
+    color: white;
+    transition: all 0.4s cubic-bezier(0.23, 1, 0.32, 1);
+    position: relative;
+  }
+  .freq-number.pulse {
+    animation: freqPulse 0.4s cubic-bezier(0.23, 1, 0.32, 1);
+  }
+  @keyframes freqPulse {
+    0% { transform: scale(1); }
+    40% { transform: scale(1.04); }
+    100% { transform: scale(1); }
+  }
+  .freq-unit {
+    font-family: 'Josefin Sans', sans-serif;
+    font-size: 13px;
+    font-weight: 100;
+    letter-spacing: 4px;
+    color: var(--muted);
+    margin-top: 4px;
+  }
+  .freq-name {
+    font-family: 'Cormorant Garamond', serif;
+    font-size: 14px;
+    font-style: italic;
+    color: var(--accent);
+    margin-top: 6px;
+    min-height: 20px;
+    transition: opacity 0.3s;
+  }
+  /* Ring around frequency */
+  .freq-ring {
+    position: absolute;
+    top: 50%; left: 50%;
+    transform: translate(-50%, -50%);
+    width: 160px; height: 160px;
+    border-radius: 50%;
+    border: 1px solid rgba(200,180,255,0.08);
+    pointer-events: none;
+    transition: all 0.6s ease;
+  }
+  .freq-ring.active {
+    border-color: rgba(200,180,255,0.25);
+    box-shadow: 0 0 40px rgba(180,140,255,0.15), inset 0 0 40px rgba(180,140,255,0.05);
+    animation: ringPulse 2s ease-in-out infinite;
+  }
+  @keyframes ringPulse {
+    0%, 100% { transform: translate(-50%, -50%) scale(1); opacity: 1; }
+    50% { transform: translate(-50%, -50%) scale(1.06); opacity: 0.7; }
+  }
+
+  /* Section label */
+  .section-label {
+    font-size: 9px;
+    letter-spacing: 4px;
+    text-transform: uppercase;
+    color: var(--muted);
+    margin-bottom: 16px;
+    padding-left: 2px;
+  }
+
+  /* Chakra buttons */
+  .chakra-grid {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    margin-bottom: 40px;
+  }
+  .chakra-btn {
+    display: flex;
+    align-items: center;
+    gap: 16px;
+    padding: 14px 20px;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    cursor: pointer;
+    transition: all 0.25s cubic-bezier(0.23, 1, 0.32, 1);
+    position: relative;
+    overflow: hidden;
+    width: 100%;
+    text-align: left;
+  }
+  .chakra-btn::before {
+    content: '';
+    position: absolute;
+    inset: 0;
+    background: linear-gradient(90deg, transparent, rgba(255,255,255,0.02));
+    opacity: 0;
+    transition: opacity 0.3s;
+  }
+  .chakra-btn:hover::before { opacity: 1; }
+  .chakra-btn:hover {
+    border-color: rgba(255,255,255,0.15);
+    transform: translateX(4px);
+  }
+  .chakra-btn.active {
+    border-color: rgba(255,255,255,0.2);
+    transform: translateX(6px);
+  }
+  .chakra-btn.active::after {
+    content: '';
+    position: absolute;
+    left: 0; top: 0; bottom: 0;
+    width: 3px;
+    border-radius: 0 2px 2px 0;
+    transition: background 0.3s;
+  }
+  .dot {
+    width: 10px; height: 10px;
+    border-radius: 50%;
+    flex-shrink: 0;
+    transition: all 0.3s;
+  }
+  .chakra-btn.active .dot {
+    box-shadow: 0 0 12px currentColor;
+  }
+  .chakra-info { flex: 1; }
+  .chakra-name {
+    font-family: 'Cormorant Garamond', serif;
+    font-size: 15px;
+    font-weight: 400;
+    color: var(--text);
+    line-height: 1;
+  }
+  .chakra-desc {
+    font-size: 10px;
+    letter-spacing: 1.5px;
+    color: var(--muted);
+    margin-top: 3px;
+    font-weight: 100;
+  }
+  .chakra-hz {
+    font-family: 'Josefin Sans', sans-serif;
+    font-size: 13px;
+    font-weight: 300;
+    letter-spacing: 1px;
+    color: rgba(255,255,255,0.5);
+    transition: color 0.3s;
+  }
+  .chakra-btn.active .chakra-hz { color: white; }
+
+  /* Neutral freqs */
+  .neutral-grid {
+    display: flex;
+    gap: 8px;
+    margin-bottom: 40px;
+  }
+  .neutral-btn {
+    flex: 1;
+    padding: 12px 8px;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    cursor: pointer;
+    transition: all 0.25s;
+    color: var(--text);
+    font-family: 'Josefin Sans', sans-serif;
+    font-size: 14px;
+    font-weight: 300;
+    letter-spacing: 1px;
+  }
+  .neutral-btn:hover, .neutral-btn.active {
+    border-color: rgba(255,255,255,0.2);
+    background: rgba(255,255,255,0.06);
+  }
+  .neutral-label {
+    font-size: 9px;
+    letter-spacing: 2px;
+    color: var(--muted);
+    display: block;
+    margin-top: 3px;
+    font-weight: 100;
+  }
+
+  /* Controls */
+  .controls-panel {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 16px;
+    padding: 28px;
+    margin-bottom: 32px;
+  }
+  .control-row {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+    margin-bottom: 22px;
+  }
+  .control-row:last-child { margin-bottom: 0; }
+  .control-label {
+    font-size: 9px;
+    letter-spacing: 3px;
+    text-transform: uppercase;
+    color: var(--muted);
+    font-weight: 300;
+  }
+  .control-value {
+    font-family: 'Josefin Sans', sans-serif;
+    font-size: 11px;
+    color: var(--accent);
+    float: right;
+  }
+  input[type="number"] {
+    background: rgba(255,255,255,0.04);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    color: white;
+    font-family: 'Josefin Sans', sans-serif;
+    font-size: 18px;
+    font-weight: 300;
+    letter-spacing: 2px;
+    padding: 12px 16px;
+    width: 100%;
+    outline: none;
+    transition: border-color 0.2s;
+  }
+  input[type="number"]:focus { border-color: rgba(200,180,255,0.3); }
+  input[type="number"]::-webkit-inner-spin-button { opacity: 0.3; }
+  select {
+    background: rgba(255,255,255,0.04);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    color: white;
+    font-family: 'Josefin Sans', sans-serif;
+    font-size: 13px;
+    font-weight: 100;
+    letter-spacing: 2px;
+    padding: 10px 16px;
+    width: 100%;
+    outline: none;
+    cursor: pointer;
+    -webkit-appearance: none;
+    transition: border-color 0.2s;
+  }
+  select:focus { border-color: rgba(200,180,255,0.3); }
+  select option { background: #0d0f1e; }
+
+  /* Volume slider */
+  input[type="range"] {
+    -webkit-appearance: none;
+    width: 100%;
+    height: 2px;
+    background: rgba(255,255,255,0.08);
+    border-radius: 2px;
+    outline: none;
+    cursor: pointer;
+    margin-top: 8px;
+  }
+  input[type="range"]::-webkit-slider-thumb {
+    -webkit-appearance: none;
+    width: 16px; height: 16px;
+    border-radius: 50%;
+    background: white;
+    box-shadow: 0 0 10px rgba(200,180,255,0.5);
+    cursor: pointer;
+    transition: box-shadow 0.2s;
+  }
+  input[type="range"]::-webkit-slider-thumb:hover {
+    box-shadow: 0 0 18px rgba(200,180,255,0.8);
+  }
+
+  /* Play / stop buttons */
+  .action-row {
+    display: grid;
+    grid-template-columns: 1fr auto;
+    gap: 10px;
+  }
+  .btn-play {
+    padding: 16px 32px;
+    background: linear-gradient(135deg, rgba(180,140,255,0.2), rgba(100,160,255,0.15));
+    border: 1px solid rgba(200,180,255,0.3);
+    border-radius: 12px;
+    color: white;
+    font-family: 'Josefin Sans', sans-serif;
+    font-size: 12px;
+    font-weight: 300;
+    letter-spacing: 3px;
+    text-transform: uppercase;
+    cursor: pointer;
+    transition: all 0.3s;
+    position: relative;
+    overflow: hidden;
+  }
+  .btn-play::after {
+    content: '';
+    position: absolute;
+    inset: 0;
+    background: linear-gradient(135deg, rgba(200,180,255,0.1), transparent);
+    opacity: 0;
+    transition: opacity 0.3s;
+  }
+  .btn-play:hover::after { opacity: 1; }
+  .btn-play:hover {
+    border-color: rgba(200,180,255,0.5);
+    box-shadow: 0 0 30px rgba(180,140,255,0.2);
+    transform: translateY(-1px);
+  }
+  .btn-play.playing {
+    border-color: rgba(200,180,255,0.4);
+    box-shadow: 0 0 40px rgba(180,140,255,0.3);
+    animation: playingGlow 2s ease-in-out infinite;
+  }
+  @keyframes playingGlow {
+    0%, 100% { box-shadow: 0 0 30px rgba(180,140,255,0.2); }
+    50% { box-shadow: 0 0 50px rgba(180,140,255,0.4); }
+  }
+  .btn-stop {
+    padding: 16px 20px;
+    background: rgba(255,255,255,0.03);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    color: var(--muted);
+    font-size: 16px;
+    cursor: pointer;
+    transition: all 0.25s;
+  }
+  .btn-stop:hover {
+    border-color: rgba(255,100,100,0.3);
+    color: rgba(255,150,150,0.8);
+  }
+
+  /* Status bar */
+  .status {
+    text-align: center;
+    font-size: 10px;
+    letter-spacing: 3px;
+    color: var(--muted);
+    font-weight: 100;
+    height: 16px;
+    transition: all 0.3s;
+  }
+  .status.on { color: var(--accent); }
+
+  /* Divider */
+  hr {
+    border: none;
+    border-top: 1px solid var(--border);
+    margin: 32px 0;
+  }
+</style>
+</head>
+<body>
+
+<canvas id="visualizer"></canvas>
+
+<div class="wrap">
+  <header>
+    <div class="eyebrow">სიხშირეების გენერატორი</div>
+    <h1>ხმოვანი<br>სიხშირეები</h1>
+    <div class="tagline">Sound · Frequency · Healing</div>
+  </header>
+
+  <!-- Big frequency display -->
+  <div class="freq-display">
+    <div class="freq-ring" id="freqRing"></div>
+    <div class="freq-number" id="freqDisplay">432</div>
+    <div class="freq-unit">H E R T Z</div>
+    <div class="freq-name" id="freqName">—</div>
+  </div>
+
+  <!-- Chakra frequencies -->
+  <div class="section-label">ჩაკრების სიხშირეები</div>
+  <div class="chakra-grid" id="chakraGrid"></div>
+
+  <!-- Other frequencies -->
+  <div class="section-label">სხვა სიხშირეები</div>
+  <div class="neutral-grid" id="neutralGrid"></div>
+
+  <hr>
+
+  <!-- Controls -->
+  <div class="controls-panel">
+    <div class="control-row">
+      <div class="control-label">სიხშირე <span class="control-value" id="freqVal">432 Hz</span></div>
+      <input type="number" id="freqInput" value="432" min="1" max="20000">
+    </div>
+    <div class="control-row">
+      <div class="control-label">ტალღის ფორმა</div>
+      <select id="waveType">
+        <option value="sine">Sine — სინუსი</option>
+        <option value="triangle">Triangle — სამკუთხა</option>
+        <option value="square">Square — კვადრატი</option>
+        <option value="sawtooth">Sawtooth — ხერხი</option>
+      </select>
+    </div>
+    <div class="control-row">
+      <div class="control-label">ხმის დონე <span class="control-value" id="volVal">20%</span></div>
+      <input type="range" id="volume" min="0" max="1" step="0.01" value="0.2">
+    </div>
+  </div>
+
+  <div class="action-row">
+    <button class="btn-play" id="btnPlay" onclick="toggleTone()">▶ &nbsp; დ ა წ ყ ე ბ ა</button>
+    <button class="btn-stop" onclick="stopTone()">■</button>
+  </div>
+
+  <div class="status" id="status">— გათიშულია —</div>
+</div>
+
+<script>
+// ── Data ──────────────────────────────────────────────────────────────────
+const CHAKRAS = [
+  { hz: 396, name: 'მულადჰარა',   desc: 'Root · განთავისუფლება',       color: '#e05252', dot: '#e05252' },
+  { hz: 417, name: 'სვადჰისტანა', desc: 'Sacral · ცვლილება',           color: '#f0873a', dot: '#f0873a' },
+  { hz: 528, name: 'მანიპურა',    desc: 'Solar · გარდაქმნა',            color: '#e8d44d', dot: '#d4b800' },
+  { hz: 639, name: 'ანაჰატა',     desc: 'Heart · კავშირი',             color: '#4caf7d', dot: '#4caf7d' },
+  { hz: 741, name: 'ვიშუდჰა',    desc: 'Throat · გამოხატვა',          color: '#4fc3f7', dot: '#4fc3f7' },
+  { hz: 852, name: 'აჯნა',        desc: 'Third Eye · ინტუიცია',        color: '#5c8ce8', dot: '#5c8ce8' },
+  { hz: 963, name: 'საჰასრარა',   desc: 'Crown · გამოღვიძება',         color: '#b07ee8', dot: '#b07ee8' },
+];
+
+const NEUTRALS = [
+  { hz: 174,  label: 'ტკივილი' },
+  { hz: 285,  label: 'ქსოვილი' },
+  { hz: 432,  label: 'ბუნება'  },
+];
+
+// ── Build UI ──────────────────────────────────────────────────────────────
+const chakraGrid = document.getElementById('chakraGrid');
+CHAKRAS.forEach(c => {
+  const btn = document.createElement('button');
+  btn.className = 'chakra-btn';
+  btn.dataset.hz = c.hz;
+  btn.innerHTML = `
+    <div class="dot" style="background:${c.dot};color:${c.dot}"></div>
+    <div class="chakra-info">
+      <div class="chakra-name">${c.name}</div>
+      <div class="chakra-desc">${c.desc}</div>
+    </div>
+    <div class="chakra-hz">${c.hz} Hz</div>
+  `;
+  btn.style.setProperty('--chakra-color', c.color);
+  btn.addEventListener('click', () => setFreq(c.hz, c.name, btn));
+  chakraGrid.appendChild(btn);
+});
+
+const neutralGrid = document.getElementById('neutralGrid');
+NEUTRALS.forEach(n => {
+  const btn = document.createElement('button');
+  btn.className = 'neutral-btn';
+  btn.dataset.hz = n.hz;
+  btn.innerHTML = `${n.hz}<span class="neutral-label">${n.label}</span>`;
+  btn.addEventListener('click', () => setFreq(n.hz, n.label + ' · ' + n.hz + ' Hz', btn));
+  neutralGrid.appendChild(btn);
+});
+
+// ── State ─────────────────────────────────────────────────────────────────
+let audioCtx = null, oscillator = null, gainNode = null;
+let currentBtn = null;
+let isPlaying = false;
+
+// ── Freq select ───────────────────────────────────────────────────────────
+function setFreq(hz, name, btn) {
+  document.getElementById('freqInput').value = hz;
+  document.getElementById('freqVal').textContent = hz + ' Hz';
+  // Animate number
+  const disp = document.getElementById('freqDisplay');
+  disp.textContent = hz;
+  disp.classList.remove('pulse');
+  void disp.offsetWidth;
+  disp.classList.add('pulse');
+  // Name
+  document.getElementById('freqName').textContent = name || '—';
+  // Active button
+  document.querySelectorAll('.chakra-btn, .neutral-btn').forEach(b => b.classList.remove('active'));
+  if (btn) btn.classList.add('active');
+  currentBtn = btn;
+  // Live update if playing
+  if (oscillator && audioCtx) {
+    oscillator.frequency.setValueAtTime(hz, audioCtx.currentTime);
+  }
+}
+
+// ── Audio ─────────────────────────────────────────────────────────────────
+function toggleTone() {
+  if (isPlaying) stopTone(); else startTone();
+}
+
+function startTone() {
+  if (isPlaying) return;
+  audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+  oscillator = audioCtx.createOscillator();
+  gainNode   = audioCtx.createGain();
+  const analyser = audioCtx.createAnalyser();
+  analyser.fftSize = 256;
+  waveData = new Uint8Array(analyser.frequencyBinCount);
+  window._analyser = analyser;
+
+  oscillator.type = document.getElementById('waveType').value;
+  oscillator.frequency.setValueAtTime(+document.getElementById('freqInput').value, audioCtx.currentTime);
+  gainNode.gain.value = +document.getElementById('volume').value;
+
+  oscillator.connect(gainNode);
+  gainNode.connect(analyser);
+  analyser.connect(audioCtx.destination);
+  oscillator.start();
+  isPlaying = true;
+
+  document.getElementById('btnPlay').textContent = '⏸  გ ა ჩ ე რ ე ბ ა';
+  document.getElementById('btnPlay').classList.add('playing');
+  document.getElementById('freqRing').classList.add('active');
+  document.getElementById('status').textContent = '— გამოსხივება —';
+  document.getElementById('status').classList.add('on');
+}
+
+function stopTone() {
+  if (!isPlaying) return;
+  oscillator.stop();
+  audioCtx.close();
+  oscillator = null; audioCtx = null; gainNode = null;
+  window._analyser = null;
+  isPlaying = false;
+
+  document.getElementById('btnPlay').innerHTML = '▶ &nbsp; დ ა წ ყ ე ბ ა';
+  document.getElementById('btnPlay').classList.remove('playing');
+  document.getElementById('freqRing').classList.remove('active');
+  document.getElementById('status').textContent = '— გათიშულია —';
+  document.getElementById('status').classList.remove('on');
+}
+
+// ── Live control updates ──────────────────────────────────────────────────
+document.getElementById('volume').addEventListener('input', function() {
+  document.getElementById('volVal').textContent = Math.round(this.value * 100) + '%';
+  if (gainNode && audioCtx) gainNode.gain.setValueAtTime(+this.value, audioCtx.currentTime);
+});
+document.getElementById('freqInput').addEventListener('input', function() {
+  document.getElementById('freqVal').textContent = this.value + ' Hz';
+  document.getElementById('freqDisplay').textContent = this.value;
+  document.getElementById('freqName').textContent = '—';
+  document.querySelectorAll('.chakra-btn, .neutral-btn').forEach(b => b.classList.remove('active'));
+  if (oscillator && audioCtx) oscillator.frequency.setValueAtTime(+this.value, audioCtx.currentTime);
+});
+document.getElementById('waveType').addEventListener('change', function() {
+  if (oscillator) oscillator.type = this.value;
+});
+
+// ── Canvas visualizer ─────────────────────────────────────────────────────
+const canvas = document.getElementById('visualizer');
+const ctx2 = canvas.getContext('2d');
+let waveData = null;
+
+function resizeCanvas() {
+  canvas.width  = window.innerWidth;
+  canvas.height = window.innerHeight;
+}
+resizeCanvas();
+window.addEventListener('resize', resizeCanvas);
+
+function drawVis() {
+  requestAnimationFrame(drawVis);
+  ctx2.clearRect(0, 0, canvas.width, canvas.height);
+  const analyser = window._analyser;
+  if (!analyser) return;
+  analyser.getByteFrequencyData(waveData);
+
+  const cx = canvas.width / 2, cy = canvas.height / 2;
+  const bars = waveData.length;
+  const radius = Math.min(cx, cy) * 0.55;
+
+  ctx2.save();
+  ctx2.translate(cx, cy);
+
+  for (let i = 0; i < bars; i++) {
+    const val    = waveData[i] / 255;
+    const angle  = (i / bars) * Math.PI * 2 - Math.PI / 2;
+    const inner  = radius;
+    const outer  = radius + val * 90;
+    const hue    = 240 + i * 0.6;
+    ctx2.beginPath();
+    ctx2.moveTo(Math.cos(angle) * inner, Math.sin(angle) * inner);
+    ctx2.lineTo(Math.cos(angle) * outer, Math.sin(angle) * outer);
+    ctx2.strokeStyle = `hsla(${hue},80%,75%,${0.3 + val * 0.7})`;
+    ctx2.lineWidth   = 2;
+    ctx2.stroke();
+  }
+
+  ctx2.restore();
+}
+drawVis();
+</script>
+</body>
+</html>
