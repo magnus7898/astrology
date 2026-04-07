@@ -56,6 +56,25 @@ def index():
 @app.route('/astro')
 def astro():
     return render_template('astro.html')
+ @app.route('/')
+def home():
+    return render_template('index.html')
+
+@app.route('/frequency')
+def frequency():
+    return render_template('frequency.html')
+
+@app.route('/matrix')
+def matrix():
+    return render_template('matrix.html')
+
+@app.route('/name')
+def name():
+    return render_template('name.html')
+
+@app.route('/pythagoras')
+def pythagoras():
+    return render_template('pythagoras.html')
 
 @app.route('/test')
 def test():
