@@ -1,0 +1,303 @@
+<!DOCTYPE html>
+<html lang="ka">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>სულის კარიბჭე</title>
+<link href="https://fonts.googleapis.com/css2?family=Cinzel+Decorative:wght@400;700&family=Cinzel:wght@300;400;600&family=IM+Fell+English:ital@0;1&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --void: #04030a;
+    --gold: #c9a84c;
+    --gold-pale: #e8d5a0;
+    --silver: #9ba8b8;
+  }
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+  body {
+    background: var(--void);
+    min-height: 100vh;
+    overflow-x: hidden;
+    cursor: none;
+    font-family: 'Cinzel', serif;
+  }
+
+  /* Cursor */
+  .cursor { position:fixed;width:6px;height:6px;background:var(--gold);border-radius:50%;pointer-events:none;z-index:9999;transform:translate(-50%,-50%);mix-blend-mode:difference; }
+  .cursor-ring { position:fixed;width:32px;height:32px;border:1px solid rgba(201,168,76,0.5);border-radius:50%;pointer-events:none;z-index:9998;transform:translate(-50%,-50%);transition:all 0.15s ease-out; }
+
+  /* Canvas */
+  #cosmos { position:fixed;inset:0;z-index:0; }
+
+  /* Grain */
+  .grain {
+    position:fixed;inset:-50%;width:200%;height:200%;z-index:1;pointer-events:none;opacity:0.03;
+    background-image:url("data:image/svg+xml,%3Csvg viewBox='0 0 512 512' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
+    animation:grain 0.4s steps(1) infinite;
+  }
+  @keyframes grain { 0%,100%{transform:translate(0,0)} 25%{transform:translate(-1%,-1%)} 50%{transform:translate(1%,0)} 75%{transform:translate(0,1%)} }
+
+  /* Vignette */
+  .vignette { position:fixed;inset:0;z-index:2;pointer-events:none;background:radial-gradient(ellipse at center,transparent 40%,rgba(4,3,10,0.55) 75%,rgba(4,3,10,0.9) 100%); }
+
+  /* Page */
+  .page { position:relative;z-index:3;min-height:100vh;display:flex;flex-direction:column;align-items:center;padding:56px 24px 90px; }
+
+  /* Header */
+  header { text-align:center;margin-bottom:64px;opacity:0;animation:fadeDown 1.2s cubic-bezier(0.22,1,0.36,1) 0.3s forwards; }
+  @keyframes fadeDown { from{opacity:0;transform:translateY(-24px)} to{opacity:1;transform:translateY(0)} }
+
+  .sigil { width:52px;height:52px;margin:0 auto 22px;display:block; }
+
+  .eyebrow { font-size:9px;letter-spacing:7px;text-transform:uppercase;color:var(--gold);opacity:0.5;margin-bottom:14px;font-weight:300; }
+
+  h1 {
+    font-family:'Cinzel Decorative',serif;
+    font-size:clamp(26px,5vw,50px);
+    font-weight:400;
+    letter-spacing:2px;
+    line-height:1.15;
+    background:linear-gradient(160deg,#f5e8ba 0%,var(--gold) 35%,#9a7028 60%,var(--gold-pale) 80%,#c09040 100%);
+    -webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text;
+    filter:drop-shadow(0 0 28px rgba(201,168,76,0.25));
+  }
+
+  .subtitle { font-family:'IM Fell English',serif;font-style:italic;font-size:14px;color:var(--silver);opacity:0.5;margin-top:12px;letter-spacing:1px; }
+
+  /* Divider */
+  .divider { display:flex;align-items:center;gap:16px;margin-bottom:56px;width:100%;max-width:460px;opacity:0;animation:fadeIn 1s ease 0.9s forwards; }
+  @keyframes fadeIn { to{opacity:1} }
+  .dline { flex:1;height:1px;background:linear-gradient(90deg,transparent,rgba(201,168,76,0.3),transparent); }
+  .dgem { width:5px;height:5px;background:var(--gold);transform:rotate(45deg);opacity:0.5; }
+
+  /* Grid */
+  .grid { display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:18px;width:100%;max-width:800px; }
+
+  /* Cards */
+  .card {
+    position:relative;height:196px;border-radius:3px;overflow:hidden;
+    opacity:0;transform:translateY(28px) scale(0.97);
+    transition:transform 0.5s cubic-bezier(0.22,1,0.36,1),box-shadow 0.5s ease,border-color 0.4s ease;
+    text-decoration:none;display:flex;flex-direction:column;align-items:center;justify-content:center;
+    border:1px solid rgba(201,168,76,0.1);
+    background:rgba(8,6,18,0.72);backdrop-filter:blur(14px);cursor:none;
+  }
+  .card.visible { opacity:1;transform:translateY(0) scale(1); }
+
+  /* Inner glow */
+  .card-glow { position:absolute;inset:0;opacity:0;transition:opacity 0.5s; }
+  .card:hover .card-glow { opacity:1; }
+  .c-matrix .card-glow  { background:radial-gradient(ellipse at 50% 110%,rgba(120,60,220,0.18),transparent 65%); }
+  .c-pyth .card-glow    { background:radial-gradient(ellipse at 50% 110%,rgba(240,160,40,0.15),transparent 65%); }
+  .c-name .card-glow    { background:radial-gradient(ellipse at 50% 110%,rgba(30,200,140,0.13),transparent 65%); }
+  .c-astro .card-glow   { background:radial-gradient(ellipse at 50% 110%,rgba(220,70,150,0.15),transparent 65%); }
+  .c-freq .card-glow    { background:radial-gradient(ellipse at 50% 110%,rgba(40,180,255,0.13),transparent 65%); }
+
+  .card:hover { transform:translateY(-8px) scale(1.02);border-color:rgba(201,168,76,0.3); }
+  .c-matrix:hover  { box-shadow:0 28px 56px rgba(0,0,0,0.5),0 0 40px rgba(120,60,220,0.12); }
+  .c-pyth:hover    { box-shadow:0 28px 56px rgba(0,0,0,0.5),0 0 40px rgba(240,160,40,0.1); }
+  .c-name:hover    { box-shadow:0 28px 56px rgba(0,0,0,0.5),0 0 40px rgba(30,200,140,0.1); }
+  .c-astro:hover   { box-shadow:0 28px 56px rgba(0,0,0,0.5),0 0 40px rgba(220,70,150,0.12); }
+  .c-freq:hover    { box-shadow:0 28px 56px rgba(0,0,0,0.5),0 0 40px rgba(40,180,255,0.1); }
+
+  /* Bottom accent line */
+  .card::after { content:'';position:absolute;bottom:0;left:25%;right:25%;height:1px;background:linear-gradient(90deg,transparent,var(--gold),transparent);opacity:0;transition:opacity 0.4s,left 0.4s,right 0.4s; }
+  .card:hover::after { opacity:0.4;left:12%;right:12%; }
+
+  /* Corner brackets */
+  .cn { position:absolute;width:13px;height:13px;border-color:rgba(201,168,76,0.18);border-style:solid;transition:all 0.4s; }
+  .card:hover .cn { border-color:rgba(201,168,76,0.5);width:17px;height:17px; }
+  .tl { top:10px;left:10px;border-width:1px 0 0 1px; }
+  .tr { top:10px;right:10px;border-width:1px 1px 0 0; }
+  .bl { bottom:10px;left:10px;border-width:0 0 1px 1px; }
+  .br { bottom:10px;right:10px;border-width:0 1px 1px 0; }
+
+  /* Symbol */
+  .sym {
+    font-size:30px;margin-bottom:16px;opacity:0.45;
+    transition:opacity 0.35s,transform 0.4s;
+  }
+  .card:hover .sym { opacity:0.9;transform:scale(1.15) translateY(-3px); }
+  .c-matrix .sym  { color:#9060e0;filter:drop-shadow(0 0 8px #9060e0); }
+  .c-pyth .sym    { color:#e0a030;filter:drop-shadow(0 0 8px #e0a030); }
+  .c-name .sym    { color:#30c890;filter:drop-shadow(0 0 8px #30c890); }
+  .c-astro .sym   { color:#e050a0;filter:drop-shadow(0 0 8px #e050a0); }
+  .c-freq .sym    { color:#30b0f0;filter:drop-shadow(0 0 8px #30b0f0); }
+
+  /* Title */
+  .card-title { font-size:12px;font-weight:600;letter-spacing:3px;text-transform:uppercase;color:var(--gold-pale);text-align:center;padding:0 14px;transition:color 0.3s;line-height:1.6; }
+  .card:hover .card-title { color:#fff; }
+
+  /* Subtitle */
+  .card-sub { font-family:'IM Fell English',serif;font-style:italic;font-size:11px;color:var(--silver);opacity:0;margin-top:7px;transition:opacity 0.3s 0.05s,transform 0.3s;transform:translateY(5px); }
+  .card:hover .card-sub { opacity:0.45;transform:translateY(0); }
+
+  /* Footer */
+  footer { margin-top:72px;text-align:center;opacity:0;animation:fadeIn 1.5s ease 2.2s forwards; }
+  footer span { font-size:9px;letter-spacing:6px;text-transform:uppercase;color:rgba(201,168,76,0.2); }
+
+  /* Mobile */
+  @media (max-width:600px) {
+    .page { padding:36px 14px 72px; }
+    h1 { font-size:24px; }
+    .grid { grid-template-columns:1fr 1fr;gap:10px; }
+    .card { height:155px; }
+    .card-title { font-size:10px;letter-spacing:2px; }
+    body { cursor:auto; }
+    .cursor,.cursor-ring { display:none; }
+  }
+  @media (max-width:360px) { .grid { grid-template-columns:1fr; } }
+</style>
+</head>
+<body>
+
+<div class="cursor" id="cur"></div>
+<div class="cursor-ring" id="crg"></div>
+
+<canvas id="cosmos"></canvas>
+<div class="grain"></div>
+<div class="vignette"></div>
+
+<div class="page">
+
+  <header>
+    <svg class="sigil" viewBox="0 0 56 56" fill="none" xmlns="http://www.w3.org/2000/svg">
+      <circle cx="28" cy="28" r="26.5" stroke="rgba(201,168,76,0.25)" stroke-width="0.5"/>
+      <circle cx="28" cy="28" r="17"   stroke="rgba(201,168,76,0.18)" stroke-width="0.5"/>
+      <polygon points="28,3 51,43 5,43"  stroke="rgba(201,168,76,0.38)" stroke-width="0.5" fill="none"/>
+      <polygon points="28,53 5,13 51,13" stroke="rgba(201,168,76,0.38)" stroke-width="0.5" fill="none"/>
+      <circle cx="28" cy="28" r="2.5" fill="rgba(201,168,76,0.7)"/>
+      <circle cx="28" cy="3"  r="1.4" fill="rgba(201,168,76,0.4)"/>
+      <circle cx="51" cy="43" r="1.4" fill="rgba(201,168,76,0.4)"/>
+      <circle cx="5"  cy="43" r="1.4" fill="rgba(201,168,76,0.4)"/>
+      <circle cx="28" cy="53" r="1.4" fill="rgba(201,168,76,0.4)"/>
+      <circle cx="5"  cy="13" r="1.4" fill="rgba(201,168,76,0.4)"/>
+      <circle cx="51" cy="13" r="1.4" fill="rgba(201,168,76,0.4)"/>
+    </svg>
+    <div class="eyebrow">სულის მეცნიერება</div>
+    <h1>კოსმოსის<br>კარიბჭე</h1>
+    <div class="subtitle">Choose your path through the cosmic void</div>
+  </header>
+
+  <div class="divider">
+    <div class="dline"></div><div class="dgem"></div><div class="dline"></div>
+  </div>
+
+  <div class="grid">
+
+    <a class="card c-matrix" href="matrix.html">
+      <div class="card-glow"></div>
+      <div class="cn tl"></div><div class="cn tr"></div><div class="cn bl"></div><div class="cn br"></div>
+      <div class="sym">⬡</div>
+      <div class="card-title">ბედისწერის<br>მატრიცა</div>
+      <div class="card-sub">Matrix of Destiny</div>
+    </a>
+
+    <a class="card c-pyth" href="pythagoras.html">
+      <div class="card-glow"></div>
+      <div class="cn tl"></div><div class="cn tr"></div><div class="cn bl"></div><div class="cn br"></div>
+      <div class="sym">△</div>
+      <div class="card-title">პითაგორას<br>კვადრატი</div>
+      <div class="card-sub">Pythagorean Square</div>
+    </a>
+
+    <a class="card c-name" href="name.html">
+      <div class="card-glow"></div>
+      <div class="cn tl"></div><div class="cn tr"></div><div class="cn bl"></div><div class="cn br"></div>
+      <div class="sym">ℵ</div>
+      <div class="card-title">სახელის<br>ნუმეროლოგია</div>
+      <div class="card-sub">Name Numerology</div>
+    </a>
+
+    <a class="card c-astro" href="/astro">
+      <div class="card-glow"></div>
+      <div class="cn tl"></div><div class="cn tr"></div><div class="cn bl"></div><div class="cn br"></div>
+      <div class="sym">☽</div>
+      <div class="card-title">ასტროლოგია</div>
+      <div class="card-sub">Celestial Chart</div>
+    </a>
+
+    <a class="card c-freq" href="frequency.html">
+      <div class="card-glow"></div>
+      <div class="cn tl"></div><div class="cn tr"></div><div class="cn bl"></div><div class="cn br"></div>
+      <div class="sym">〜</div>
+      <div class="card-title">სიხშირეები</div>
+      <div class="card-sub">Healing Frequencies</div>
+    </a>
+
+  </div>
+
+  <footer><span>✦ &nbsp; omnia ex uno &nbsp; ✦</span></footer>
+</div>
+
+<script>
+// ── Cursor ────────────────────────────────────────────────────────────────
+const cur = document.getElementById('cur');
+const crg = document.getElementById('crg');
+let mx=-100,my=-100,rx=-100,ry=-100;
+document.addEventListener('mousemove',e=>{mx=e.clientX;my=e.clientY;});
+(function loop(){
+  rx+=(mx-rx)*0.12; ry+=(my-ry)*0.12;
+  cur.style.cssText+=`;left:${mx}px;top:${my}px`;
+  crg.style.cssText+=`;left:${rx}px;top:${ry}px`;
+  requestAnimationFrame(loop);
+})();
+document.querySelectorAll('.card').forEach(c=>{
+  c.addEventListener('mouseenter',()=>{crg.style.width=crg.style.height='58px';crg.style.borderColor='rgba(201,168,76,0.65)';});
+  c.addEventListener('mouseleave',()=>{crg.style.width=crg.style.height='32px';crg.style.borderColor='rgba(201,168,76,0.5)';});
+});
+
+// ── Deep space ────────────────────────────────────────────────────────────
+const cv=document.getElementById('cosmos'), cx2=cv.getContext('2d');
+let W,H,stars=[],blobs=[];
+
+function resize(){W=cv.width=window.innerWidth;H=cv.height=window.innerHeight;}
+resize(); window.addEventListener('resize',resize);
+
+for(let i=0;i<220;i++) stars.push({
+  x:Math.random(),y:Math.random(),
+  r:Math.random()*1.3+0.15,
+  a:Math.random()*0.65+0.1,
+  p:Math.random()*Math.PI*2,
+  sp:Math.random()*0.018+0.004
+});
+
+const bCols=['rgba(100,50,200,','rgba(200,55,130,','rgba(25,155,220,','rgba(170,90,240,','rgba(30,180,120,'];
+for(let i=0;i<5;i++) blobs.push({
+  x:Math.random(),y:Math.random(),
+  r:0.22+Math.random()*0.18,
+  col:bCols[i%bCols.length],
+  a:0.035+Math.random()*0.05,
+  dx:(Math.random()-0.5)*0.00007,
+  dy:(Math.random()-0.5)*0.00007,
+});
+
+function draw(){
+  cx2.fillStyle='#04030a'; cx2.fillRect(0,0,W,H);
+  blobs.forEach(b=>{
+    b.x+=b.dx; b.y+=b.dy;
+    if(b.x<-0.3||b.x>1.3)b.dx*=-1;
+    if(b.y<-0.3||b.y>1.3)b.dy*=-1;
+    const g=cx2.createRadialGradient(b.x*W,b.y*H,0,b.x*W,b.y*H,b.r*W);
+    g.addColorStop(0,b.col+b.a+')'); g.addColorStop(1,b.col+'0)');
+    cx2.fillStyle=g; cx2.beginPath(); cx2.arc(b.x*W,b.y*H,b.r*W,0,Math.PI*2); cx2.fill();
+  });
+  stars.forEach(s=>{
+    s.p+=s.sp;
+    const al=s.a*(0.55+0.45*Math.sin(s.p));
+    cx2.beginPath(); cx2.arc(s.x*W,s.y*H,s.r,0,Math.PI*2);
+    cx2.fillStyle=`rgba(255,255,245,${al})`; cx2.fill();
+  });
+  requestAnimationFrame(draw);
+}
+draw();
+
+// ── Staggered card reveal ─────────────────────────────────────────────────
+document.querySelectorAll('.card').forEach((c,i)=>{
+  setTimeout(()=>{
+    c.style.transition='opacity 0.75s ease,transform 0.75s cubic-bezier(0.22,1,0.36,1),box-shadow 0.5s ease,border-color 0.4s ease';
+    c.classList.add('visible');
+  },680+i*110);
+});
+</script>
+</body>
+</html>
