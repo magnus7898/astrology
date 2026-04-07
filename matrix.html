@@ -1,0 +1,600 @@
+<!DOCTYPE html>
+<html lang="ka">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>ნუმეროლოგიური მატრიცა</title>
+  <link href="https://fonts.googleapis.com/css2?family=Cinzel:wght@400;600;700&family=Noto+Sans+Georgian:wght@300;400;600;700&display=swap" rel="stylesheet">
+  <style>
+    *,*::before,*::after{box-sizing:border-box;margin:0;padding:0;}
+    body{min-height:100vh;background:#0a0618;font-family:'Noto Sans Georgian',sans-serif;color:#e0d8ff;display:flex;flex-direction:column;align-items:center;padding:24px 12px 60px;position:relative;overflow-x:hidden;}
+    body::before{content:'';position:fixed;inset:0;pointer-events:none;z-index:0;background:radial-gradient(ellipse 900px 700px at 20% 30%,rgba(100,60,200,0.18) 0%,transparent 70%),radial-gradient(ellipse 700px 700px at 80% 70%,rgba(80,40,180,0.15) 0%,transparent 70%);}
+
+    .page-title{font-family:'Cinzel',serif;font-size:26px;font-weight:700;letter-spacing:4px;text-align:center;margin-bottom:4px;background:linear-gradient(135deg,#ffd700,#ff9fd7,#a78bfa,#60d0ff);-webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text;position:relative;z-index:1;}
+    .page-subtitle{font-size:11px;letter-spacing:3px;color:rgba(180,170,255,0.7);text-align:center;margin-bottom:20px;position:relative;z-index:1;text-transform:uppercase;}
+
+    /* Method bar */
+    .method-bar{display:flex;gap:8px;margin-bottom:16px;justify-content:center;flex-wrap:wrap;position:relative;z-index:1;}
+    .method-btn{padding:8px 18px;background:rgba(20,12,50,0.9);border:1px solid rgba(140,110,255,0.4);border-radius:8px;color:rgba(180,160,255,0.8);font-size:12px;font-family:'Noto Sans Georgian',sans-serif;cursor:pointer;transition:all 0.2s;}
+    .method-btn:hover{border-color:rgba(167,139,250,0.8);color:white;}
+    .method-btn.active{background:rgba(100,60,200,0.7);border-color:rgba(167,139,250,0.9);color:white;font-weight:600;}
+
+    /* Input panels */
+    .input-panel{display:flex;gap:10px;align-items:flex-end;flex-wrap:wrap;justify-content:center;margin-bottom:16px;background:rgba(18,10,45,0.85);border:1px solid rgba(120,100,200,0.3);padding:14px 20px;border-radius:12px;position:relative;z-index:1;backdrop-filter:blur(10px);}
+    .input-group{display:flex;flex-direction:column;align-items:center;gap:3px;}
+    .input-panel label{font-size:10px;letter-spacing:1.5px;text-transform:uppercase;color:rgba(180,170,255,0.8);}
+    .input-panel input{padding:6px 8px;background:rgba(255,255,255,0.06);border:1px solid rgba(120,100,200,0.4);border-radius:8px;font-size:15px;text-align:center;color:#e0d8ff;font-family:'Cinzel',serif;outline:none;width:55px;}
+    .input-panel input[name="yyyy"]{width:78px;}
+    .input-panel input:focus{border-color:rgba(167,139,250,0.8);}
+    .calc-btn{padding:9px 22px;background:linear-gradient(135deg,#7c3aed,#4f46e5);border:1px solid rgba(167,139,250,0.4);border-radius:10px;font-size:12px;font-weight:600;letter-spacing:1px;text-transform:uppercase;cursor:pointer;color:white;font-family:'Noto Sans Georgian',sans-serif;transition:all 0.2s;margin-top:14px;}
+    .calc-btn:hover{background:linear-gradient(135deg,#8b5cf6,#6366f1);transform:translateY(-1px);}
+
+    /* M3 inputs */
+    #m3-inputs{display:none;width:100%;max-width:360px;margin-bottom:14px;background:rgba(18,10,45,0.9);border:1px solid rgba(140,110,255,0.35);border-radius:12px;padding:14px 18px;position:relative;z-index:1;}
+    #m3-inputs .ig{display:flex;flex-direction:column;gap:3px;width:100%;}
+    #m3-inputs label{font-size:10px;letter-spacing:1px;text-transform:uppercase;color:rgba(180,170,255,0.8);}
+    #m3-inputs input{width:100%;padding:7px 10px;background:rgba(255,255,255,0.06);border:1px solid rgba(120,100,200,0.4);border-radius:8px;font-size:13px;color:#e0d8ff;font-family:'Noto Sans Georgian',sans-serif;outline:none;}
+    #m3-inputs input:focus{border-color:rgba(167,139,250,0.8);}
+    #m3-preview{margin-top:8px;font-size:10px;color:rgba(160,140,220,0.7);display:flex;gap:10px;flex-wrap:wrap;}
+
+    /* Compat inputs */
+    #compat-inputs{display:none;width:100%;max-width:480px;margin-bottom:14px;background:rgba(18,10,45,0.9);border:1px solid rgba(140,110,255,0.35);border-radius:12px;padding:14px 18px;position:relative;z-index:1;}
+    .compat-label{font-size:11px;color:rgba(180,160,255,0.8);letter-spacing:1px;text-align:center;margin-bottom:8px;}
+    .compat-row{display:flex;gap:10px;align-items:flex-end;justify-content:center;flex-wrap:wrap;}
+    .compat-row .input-group label{font-size:10px;letter-spacing:1px;text-transform:uppercase;color:rgba(180,170,255,0.7);}
+    .compat-row input{padding:6px 8px;background:rgba(255,255,255,0.06);border:1px solid rgba(120,100,200,0.4);border-radius:8px;font-size:15px;text-align:center;color:#e0d8ff;font-family:'Cinzel',serif;outline:none;width:55px;}
+    .compat-row input.yyyy{width:78px;}
+    .compat-row input:focus{border-color:rgba(167,139,250,0.8);}
+
+    /* Main layout */
+    .main-layout{display:flex;flex-direction:column;align-items:center;gap:20px;position:relative;z-index:1;width:100%;max-width:1120px;margin:0 auto;}
+    .diagram-wrapper{width:100%;max-width:min(90vh,1120px);}
+    .diagram-wrapper svg{width:100%;height:auto;display:block;}
+
+    /* Extra panels */
+    #extra-panels{display:none;width:100%;max-width:860px;}
+    .ep-box{flex:1;min-width:140px;background:rgba(18,10,45,0.9);border:1px solid rgba(140,110,255,0.35);border-radius:13px;padding:13px 16px;display:flex;flex-direction:column;gap:9px;}
+    .ep-title{font-size:12px;font-weight:700;letter-spacing:1px;color:rgba(180,160,255,0.95);text-align:center;}
+    .ep-row{display:flex;gap:11px;align-items:center;justify-content:center;flex-wrap:wrap;}
+    .ep-circ{width:56px;height:56px;border-radius:50%;background:rgba(25,15,55,0.95);border:2px solid rgba(140,110,255,0.7);display:flex;align-items:center;justify-content:center;font-size:20px;font-weight:700;color:white;font-family:'Cinzel',serif;flex-shrink:0;position:relative;}
+    .ep-circ.ep-gold{border-color:rgba(255,215,0,0.8);background:rgba(45,30,5,0.95);}
+    .ep-circ.ep-big{width:63px;height:63px;font-size:21px;}
+    .ep-label{position:absolute;bottom:-17px;left:50%;transform:translateX(-50%);font-size:8px;color:rgba(160,140,220,0.7);white-space:nowrap;font-family:sans-serif;}
+
+    /* Tables */
+    .table-wrapper{width:100%;max-width:860px;border-radius:13px;overflow:hidden;box-shadow:0 4px 24px rgba(0,0,0,0.4);}
+    .chakra-table{border-collapse:collapse;width:100%;font-family:'Noto Sans Georgian',sans-serif;}
+    .chakra-table thead tr{background:linear-gradient(135deg,rgba(240,100,160,0.85),rgba(180,60,120,0.85));}
+    .chakra-table th{padding:12px 14px;text-align:center;font-weight:700;font-size:13px;letter-spacing:1px;color:white;border-right:1px solid rgba(255,255,255,0.15);}
+    .chakra-table th:first-child{text-align:left;}
+    .chakra-table td{padding:10px 14px;text-align:center;font-weight:600;font-size:17px;border-bottom:1px solid rgba(0,0,0,0.15);border-right:1px solid rgba(0,0,0,0.1);}
+    .chakra-table td:first-child{text-align:left;font-size:12px;font-weight:700;}
+    .chakra-table tbody tr:hover td{filter:brightness(1.12);}
+    .row-sahasrara td{background:rgba(126,87,194,0.85);color:white;}
+    .row-ajna td{background:rgba(92,155,214,0.85);color:white;}
+    .row-vishudha td{background:rgba(181,212,244,0.85);color:#0c3060;}
+    .row-anahata td{background:rgba(102,187,106,0.85);color:#0d3b0f;}
+    .row-manipura td{background:rgba(255,215,0,0.85);color:#412402;}
+    .row-svadhistana td{background:rgba(239,159,39,0.85);color:#2d1500;}
+    .row-muladhara td{background:rgba(220,70,70,0.85);color:white;}
+    .row-total td{background:rgba(90,90,90,0.75);color:#e8e8e8;font-weight:700;font-size:14px;}
+
+    .side-table-wrapper{width:100%;max-width:860px;border-radius:12px;overflow:hidden;box-shadow:0 4px 20px rgba(0,0,0,0.4);}
+    .side-table{border-collapse:collapse;width:100%;font-family:'Noto Sans Georgian',sans-serif;font-size:13px;}
+    .side-table thead th{background:rgba(0,100,140,0.9);color:#7ff0ff;padding:9px 8px;text-align:center;font-weight:700;font-size:13px;border-bottom:1px solid rgba(0,200,230,0.3);}
+    .side-table td{padding:6px 6px;text-align:center;border-bottom:1px solid rgba(255,255,255,0.05);color:rgba(200,235,255,0.85);}
+    .side-table td:first-child{width:85px;font-weight:600;color:rgba(150,220,255,0.9);text-align:left;padding-left:8px;}
+    .side-table td:nth-child(2){width:55px;font-weight:700;color:#FFD700;font-size:14px;}
+    .side-table td:nth-child(3){text-align:left;padding-left:6px;}
+    .side-table tr.anchor-row td{background:rgba(0,80,120,0.7);color:#7ff0ff;font-weight:700;font-size:13px;}
+    .side-table tr.anchor-row td:nth-child(2){color:#FFD700;font-size:15px;}
+    .side-table tr.mid-row td{background:rgba(0,50,80,0.5);}
+    .side-table tr:hover td{background:rgba(0,100,140,0.3);}
+
+    .footer-text{margin-top:36px;font-size:10px;letter-spacing:3px;text-transform:uppercase;color:rgba(167,139,250,0.4);position:relative;z-index:1;}
+
+    @media(max-width:900px){body{padding:12px 8px 36px;}.page-title{font-size:18px;}.diagram-wrapper{max-width:100vw!important;}}
+    @media(max-width:600px){.page-title{font-size:14px;letter-spacing:1px;}.page-subtitle{display:none;}.chakra-table th,.chakra-table td{padding:6px 4px;font-size:10px;}.chakra-table td:first-child{font-size:8px;}.ep-box{min-width:130px;}}
+  </style>
+</head>
+<body>
+
+<div class="method-bar">
+  <button class="method-btn active" id="btn-m1" onclick="setMethod(1)">მეთოდი 1</button>
+  <button class="method-btn"        id="btn-m2" onclick="setMethod(2)">მეთოდი 2</button>
+  <button class="method-btn"        id="btn-m3" onclick="setMethod(3)">მეთოდი 3</button>
+  <button class="method-btn"        id="btn-mc" onclick="setMethod(4)">შეთავსება</button>
+</div>
+
+<h1 class="page-title">✦ ნუმეროლოგიური მატრიცა ✦</h1>
+<p class="page-subtitle">სულის რუქა · სამყაროს კოდი</p>
+
+<!-- Date inputs (methods 1,2,3) -->
+<div class="input-panel" id="date-panel">
+  <div class="input-group"><label>დღე</label><input name="dd" maxlength="2" placeholder="DD" value="24"/></div>
+  <div class="input-group"><label>თვე</label><input name="mm" maxlength="2" placeholder="MM" value="06"/></div>
+  <div class="input-group"><label>წელი</label><input name="yyyy" maxlength="4" placeholder="YYYY" value="1987"/></div>
+  <div class="input-group"><label>&nbsp;</label><button class="calc-btn" onclick="calculate()">⟡ გამოთვლა</button></div>
+</div>
+
+<!-- Method 3: name inputs (vertical) -->
+<div id="m3-inputs">
+  
+  <div style="display:flex;flex-direction:column;gap:10px;">
+    <div class="ig"><label>გვარი</label><input id="m3-gvari" placeholder="გვარი" oninput="m3Preview()"/></div>
+    <div class="ig"><label>სახელი</label><input id="m3-saxeli" placeholder="სახელი" oninput="m3Preview()"/></div>
+    <div class="ig"><label>მამის სახელი</label><input id="m3-mamis" placeholder="მამის სახელი, მაგალითად თორნიკეს ასული, ლაშას ძე" oninput="m3Preview()"/></div>
+    <div class="ig"><label>დედის გვარი</label><input id="m3-dedis" placeholder="დედის გვარი" oninput="m3Preview()"/></div>
+  </div>
+  <div id="m3-preview"></div>
+</div>
+
+<!-- Compatibility inputs -->
+<div id="compat-inputs">
+  <div class="compat-label">პირველი პიროვნება</div>
+  <div class="compat-row">
+    <div class="input-group"><label>დღე</label><input id="c1-dd" maxlength="2" placeholder="DD" value="01"/></div>
+    <div class="input-group"><label>თვე</label><input id="c1-mm" maxlength="2" placeholder="MM" value="01"/></div>
+    <div class="input-group"><label>წელი</label><input id="c1-yyyy" maxlength="4" placeholder="YYYY" value="1990" class="yyyy"/></div>
+  </div>
+  <div class="compat-label" style="margin-top:14px;">მეორე პიროვნება</div>
+  <div class="compat-row">
+    <div class="input-group"><label>დღე</label><input id="c2-dd" maxlength="2" placeholder="DD" value="01"/></div>
+    <div class="input-group"><label>თვე</label><input id="c2-mm" maxlength="2" placeholder="MM" value="01"/></div>
+    <div class="input-group"><label>წელი</label><input id="c2-yyyy" maxlength="4" placeholder="YYYY" value="1995" class="yyyy"/></div>
+  </div>
+  <div style="text-align:center;margin-top:14px;">
+    <button class="calc-btn" onclick="calculateCompat()">⟡ შეთავსება</button>
+  </div>
+</div>
+
+<div class="main-layout" id="main-layout">
+  <div class="diagram-wrapper">
+    <svg id="diagram" width="1800" height="1800" viewBox="-120 -120 1440 1440" xmlns="http://www.w3.org/2000/svg"></svg>
+  </div>
+
+  <div id="extra-panels">
+    <div style="display:flex;gap:12px;flex-wrap:wrap;margin-bottom:12px;">
+      <!-- Male line -->
+      <div class="ep-box"><div class="ep-title" style="color:rgba(210,130,255,0.95);">მამაკაცის ხაზი</div><div class="ep-row"><div class="ep-circ" id="ep-tl3"><span class="ep-label">TL3</span></div><div class="ep-circ" id="ep-br3"><span class="ep-label">BR3</span></div><div class="ep-circ ep-gold" id="ep-male-sum"><span class="ep-label">ჯამი</span></div></div></div>
+      <!-- Female line -->
+      <div class="ep-box"><div class="ep-title" style="color:rgba(255,140,140,0.95);">ქალის ხაზი</div><div class="ep-row"><div class="ep-circ" id="ep-tr3"><span class="ep-label">TR3</span></div><div class="ep-circ" id="ep-bl3"><span class="ep-label">BL3</span></div><div class="ep-circ ep-gold" id="ep-fem-sum"><span class="ep-label">ჯამი</span></div></div></div>
+    </div>
+    <div style="display:flex;gap:12px;flex-wrap:wrap;">
+
+      <!-- სულის ძიება: ცა top, მიწა bottom (switched from before), middle = sum -->
+      <div class="ep-box" style="flex:2;min-width:190px;">
+        <div class="ep-title">სულის ძიება</div>
+        <div class="ep-row">
+          <div style="display:flex;flex-direction:column;gap:6px;align-items:center;">
+            <span style="font-size:9px;color:rgba(180,160,255,0.7);letter-spacing:1px;">ცა</span>
+            <div class="ep-circ" id="ep-soul-top"><span class="ep-label">T3+B3</span></div>
+            <span style="font-size:9px;color:rgba(180,160,255,0.7);letter-spacing:1px;">მიწა</span>
+            <div class="ep-circ" id="ep-soul-bot"><span class="ep-label">R3+L3</span></div>
+          </div>
+          <div class="ep-circ ep-gold ep-big" id="ep-soul-mid"><span class="ep-label">ჯამი</span></div>
+        </div>
+      </div>
+
+      <!-- სოციალიზაცია: მამაკაცი top, ქალი bottom -->
+      <div class="ep-box" style="flex:2;min-width:190px;">
+        <div class="ep-title">სოციალიზაცია</div>
+        <div class="ep-row">
+          <div style="display:flex;flex-direction:column;gap:6px;align-items:center;">
+            <span style="font-size:9px;color:rgba(210,130,255,0.7);letter-spacing:1px;">მამაკაცი</span>
+            <div class="ep-circ" id="ep-soc-top"><span class="ep-label">TL3+BR3</span></div>
+            <span style="font-size:9px;color:rgba(255,140,140,0.7);letter-spacing:1px;">ქალი</span>
+            <div class="ep-circ" id="ep-soc-bot"><span class="ep-label">TR3+BL3</span></div>
+          </div>
+          <div class="ep-circ ep-gold ep-big" id="ep-soc-mid"><span class="ep-label">ჯამი</span></div>
+        </div>
+      </div>
+
+      <!-- სულიერი ცოდნა -->
+      <div class="ep-box" style="flex:1;min-width:120px;align-items:center;justify-content:center;">
+        <div class="ep-title">სულიერი ცოდნა</div>
+        <div style="flex:1;display:flex;align-items:center;justify-content:center;">
+          <div class="ep-circ ep-gold ep-big" id="ep-misia"><span class="ep-label">ჯამი</span></div>
+        </div>
+      </div>
+
+    </div>
+  </div>
+
+  <div class="table-wrapper" id="chakra-panel">
+    <table class="chakra-table">
+      <thead><tr><th>ჩაკრა</th><th>ენერგია</th><th>მატერია (სხეული)</th><th>ემოცია</th></tr></thead>
+      <tbody>
+        <tr class="row-sahasrara"><td>საჰასრარა (გვირგვინი)</td><td id="c-t3">-</td><td id="c-l3">-</td><td id="c-s1">-</td></tr>
+        <tr class="row-ajna"><td>აჯნა (მესამე თვალი)</td><td id="c-t2">-</td><td id="c-l2">-</td><td id="c-s2">-</td></tr>
+        <tr class="row-vishudha"><td>ვიშუდჰა (ყელის ჩაკრა)</td><td id="c-t1">-</td><td id="c-l1">-</td><td id="c-s3">-</td></tr>
+        <tr class="row-anahata"><td>ანაჰატა (გულის ჩაკრა)</td><td id="c-g2">-</td><td id="c-g1">-</td><td id="c-s4">-</td></tr>
+        <tr class="row-manipura"><td>მანიპურა (მზის წნული)</td><td id="c-cv">-</td><td id="c-cv2">-</td><td id="c-s5">-</td></tr>
+        <tr class="row-svadhistana"><td>სვადჰისტანა (საკრალური)</td><td id="c-b1">-</td><td id="c-r1">-</td><td id="c-s6">-</td></tr>
+        <tr class="row-muladhara"><td>მულადჰარა (ფუძის ჩაკრა)</td><td id="c-b3">-</td><td id="c-r3">-</td><td id="c-s7">-</td></tr>
+        <tr class="row-total"><td>სულ</td><td id="c-sum-e">-</td><td id="c-sum-l">-</td><td id="c-sum-s">-</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <div class="side-table-wrapper" id="age-panel">
+    <table class="side-table">
+      <thead><tr><th>ასაკი</th><th>ენერგია</th><th>განმარტება</th></tr></thead>
+      <tbody id="side-table-body">
+        <tr><td colspan="3" style="color:rgba(150,220,255,0.4);padding:18px;text-align:center">შეიყვანეთ თარიღი</td></tr>
+      </tbody>
+    </table>
+  </div>
+</div>
+
+<p class="footer-text">✦ სამყაროს რიცხვები · ენერგიის ნიმუში ✦</p>
+
+<script>
+// ── Numerology core ──────────────────────────────────────────────────────
+function r22(n){while(n>22)n=String(n).split('').reduce((a,d)=>a+parseInt(d),0);return n;}
+
+const GEO={
+  'ა':1,'ბ':2,'გ':3,'დ':4,'ე':5,'ვ':6,'ზ':7,'ჱ':8,'თ':9,
+  'ი':1,'კ':2,'ლ':3,'მ':4,'ნ':5,'ჲ':6,'ო':7,'პ':8,'ჟ':9,
+  'რ':1,'ს':2,'ტ':3,'უ':4,'ფ':5,'ქ':6,'ღ':7,'ყ':8,'შ':9,
+  'ჩ':1,'ც':2,'ძ':3,'წ':4,'ჭ':5,'ხ':6,'ჯ':7,'ჰ':8
+};
+function geoNum(s){if(!s)return 0;return r22([...s].reduce((a,c)=>a+(GEO[c]||0),0));}
+
+// ── Method state ─────────────────────────────────────────────────────────
+let CUR=1;
+function setMethod(m){
+  CUR=m;
+  ['m1','m2','m3','mc'].forEach((id,i)=>{
+    const b=document.getElementById('btn-'+id);
+    if(b)b.classList.toggle('active',i+1===m);
+  });
+  document.getElementById('date-panel').style.display    = m<=3?'flex':'none';
+  document.getElementById('m3-inputs').style.display     = m===3?'block':'none';
+  document.getElementById('compat-inputs').style.display = m===4?'block':'none';
+  // Clear diagram and hide panels when switching tabs
+  document.getElementById('diagram').innerHTML='';
+  document.getElementById('extra-panels').style.display='none';
+  document.getElementById('chakra-panel').style.display='none';
+  document.getElementById('age-panel').style.display='none';
+}
+
+function m3Preview(){
+  const v=[
+    ['გვარი',  geoNum(document.getElementById('m3-gvari').value)],
+    ['სახელი', geoNum(document.getElementById('m3-saxeli').value)],
+    ['მამის',  geoNum(document.getElementById('m3-mamis').value)],
+    ['დედის',  geoNum(document.getElementById('m3-dedis').value)],
+  ];
+  document.getElementById('m3-preview').innerHTML=
+    v.map(([l,n])=>`<span>${l}: <b style="color:white">${n||'-'}</b></span>`).join(' · ');
+}
+
+// ── Calculate (methods 1,2,3) ─────────────────────────────────────────────
+function calculate(){
+  const dd  =parseInt(document.querySelector('[name=dd]').value)||1;
+  const mm  =parseInt(document.querySelector('[name=mm]').value)||1;
+  const yyyy=parseInt(document.querySelector('[name=yyyy]').value)||2000;
+
+  const L3=r22(dd), T3=r22(mm), R3=r22(yyyy);
+  const B3=r22(L3+T3+R3);
+  const Cv=r22(L3+T3+R3+B3);
+
+  // Diagonal 3s — base from date
+  let TL3=r22(L3+T3), TR3=r22(T3+R3), BR3=r22(R3+B3), BL3=r22(B3+L3);
+
+  // Method 3 overrides TL3/TR3/BR3/BL3 with name numerology
+  let m3Cv2=0;
+  if(CUR===3){
+    const gv=geoNum(document.getElementById('m3-gvari').value);
+    const sx=geoNum(document.getElementById('m3-saxeli').value);
+    const ma=geoNum(document.getElementById('m3-mamis').value);
+    const de=geoNum(document.getElementById('m3-dedis').value);
+    if(!gv&&!sx&&!ma&&!de){alert('გთხოვთ შეიყვანოთ სახელი, გვარი ან სხვა მონაცემი');return;}
+    if(gv)TL3=gv; if(sx)TR3=sx; if(ma)BR3=ma; if(de)BL3=de;
+    m3Cv2=r22(TL3+TR3+BR3+BL3);
+  }
+
+  const RC1=r22(TL3+TR3+BR3+BL3), RC2=r22(RC1+Cv);
+  const B1=r22(Cv+B3), B2=r22(B1+B3);
+  const R1=r22(Cv+R3), R2=r22(R1+R3);
+  const L1=r22(Cv+L3), L2=r22(L1+L3);
+  const T1=r22(Cv+T3), T2=r22(T1+T3);
+  const G1=r22(L1+Cv), G2=r22(T1+Cv);
+
+  // Diagonal 1s and 2s
+  // Method 1: uses RC1 (TL1=RC1+TL3 etc)
+  // Method 2: uses Cv/yellow center (TL1=TL3+Cv)
+  // Method 3: uses m3Cv2 (name numerology sum)
+  const dCv = CUR===1 ? RC1 : CUR===2 ? Cv : m3Cv2;
+  const TL1=r22(TL3+dCv), TL2=r22(TL1+TL3);
+  const TR1=r22(TR3+dCv), TR2=r22(TR1+TR3);
+  const BR1=r22(BR3+dCv), BR2=r22(BR1+BR3);
+  const BL1=r22(BL3+dCv), BL2=r22(BL1+BL3);
+
+  const W2=r22(B1+R1), W1=r22(B1+W2), W3=r22(R1+W2);
+
+  draw({L3,T3,R3,B3,Cv,B1,B2,R1,R2,L1,L2,T1,T2,G1,G2,
+        TL3,TR3,BR3,BL3,RC1,RC2,TL1,TL2,TR1,TR2,BR1,BR2,BL1,BL2,
+        W1,W2,W3, showRC:CUR!==2, m3Cv2, compat:false});
+
+  // Side table
+  buildSideTable(L3,T3,R3,B3,TL3,TR3,BR3,BL3);
+
+  // Show panels
+  document.getElementById('extra-panels').style.display='block';
+  document.getElementById('chakra-panel').style.display='block';
+  document.getElementById('age-panel').style.display='block';
+
+  // Extra panel values
+  const sc=(id,v)=>{const e=document.getElementById(id);if(e)e.textContent=v;};
+  sc('ep-tl3',TL3);sc('ep-br3',BR3);sc('ep-male-sum',r22(TL3+BR3));
+  sc('ep-tr3',TR3);sc('ep-bl3',BL3);sc('ep-fem-sum',r22(TR3+BL3));
+  const sT=r22(T3+B3),sB=r22(R3+L3),sM=r22(sT+sB);
+  sc('ep-soul-top',sT);sc('ep-soul-bot',sB);sc('ep-soul-mid',sM);
+  const oT=r22(TL3+BR3),oB=r22(TR3+BL3),oM=r22(oT+oB);
+  sc('ep-soc-top',oT);sc('ep-soc-bot',oB);sc('ep-soc-mid',oM);
+  sc('ep-misia',r22(sM+oM)); // სულიერი ცოდნა
+
+  // Chakra table
+  sc('c-t3',T3);sc('c-l3',L3);sc('c-s1',r22(T3+L3));
+  sc('c-t2',T2);sc('c-l2',L2);sc('c-s2',r22(T2+L2));
+  sc('c-t1',T1);sc('c-l1',L1);sc('c-s3',r22(T1+L1));
+  sc('c-g2',G2);sc('c-g1',G1);sc('c-s4',r22(G2+G1));
+  sc('c-cv',Cv);sc('c-cv2',Cv);sc('c-s5',r22(Cv+Cv));
+  sc('c-b1',B1);sc('c-r1',R1);sc('c-s6',r22(B1+R1));
+  sc('c-b3',B3);sc('c-r3',R3);sc('c-s7',r22(B3+R3));
+  const eV=[T3,T2,T1,G2,Cv,B1,B3],lV=[L3,L2,L1,G1,Cv,R1,R3];
+  const sV=[r22(T3+L3),r22(T2+L2),r22(T1+L1),r22(G2+G1),r22(Cv+Cv),r22(B1+R1),r22(B3+R3)];
+  sc('c-sum-e',r22(eV.reduce((a,b)=>a+b,0)));
+  sc('c-sum-l',r22(lV.reduce((a,b)=>a+b,0)));
+  sc('c-sum-s',r22(sV.reduce((a,b)=>a+b,0)));
+}
+
+// ── Compatibility ─────────────────────────────────────────────────────────
+function calculateCompat(){
+  const g=id=>parseInt(document.getElementById(id).value)||1;
+  const p1={dd:g('c1-dd'),mm:g('c1-mm'),yyyy:g('c1-yyyy')};
+  const p2={dd:g('c2-dd'),mm:g('c2-mm'),yyyy:g('c2-yyyy')};
+  const v1=base(p1), v2=base(p2);
+
+  // Combined cardinal values
+  const L3=r22(v1.L3+v2.L3), T3=r22(v1.T3+v2.T3), R3=r22(v1.R3+v2.R3);
+  const B3=r22(L3+T3+R3);
+  const Cv=r22(L3+T3+R3+B3);
+
+  // Diagonals
+  const TL3=r22(L3+T3),TR3=r22(T3+R3),BR3=r22(R3+B3),BL3=r22(B3+L3);
+  const RC1=r22(TL3+TR3+BR3+BL3),RC2=r22(RC1+Cv);
+  const B1=r22(Cv+B3),B2=r22(B1+B3);
+  const R1=r22(Cv+R3),R2=r22(R1+R3);
+  const L1=r22(Cv+L3),L2=r22(L1+L3);
+  const T1=r22(Cv+T3),T2=r22(T1+T3);
+  const G1=r22(L1+Cv),G2=r22(T1+Cv);
+  const W2=r22(B1+R1),W1=r22(B1+W2),W3=r22(R1+W2);
+
+  // No diagonal circles (TL1 etc) in compat mode
+  draw({L3,T3,R3,B3,Cv,B1,B2,R1,R2,L1,L2,T1,T2,G1,G2,
+        TL3,TR3,BR3,BL3,RC1,RC2,
+        TL1:0,TL2:0,TR1:0,TR2:0,BR1:0,BR2:0,BL1:0,BL2:0,
+        W1,W2,W3, showRC:false, m3Cv2:0, compat:true});
+
+  document.getElementById('extra-panels').style.display='none';
+  document.getElementById('chakra-panel').style.display='none';
+  document.getElementById('age-panel').style.display='none';
+}
+
+function base(p){
+  const L3=r22(p.dd),T3=r22(p.mm),R3=r22(p.yyyy),B3=r22(L3+T3+R3);
+  return {L3,T3,R3,B3};
+}
+
+// ── Side table ────────────────────────────────────────────────────────────
+function buildSideTable(L3,T3,R3,B3,TL3,TR3,BR3,BL3){
+  const anchors=[{a:'0',v:L3},{a:'10',v:TL3},{a:'20',v:T3},{a:'30',v:TR3},{a:'40',v:R3},{a:'50',v:BR3},{a:'60',v:B3},{a:'70',v:BL3}];
+  const secs=[[L3,TL3],[TL3,T3],[T3,TR3],[TR3,R3],[R3,BR3],[BR3,B3],[B3,BL3],[BL3,L3]];
+  const starts=[1,11,21,31,41,51,61,71];
+  function ages(s){const f=n=>n===Math.floor(n)?''+n:(''+n).replace('.',',');return[`${f(s)}-${f(s+1.5)}`,`${f(s+1.5)}-${f(s+2.5)}`,`${f(s+2.5)}-${f(s+3)}`,`${f(s+4)}`,`${f(s+5)}-${f(s+6.5)}`,`${f(s+6.5)}-${f(s+7.5)}`,`${f(s+7.5)}-${f(s+8)}`];}
+  function en(A,B){const d4=r22(A+B),d2=r22(A+d4),d1=r22(A+d2),d3=r22(d2+d4),d6=r22(d4+B),d5=r22(d4+d6),d7=r22(d6+B);return[d1,d2,d3,d4,d5,d6,d7];}
+  const tb=document.getElementById('side-table-body');tb.innerHTML='';
+  for(let i=0;i<8;i++){
+    const ar=document.createElement('tr');ar.className='anchor-row';
+    ar.innerHTML=`<td>${anchors[i].a}</td><td>${anchors[i].v}</td><td></td>`;tb.appendChild(ar);
+    const ag=ages(starts[i]),ev=en(secs[i][0],secs[i][1]);
+    for(let d=0;d<7;d++){
+      const tr=document.createElement('tr');if(d===3)tr.className='mid-row';
+      tr.innerHTML=`<td>${ag[d]}</td><td>${ev[d]}</td><td></td>`;tb.appendChild(tr);
+    }
+  }
+}
+
+// ── Draw ──────────────────────────────────────────────────────────────────
+function draw(v){
+  const svg=document.getElementById('diagram');
+  svg.innerHTML='';
+  const cx=600,cy=600;
+  const rc_r=60,r1_r=25,r2_r=40,r3_r=64,gap=180;
+  const d1=rc_r+gap+r1_r, d2=d1+r1_r+r2_r, d3=d2+r2_r+r3_r;
+  const sq=Math.sqrt(2)/2;
+  const dd1=Math.round(d1*sq), dd2=Math.round((d1+r1_r+r2_r)*sq), dd3=Math.round((d1+r1_r+r2_r+r2_r+r3_r)*sq);
+  const outerR=d3+r3_r;
+
+  function el(tag,attrs,txt){
+    const e=document.createElementNS('http://www.w3.org/2000/svg',tag);
+    for(const[k,vl]of Object.entries(attrs))e.setAttribute(k,vl);
+    if(txt!==undefined)e.textContent=txt;
+    svg.appendChild(e);return e;
+  }
+  function circ(x,y,r,fill,stroke,sw,lbl,darkFont){
+    el('circle',{cx:x,cy:y,r,fill,stroke,'stroke-width':sw||1});
+    if(lbl!==undefined&&lbl!==0&&lbl!==''){
+      const fs=Math.max(20,Math.round(r*1.3));
+      el('text',{x,y,'font-size':fs,'font-weight':700,fill:darkFont?'#1a0a00':'white',
+        'font-family':'Cinzel,serif','text-anchor':'middle','dominant-baseline':'central'},lbl);
+    }
+  }
+  function icon(x,y,type){
+    const e=document.createElementNS('http://www.w3.org/2000/svg','text');
+    e.setAttribute('x',x);e.setAttribute('y',y);e.setAttribute('font-size','16');
+    e.setAttribute('text-anchor','middle');e.setAttribute('dominant-baseline','central');
+    e.textContent=type==='heart'?'♥':'₾';
+    e.setAttribute('fill',type==='heart'?'#ff6b8a':'#7ec850');
+    e.setAttribute('transform',`rotate(-45,${x},${y})`);svg.appendChild(e);
+  }
+
+  const dkFill='rgba(20,14,50,0.92)', dkStr='rgba(180,160,255,0.75)';
+  const isCompat=v.compat===true, isM3=!!v.m3Cv2, isM2=CUR===2;
+
+  // ── Geometry FIRST (behind circles) ─────────────────────────────────
+  // ── Purple rhombus — tips at 2*dd1, sides pass through TL1/TR1/BL1/BR1
+  el('polygon',{points:`${cx},${cy-2*dd1} ${cx+2*dd1},${cy} ${cx},${cy+2*dd1} ${cx-2*dd1},${cy}`,
+    fill:'none',stroke:'rgba(127,119,221,0.9)','stroke-width':'1.5'});
+
+  // ── Square — sides pass through L1/T1/R1/B1 centers (at distance d1 from center)
+  // Square with side midpoints at L1/T1/R1/B1: corners at (cx±d1, cy±d1)
+  el('rect',{x:cx-d1,y:cy-d1,width:d1*2,height:d1*2,
+    fill:'none',stroke:'rgba(220,200,255,0.9)','stroke-width':'1.5'});
+
+  // ── Axis cross lines (horizontal + vertical) — skip circles they pass through
+  const lc='rgba(220,200,255,0.75)', xExt=d3+r3_r;
+  function skipLine(x1,y1,x2,y2,gaps,col){
+    // gaps: [{lo,hi}] sorted ascending — segments between gaps
+    let cur=x1===x2?(y1<y2?y1:y2):(x1<x2?x1:x2);
+    const end=x1===x2?(y1<y2?y2:y1):(x1<x2?x2:x1);
+    const isV=x1===x2;
+    for(const g of gaps){
+      if(cur<g.lo) el('line',{x1:isV?x1:cur,y1:isV?cur:y1,x2:isV?x1:g.lo,y2:isV?g.lo:y1,stroke:col,'stroke-width':'0.8'});
+      cur=Math.max(cur,g.hi);
+    }
+    if(cur<end) el('line',{x1:isV?x1:cur,y1:isV?cur:y1,x2:isV?x1:end,y2:isV?end:y1,stroke:col,'stroke-width':'0.8'});
+  }
+  // Horizontal — skips L3,L2,L1,Center,R1,R2,R3
+  const hGaps=[cx-d3-r3_r,cx-d2-r2_r,cx-d1-r1_r,cx-rc_r,cx+rc_r,cx+d1+r1_r,cx+d2+r2_r,cx+d3+r3_r]
+    .reduce((a,v,i,ar)=>i%2===0?[...a,{lo:ar[i],hi:ar[i+1]}]:a,[]);
+  skipLine(cx-xExt,cy,cx+xExt,cy,hGaps,lc);
+  // Vertical — skips T3,T2,T1,Center,B1,B2,B3
+  const vGaps=[cy-d3-r3_r,cy-d2-r2_r,cy-d1-r1_r,cy-rc_r,cy+rc_r,cy+d1+r1_r,cy+d2+r2_r,cy+d3+r3_r]
+    .reduce((a,v,i,ar)=>i%2===0?[...a,{lo:ar[i],hi:ar[i+1]}]:a,[]);
+  skipLine(cx,cy-xExt,cx,cy+xExt,vGaps,lc);
+
+  // ── B1→R1 connecting line (always visible in all tabs)
+  el('line',{x1:cx,y1:cy+d1,x2:cx+d1,y2:cy,stroke:lc,'stroke-width':'0.8'});
+
+  // ── L1↔R1 horizontal segment (through center, between the circles)
+  el('line',{x1:cx-d1+r1_r,y1:cy,x2:cx+d1-r1_r,y2:cy,stroke:lc,'stroke-width':'0.8'});
+
+  // ── T1↔B1 vertical segment (through center, between the circles)
+  el('line',{x1:cx,y1:cy-d1+r1_r,x2:cx,y2:cy+d1-r1_r,stroke:lc,'stroke-width':'0.8'});
+
+  // ── Red/purple diagonal lines
+  // Methods 1,2,3: reach TL1/BR1 and TR1/BL1 (dd1)
+  // Method 4 (compat): reach TL3/BR3 and TR3/BL3 (dd3)
+  const dEnd = isCompat ? dd3 : dd1;
+  // Red: TR1→BL1 direction (or TR3→BL3 in compat)
+  el('line',{x1:cx+dEnd,y1:cy-dEnd,x2:cx-dEnd,y2:cy+dEnd,stroke:'rgba(255,120,120,1.0)','stroke-width':'1.5'});
+  // Purple: TL1→BR1 direction (or TL3→BR3 in compat)
+  el('line',{x1:cx-dEnd,y1:cy-dEnd,x2:cx+dEnd,y2:cy+dEnd,stroke:'rgba(210,110,255,1.0)','stroke-width':'1.5'});
+  el('text',{x:670,y:493,'font-size':13,'font-weight':600,fill:'rgba(255,130,130,0.95)','font-family':'Noto Sans Georgian,sans-serif','text-anchor':'middle',transform:'rotate(-45,670,493)'},'ქალის ხაზი');
+  el('text',{x:529,y:493,'font-size':13,'font-weight':600,fill:'rgba(200,130,255,0.95)','font-family':'Noto Sans Georgian,sans-serif','text-anchor':'middle',transform:'rotate(45,529,493)'},'მამაკაცის ხაზი');
+
+  // Outer circle
+  el('circle',{cx,cy,r:outerR,fill:'none',stroke:'rgba(180,160,255,0.95)','stroke-width':'2.5'});
+
+  // ── CENTER ────────────────────────────────────────────────────────────
+  if(isM3){
+    // Method 3: two small circles touching at (cx,cy)
+    const m3r=Math.round(rc_r*0.7); // smaller circles
+    circ(cx,cy-m3r,m3r,'#FFD700','#BA7517',1.5,v.Cv,true);
+    circ(cx,cy+m3r,m3r,'#4488CC','#2255AA',1.5,v.m3Cv2,false);
+  } else if(isCompat){
+    circ(cx,cy,rc_r,dkFill,dkStr,1.5,v.Cv,false);
+  } else {
+    circ(cx,cy,rc_r,'#FFD700','#BA7517',1.5,v.Cv,true);
+  }
+
+  // ── GREEN circles (methods 1,2,3 only) ───────────────────────────────
+  if(!isCompat){
+    circ(cx-rc_r-gap/2,cy,r1_r,'#639922','#3B6D11',1,v.G1,false);
+    circ(cx,cy-rc_r-gap/2,r1_r,'#639922','#3B6D11',1,v.G2,false);
+  }
+
+  // ── Cardinal circles ──────────────────────────────────────────────────
+  const C1f='#4a8cc8',C1s='#1a5090',C2f='#2060a8',C2s='#0a3878';
+  function cf(normal){return isCompat?dkFill:normal;}
+  function cs(normal){return isCompat?dkStr:normal;}
+  function cw(){return isCompat?1.5:1;}
+  circ(cx,cy-d1,r1_r,cf(C1f),cs(C1s),cw(),v.T1,false);
+  circ(cx,cy-d2,r2_r,cf(C2f),cs(C2s),cw(),v.T2,false);
+  circ(cx,cy-d3,r3_r,cf('#7F77DD'),cs('#534AB7'),cw(),v.T3,false);
+  circ(cx,cy+d1,r1_r,cf('#EF9F27'),cs('#BA7517'),cw(),v.B1,false);
+  circ(cx,cy+d2,r2_r,dkFill,dkStr,1.5,v.B2,false);
+  circ(cx,cy+d3,r3_r,cf('#E24B4A'),cs('#A32D2D'),cw(),v.B3,false);
+  circ(cx-d1,cy,r1_r,cf(C1f),cs(C1s),cw(),v.L1,false);
+  circ(cx-d2,cy,r2_r,cf(C2f),cs(C2s),cw(),v.L2,false);
+  circ(cx-d3,cy,r3_r,cf('#7F77DD'),cs('#534AB7'),cw(),v.L3,false);
+  circ(cx+d1,cy,r1_r,cf('#EF9F27'),cs('#BA7517'),cw(),v.R1,false);
+  circ(cx+d2,cy,r2_r,dkFill,dkStr,1.5,v.R2,false);
+  circ(cx+d3,cy,r3_r,cf('#E24B4A'),cs('#A32D2D'),cw(),v.R3,false);
+
+  // ── RC circles (method 1 only; not compat, not M2, not M3) ──────────
+  if(!isCompat&&!isM3&&v.showRC!==false){
+    circ(cx+rc_r+r2_r,cy,r2_r,dkFill,dkStr,1.5,v.RC1,false);
+    circ(cx+rc_r+r2_r*2+r1_r,cy,r1_r,dkFill,dkStr,1.5,v.RC2,false);
+  }
+
+  // ── Diagonal circles ──────────────────────────────────────────────────
+  const dc=(x,y,r,lbl)=>circ(x,y,r,dkFill,dkStr,1.5,lbl,false);
+  if(!isCompat){
+    dc(cx-dd1,cy-dd1,r1_r,v.TL1);dc(cx-dd2,cy-dd2,r2_r,v.TL2);dc(cx-dd3,cy-dd3,r3_r,v.TL3);
+    dc(cx+dd1,cy-dd1,r1_r,v.TR1);dc(cx+dd2,cy-dd2,r2_r,v.TR2);dc(cx+dd3,cy-dd3,r3_r,v.TR3);
+    dc(cx-dd1,cy+dd1,r1_r,v.BL1);dc(cx-dd2,cy+dd2,r2_r,v.BL2);dc(cx-dd3,cy+dd3,r3_r,v.BL3);
+    dc(cx+dd1,cy+dd1,r1_r,v.BR1);dc(cx+dd2,cy+dd2,r2_r,v.BR2);dc(cx+dd3,cy+dd3,r3_r,v.BR3);
+  } else {
+    // Compat: only the 4 outer diagonal circles (TL3/TR3/BL3/BR3)
+    dc(cx-dd3,cy-dd3,r3_r,v.TL3);dc(cx+dd3,cy-dd3,r3_r,v.TR3);
+    dc(cx-dd3,cy+dd3,r3_r,v.BL3);dc(cx+dd3,cy+dd3,r3_r,v.BR3);
+  }
+
+  // ── W circles ─────────────────────────────────────────────────────────
+  const Bx=cx,By=cy+d1,Rx=cx+d1,Ry=cy;
+  const W1x=Math.round(Bx+0.25*(Rx-Bx)),W1y=Math.round(By+0.25*(Ry-By));
+  const W2x=Math.round(Bx+0.5*(Rx-Bx)), W2y=Math.round(By+0.5*(Ry-By));
+  const W3x=Math.round(Bx+0.75*(Rx-Bx)),W3y=Math.round(By+0.75*(Ry-By));
+  dc(W1x,W1y,r1_r,v.W1);dc(W2x,W2y,r1_r,v.W2);dc(W3x,W3y,r1_r,v.W3);
+  icon(W1x,W1y-r1_r-16,'heart');icon(W3x,W3y-r1_r-16,'gel');
+
+  // ── Outer ring dots + labels ──────────────────────────────────────────
+  const aAngles=[180,225,270,315,0,45,90,135];
+  const sEnAnch=[[v.L3,v.TL3],[v.TL3,v.T3],[v.T3,v.TR3],[v.TR3,v.R3],[v.R3,v.BR3],[v.BR3,v.B3],[v.B3,v.BL3],[v.BL3,v.L3]];
+  const sStarts=[1,11,21,31,41,51,61,71];
+  function sEn(A,B){const d4=r22(A+B),d2=r22(A+d4),d1b=r22(A+d2),d3b=r22(d2+d4),d6=r22(d4+B),d5=r22(d4+d6),d7=r22(d6+B);return[d1b,d2,d3b,d4,d5,d6,d7];}
+  function sAg(s){const f=n=>n===Math.floor(n)?String(n):String(n.toFixed(1)).replace('.',',');return[`${f(s)}-${f(s+1.5)}`,`${f(s+1.5)}-${f(s+2.5)}`,`${f(s+2.5)}-${f(s+3)}`,`${f(s+4)}`,`${f(s+5)}-${f(s+6.5)}`,`${f(s+6.5)}-${f(s+7.5)}`,`${f(s+7.5)}-${f(s+8)}`];}
+
+  for(let sec=0;sec<8;sec++){
+    const sa=aAngles[sec],ea=aAngles[(sec+1)%8];
+    let diff=ea-sa;if(diff<=0)diff+=360;
+    const ages=sAg(sStarts[sec]),ens=sEn(sEnAnch[sec][0],sEnAnch[sec][1]);
+    for(let d=0;d<7;d++){
+      const t=(d+1)/8,ang=sa+diff*t,rad=ang*Math.PI/180;
+      const px=Math.round(cx+outerR*Math.cos(rad)),py=Math.round(cy+outerR*Math.sin(rad));
+      const isMid=d===3;
+      el('circle',{cx:px,cy:py,r:isMid?5:3,fill:isMid?'#FFD700':'rgba(200,180,255,0.9)',stroke:'none'});
+      // Age label inside (all methods)
+      const tA=0.20+(d/6)*0.60,aAng=sa+diff*tA,aR=aAng*Math.PI/180;
+      const ins=outerR-18,ax=Math.round(cx+ins*Math.cos(aR)),ay=Math.round(cy+ins*Math.sin(aR));
+      el('text',{x:ax,y:ay,'font-size':isMid?8:7,'font-weight':isMid?700:400,
+        fill:isMid?'#FFD700':'rgba(200,180,255,0.85)',
+        'text-anchor':'middle','dominant-baseline':'central','font-family':'sans-serif'},ages[d]);
+      // Energy numbers outside — only in methods 1,2,3 (not compat)
+      if(!isCompat){
+        const out=outerR+38,ex=Math.round(cx+out*Math.cos(rad)),ey=Math.round(cy+out*Math.sin(rad));
+        el('text',{x:ex,y:ey,'font-size':isMid?17:15,'font-weight':isMid?700:600,
+          fill:isMid?'#FFD700':'rgba(167,139,250,0.95)',
+          'text-anchor':'middle','dominant-baseline':'central','font-family':'Cinzel,serif'},ens[d]);
+      }
+    }
+  }
+}
+</script>
+</body>
+</html>
