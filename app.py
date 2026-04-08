@@ -108,68 +108,114 @@ def calculate_aspects(planets):
 # ── LUNAR DAY CALCULATION ─────────────────────────────────────
 def calc_lunar_day(jd):
     """
-    Calculate lunar day using swisseph.
-    Finds the previous New Moon by searching backwards,
-    then computes how many lunar days have passed.
-    Returns: lunar_day (1-30), pct_elapsed (0-99%), 
-             phase_name, next_new_moon_hours
+    Accurate lunar day calculation using swisseph.
+
+    Method: find the exact moment of the PREVIOUS New Moon by
+    iterating backwards in time until Moon-Sun elongation crosses 0.
+    Then count real days elapsed since that moment.
+
+    This correctly accounts for the synodic month (29.53 days)
+    which already includes Earth's motion around the Sun.
     """
     swe.set_ephe_path(EPHE_PATH)
 
-    # Get current Sun and Moon positions
-    sun_pos, _  = swe.calc_ut(jd, swe.SUN)
+    def get_elongation(jd_t):
+        sun,  _ = swe.calc_ut(jd_t, swe.SUN)
+        moon, _ = swe.calc_ut(jd_t, swe.MOON)
+        return (moon[0] - sun[0] + 360) % 360
+
+    # Current elongation
+    elong_now = get_elongation(jd)
+
+    # Step back in time to find exact previous new moon.
+    # New moon = elongation crossing 0 (or 360→0 wrap).
+    # We know lunar month ~29.53 days, so step back by elongation/360 * 29.53
+    synodic = 29.53058868
+    approx_days_back = (elong_now / 360.0) * synodic
+
+    # Start search from approximate position
+    jd_search = jd - approx_days_back - 1.0  # extra day margin
+
+    # Binary search: find exact JD when elongation = 0 (new moon)
+    # First find a bracket where elongation is near 0
+    # Step forward in 0.5-day increments until elongation rises from near 0
+    step = 0.5
+    jd_test = jd_search
+    prev_e = get_elongation(jd_test)
+
+    # Find last new moon: elongation goes from near 360 → wraps to near 0
+    jd_nm = jd_search
+    for _ in range(80):  # max 40 days search
+        jd_test += step
+        curr_e = get_elongation(jd_test)
+        # New moon detected when elongation wraps (drops by > 180)
+        if prev_e > 180 and curr_e < 180:
+            jd_nm = jd_test - step  # just before wrap
+            break
+        prev_e = curr_e
+
+    # Binary search to pinpoint exact new moon moment (within 0.001 day = ~1.5 min)
+    lo, hi = jd_nm, jd_nm + step
+    for _ in range(40):
+        mid = (lo + hi) / 2.0
+        e_lo  = get_elongation(lo)
+        e_mid = get_elongation(mid)
+        if e_lo > 180:
+            # Wrap zone: elongation near 360 on left, near 0 on right
+            if e_mid > 180:
+                lo = mid
+            else:
+                hi = mid
+        else:
+            if e_mid < e_lo:
+                lo = mid
+            else:
+                hi = mid
+        if (hi - lo) < 0.0007:  # ~1 minute precision
+            break
+
+    jd_new_moon = (lo + hi) / 2.0
+
+    # Verify: new moon must be before now
+    if jd_new_moon > jd:
+        jd_new_moon -= synodic
+
+    # Days elapsed since new moon
+    days_elapsed = jd - jd_new_moon  # real days, accounts for synodic cycle
+
+    lunar_day   = int(days_elapsed) + 1   # 1-based lunar day
+    pct_elapsed = round((days_elapsed % 1) * 100)  # % through current day
+    pct_remaining = 100 - pct_elapsed
+
+    # Hours until next lunar day
+    frac_remaining  = 1.0 - (days_elapsed % 1)
+    hours_to_next   = frac_remaining * 24.0
+
+    # Phase based on elongation
+    e = elong_now
+    if e < 45:   phase = 'ახალი მთვარე'
+    elif e < 90:  phase = 'მომიბყრობა (Crescent)'
+    elif e < 135: phase = 'პირველი მეოთხედი'
+    elif e < 180: phase = 'ამოზრდა (Gibbous)'
+    elif e < 225: phase = 'სავსე მთვარე'
+    elif e < 270: phase = 'კლება (Disseminating)'
+    elif e < 315: phase = 'ბოლო მეოთხედი'
+    else:         phase = 'კლება (Balsamic)'
+
+    sun_pos,  _ = swe.calc_ut(jd, swe.SUN)
     moon_pos, _ = swe.calc_ut(jd, swe.MOON)
 
-    sun_deg  = sun_pos[0]
-    moon_deg = moon_pos[0]
-
-    # Elongation = angular distance Moon - Sun (0=New, 180=Full)
-    elongation = (moon_deg - sun_deg + 360) % 360
-
-    # Each lunar day = 360 / 29.53058868 degrees of elongation
-    synodic_month = 29.53058868
-    deg_per_day   = 360.0 / synodic_month
-
-    # Age in days
-    age_days = elongation / deg_per_day  # 0..29.53
-
-    lunar_day = int(age_days) + 1  # 1..30
-    pct_elapsed = round((age_days % 1) * 100)  # % through current lunar day
-
-    # Time remaining till next lunar day (in hours)
-    frac_remaining = 1.0 - (age_days % 1)
-    # Moon moves ~12.19 deg/day = 0.508 deg/hour
-    moon_speed_deg_per_hour = 360.0 / (synodic_month * 24)
-    hours_to_next = (frac_remaining * deg_per_day) / moon_speed_deg_per_hour
-
-    # Phase name
-    if elongation < 45:
-        phase = 'მომატება (New)'
-    elif elongation < 90:
-        phase = 'მომატება (Crescent)'
-    elif elongation < 135:
-        phase = 'მომატება (First Quarter)'
-    elif elongation < 180:
-        phase = 'მომატება (Gibbous)'
-    elif elongation < 225:
-        phase = 'კლება (Full)'
-    elif elongation < 270:
-        phase = 'კლება (Disseminating)'
-    elif elongation < 315:
-        phase = 'კლება (Last Quarter)'
-    else:
-        phase = 'კლება (Balsamic)'
-
     return {
-        'lunar_day': lunar_day,
-        'pct_elapsed': pct_elapsed,
-        'pct_remaining': 100 - pct_elapsed,
-        'hours_to_next': round(hours_to_next, 1),
-        'elongation': round(elongation, 2),
-        'age_days': round(age_days, 3),
-        'phase': phase,
-        'moon_deg': round(moon_deg, 4),
-        'sun_deg': round(sun_deg, 4),
+        'lunar_day':    lunar_day,
+        'pct_elapsed':  pct_elapsed,
+        'pct_remaining': pct_remaining,
+        'hours_to_next': round(hours_to_next, 2),
+        'elongation':   round(e, 2),
+        'days_elapsed': round(days_elapsed, 3),
+        'new_moon_jd':  round(jd_new_moon, 4),
+        'phase':        phase,
+        'moon_deg':     round(moon_pos[0], 4),
+        'sun_deg':      round(sun_pos[0], 4),
     }
 
 # ── MOON PATH for a full day ──────────────────────────────────
