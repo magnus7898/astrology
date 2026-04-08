@@ -51,33 +51,19 @@ tf = TimezoneFinder()
 
 @app.route('/')
 def index():
-    return render_template('astro.html')  # ✅ renamed
+    return jsonify({'status': 'ok', 'message': 'Matrix Destiny API'})
 
-@app.route('/astro')
-def astro():
-    return render_template('astro.html')
- @app.route('/')
-def home():
-    return render_template('index.html')
+@app.route('/geocode', methods=['POST'])
+def geocode():
+    # ... your existing geocode code
 
-@app.route('/frequency')
-def frequency():
-    return render_template('frequency.html')
-
-@app.route('/matrix')
-def matrix():
-    return render_template('matrix.html')
-
-@app.route('/name')
-def name():
-    return render_template('name.html')
-
-@app.route('/pythagoras')
-def pythagoras():
-    return render_template('pythagoras.html')
+@app.route('/chart', methods=['POST'])
+def chart():
+    # ... your existing chart code
 
 @app.route('/test')
 def test():
+    # ... your existing test code
     swe.set_ephe_path(EPHE_PATH)
     jd = swe.julday(1990, 1, 1, 12.0)
 
