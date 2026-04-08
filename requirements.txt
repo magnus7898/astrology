@@ -1,7 +1,6 @@
 flask
 flask-cors
 gunicorn
-swisseph
 geopy
 timezonefinder
 pytz
