@@ -62,13 +62,17 @@ tf = TimezoneFinder()
 
 # Aspect definitions
 ASPECTS_DEF = [
-    {'name': 'კონიუნქცია', 'angle': 0,   'orb': 8,  'sym': '☌', 'color': '#f9c646'},
-    {'name': 'სექსტილი',   'angle': 60,  'orb': 6,  'sym': '⚹', 'color': '#30c890'},
-    {'name': 'კვადრატი',   'angle': 90,  'orb': 8,  'sym': '□', 'color': '#e84040'},
-    {'name': 'ტრინი',      'angle': 120, 'orb': 8,  'sym': '△', 'color': '#a078f0'},
-    {'name': 'ოპოზიცია',   'angle': 180, 'orb': 8,  'sym': '☍', 'color': '#e89040'},
-    {'name': 'კვინკუნქსი', 'angle': 150, 'orb': 3,  'sym': '⚻', 'color': '#9ba8b8'},
-    {'name': 'სემისექსტ.', 'angle': 30,  'orb': 2,  'sym': '⚺', 'color': '#9ba8b8'},
+    {'name': 'კონიუნქცია',      'angle': 0,   'orb': 8,  'sym': '☌', 'color': '#f9c646'},
+    {'name': 'სექსტილი',        'angle': 60,  'orb': 6,  'sym': '⚹', 'color': '#30c890'},
+    {'name': 'კვადრატი',        'angle': 90,  'orb': 8,  'sym': '□', 'color': '#e84040'},
+    {'name': 'ტრინი',           'angle': 120, 'orb': 8,  'sym': '△', 'color': '#a078f0'},
+    {'name': 'ოპოზიცია',        'angle': 180, 'orb': 8,  'sym': '☍', 'color': '#e89040'},
+    {'name': 'კვინკუნქსი',      'angle': 150, 'orb': 3,  'sym': '⚻', 'color': '#9ba8b8'},
+    {'name': 'ნახევარ-სექსტილი','angle': 30,  'orb': 2,  'sym': '⚺', 'color': '#7080a0'},
+    {'name': 'ნახევარ-კვადრატი','angle': 45,  'orb': 2,  'sym': '∠', 'color': '#c06060'},
+    {'name': 'სესკვიკვადრატი',  'angle': 135, 'orb': 2,  'sym': '⚼', 'color': '#c08040'},
+    {'name': 'ბიკვინტილი',      'angle': 144, 'orb': 2,  'sym': 'bQ', 'color': '#60a0c0'},
+    {'name': 'კვინტილი',        'angle': 72,  'orb': 2,  'sym': 'Q',  'color': '#50b0d0'},
 ]
 
 MAIN_PLANETS_FOR_ASPECTS = [
