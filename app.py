@@ -299,6 +299,19 @@ def chart():
         }
     except: pass
 
+
+    # ── JUNO (asteroid 3) ────────────────────────────────────
+    try:
+        pos, _ = swe.calc_ut(jd, swe.AST_OFFSET + 3)
+        deg = pos[0]
+        d, c = deg_to_display(deg)
+        planets['იუნო'] = {
+            'degree': round(deg, 4), 'sign': get_zodiac(deg),
+            'sign_degree': d, 'centesimal': c,
+            'retrograde': bool(pos[3] < 0) if len(pos) > 3 else False
+        }
+    except: pass
+
     # ── ASSIGN HOUSES ────────────────────────────────────────
     for name in planets:
         planets[name]['house'] = get_house(planets[name]['degree'], cusps)
