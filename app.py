@@ -62,7 +62,7 @@ tf = TimezoneFinder()
 
 # Aspect definitions
 ASPECTS_DEF = [
-    {'name': 'კონიუნქცია',      'angle': 0,   'orb': 8,  'sym': '☌', 'color': '#f9c646'},
+    {'name': 'შეერთება',      'angle': 0,   'orb': 8,  'sym': '☌', 'color': '#f9c646'},
     {'name': 'სექსტილი',        'angle': 60,  'orb': 6,  'sym': '⚹', 'color': '#30c890'},
     {'name': 'კვადრატი',        'angle': 90,  'orb': 8,  'sym': '□', 'color': '#e84040'},
     {'name': 'ტრინი',           'angle': 120, 'orb': 8,  'sym': '△', 'color': '#a078f0'},
