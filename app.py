@@ -106,100 +106,52 @@ def calculate_aspects(planets):
     return aspects
 
 # ── LUNAR DAY CALCULATION ─────────────────────────────────────
-# Uses Meeus "Astronomical Algorithms" Ch.49 — same method as
-# most lunar calendar apps (Russian/Georgian astrology tradition)
+# Pure elongation system: 360°/30 = 12° per lunar day
+# New moon  (  0°) = day  1, 0%
+# Quarter   ( 90°) = day  8, 50%
+# Full moon (180°) = day 16, 0%
+# Quarter   (270°) = day 23, 50%
 
 def calc_lunar_day(jd_ut, tz_offset_hours=0.0):
-    """
-    Accurate lunar day using Meeus lunation formula.
-    Counts calendar days from previous New Moon in local time.
-    """
-    import math
-
-    # Approximate lunation number k (new moons since Jan 2000)
-    T = (jd_ut - 2451545.0) / 36525.0
-    year_decimal = 2000.0 + T * 100.0
-    k_approx = (year_decimal - 2000.0) * 12.3685
-    k_base = int(k_approx)
-
-    def new_moon_jd(k):
-        Tk = k / 1236.85
-        JDE = (2451550.09766 + 29.530588861 * k
-               + 0.00015437 * Tk * Tk
-               - 0.000000150 * Tk * Tk * Tk
-               + 0.00000000073 * Tk * Tk * Tk * Tk)
-        M  = math.radians(2.5534   + 29.10535670  * k - 0.0000014 * Tk * Tk)
-        Mp = math.radians(201.5643 + 385.81693528 * k + 0.0107582 * Tk * Tk)
-        F  = math.radians(160.7108 + 390.67050284 * k - 0.0016118 * Tk * Tk)
-        Om = math.radians(124.7746 -   1.56375588 * k + 0.0020672 * Tk * Tk)
-        corr = (-0.40720 * math.sin(Mp)
-                + 0.17241 * math.sin(M)
-                + 0.01608 * math.sin(2*Mp)
-                + 0.01039 * math.sin(2*F)
-                + 0.00739 * math.sin(Mp - M)
-                - 0.00514 * math.sin(Mp + M)
-                + 0.00208 * math.sin(2*M)
-                - 0.00111 * math.sin(Mp - 2*F)
-                - 0.00057 * math.sin(Mp + 2*F)
-                + 0.00056 * math.sin(2*Mp + M)
-                - 0.00042 * math.sin(3*Mp)
-                + 0.00042 * math.sin(M + 2*F)
-                + 0.00038 * math.sin(M - 2*F)
-                - 0.00024 * math.sin(2*Mp - M)
-                - 0.00017 * math.sin(Om)
-                - 0.00007 * math.sin(Mp + 2*M))
-        return JDE + corr
-
-    # Find the previous new moon
-    jd_nm = new_moon_jd(k_base)
-    if jd_nm > jd_ut:
-        jd_nm = new_moon_jd(k_base - 1)
-    # Make sure we have the LAST new moon before jd_ut
-    while True:
-        jd_nm_next = jd_nm + 29.53058868
-        if jd_nm_next <= jd_ut:
-            jd_nm = jd_nm_next
-        else:
-            break
-
-    # Calendar-day counting in LOCAL timezone
-    jd_nm_local    = jd_nm   + tz_offset_hours / 24.0
-    jd_birth_local = jd_ut   + tz_offset_hours / 24.0
-
-    # Local midnight = floor(jd_local - 0.5) + 0.5
-    nm_midnight    = math.floor(jd_nm_local    - 0.5) + 0.5
-    birth_midnight = math.floor(jd_birth_local - 0.5) + 0.5
-
-    calendar_days = round(birth_midnight - nm_midnight)
-    lunar_day     = calendar_days + 1
-
-    hours_into_day = (jd_birth_local - birth_midnight) * 24.0
-    pct_elapsed    = round(hours_into_day / 24.0 * 100, 2)
-    hours_to_next  = round(24.0 - hours_into_day, 2)
-
-    # Elongation for phase name
     swe.set_ephe_path(EPHE_PATH)
+
     sun,  _ = swe.calc_ut(jd_ut, swe.SUN)
     moon, _ = swe.calc_ut(jd_ut, swe.MOON)
-    elong   = (moon[0] - sun[0] + 360) % 360
 
-    if elong < 45:    phase = 'ახალი მთვარე'
+    # True elongation: angular distance Moon - Sun (0=New, 180=Full, 360=back to New)
+    elong = (moon[0] - sun[0] + 360) % 360
+
+    # Each lunar day = exactly 12° of elongation (360°/30 days)
+    deg_per_day = 12.0
+
+    age      = elong / deg_per_day          # 0..30
+    lunar_day = int(age) + 1                # 1..30
+    pct_elapsed   = round((age % 1) * 100, 2)
+    pct_remaining = round(100 - pct_elapsed, 2)
+
+    # Hours to next lunar day — Moon moves ~0.5°/hour relative to Sun
+    # Relative speed Moon-Sun ≈ (360°/29.53days)/24h = 0.5085°/h
+    rel_speed_deg_per_hour = 360.0 / (29.53058868 * 24.0)
+    deg_to_next    = deg_per_day - (elong % deg_per_day)
+    hours_to_next  = round(deg_to_next / rel_speed_deg_per_hour, 2)
+
+    # Phase name
+    if elong < 30:    phase = 'ახალი მთვარე'
     elif elong < 90:  phase = 'მზარდი'
-    elif elong < 135: phase = 'I მეოთხედი'
+    elif elong < 150: phase = 'I მეოთხედი'
     elif elong < 180: phase = 'მზარდი სავსე'
-    elif elong < 225: phase = 'სავსე მთვარე'
+    elif elong < 210: phase = 'სავსე მთვარე'
     elif elong < 270: phase = 'კლება'
-    elif elong < 315: phase = 'III მეოთხედი'
+    elif elong < 330: phase = 'III მეოთხედი'
     else:             phase = 'კლება'
 
     return {
         'lunar_day':     lunar_day,
         'pct_elapsed':   pct_elapsed,
-        'pct_remaining': round(100 - pct_elapsed, 2),
+        'pct_remaining': pct_remaining,
         'hours_to_next': hours_to_next,
         'elongation':    round(elong, 2),
         'phase':         phase,
-        'new_moon_jd':   round(jd_nm, 4),
         'moon_deg':      round(moon[0], 4),
         'sun_deg':       round(sun[0], 4),
     }
