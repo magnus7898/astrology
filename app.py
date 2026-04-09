@@ -408,6 +408,406 @@ def chart():
         'lat': lat, 'lon': lon, 'tz_name': tz_name
     })
 
+
+# ── 27 NAKSHATRAS ────────────────────────────────────────────────
+NAKSHATRAS = [
+    {'name':'Ashwini',              'ka':'აშვინი',              'ruler':'Ketu',    'deity':'Ashwins',       'symbol':'Horse head'},
+    {'name':'Bharani',              'ka':'ბჰარანი',             'ruler':'Venus',   'deity':'Yama',          'symbol':'Yoni'},
+    {'name':'Krittika',             'ka':'კრიტიკა',             'ruler':'Sun',     'deity':'Agni',          'symbol':'Razor/Flame'},
+    {'name':'Rohini',               'ka':'როჰინი',              'ruler':'Moon',    'deity':'Brahma',        'symbol':'Chariot'},
+    {'name':'Mrigashira',           'ka':'მრიგაშირა',           'ruler':'Mars',    'deity':'Soma',          'symbol':'Deer head'},
+    {'name':'Ardra',                'ka':'არდრა',               'ruler':'Rahu',    'deity':'Rudra',         'symbol':'Teardrop'},
+    {'name':'Punarvasu',            'ka':'პუნარვასუ',           'ruler':'Jupiter', 'deity':'Aditi',         'symbol':'Bow/Quiver'},
+    {'name':'Pushya',               'ka':'პუშია',               'ruler':'Saturn',  'deity':'Brihaspati',    'symbol':'Flower'},
+    {'name':'Ashlesha',             'ka':'აშლეშა',              'ruler':'Mercury', 'deity':'Nagas',         'symbol':'Serpent'},
+    {'name':'Magha',                'ka':'მაღა',                'ruler':'Ketu',    'deity':'Pitrs',         'symbol':'Throne'},
+    {'name':'Purva Phalguni',       'ka':'პ. ფალგუნი',         'ruler':'Venus',   'deity':'Bhaga',         'symbol':'Hammock'},
+    {'name':'Uttara Phalguni',      'ka':'უ. ფალგუნი',         'ruler':'Sun',     'deity':'Aryaman',       'symbol':'Bed'},
+    {'name':'Hasta',                'ka':'ჰასტა',               'ruler':'Moon',    'deity':'Savitar',       'symbol':'Hand'},
+    {'name':'Chitra',               'ka':'ჩიტრა',               'ruler':'Mars',    'deity':'Vishwakarma',   'symbol':'Pearl'},
+    {'name':'Swati',                'ka':'სვატი',               'ruler':'Rahu',    'deity':'Vayu',          'symbol':'Coral'},
+    {'name':'Vishakha',             'ka':'ვიშახა',              'ruler':'Jupiter', 'deity':'Indra-Agni',    'symbol':'Arch'},
+    {'name':'Anuradha',             'ka':'ანურადჰა',            'ruler':'Saturn',  'deity':'Mitra',         'symbol':'Lotus'},
+    {'name':'Jyeshtha',             'ka':'ჯიეშთა',             'ruler':'Mercury', 'deity':'Indra',         'symbol':'Umbrella'},
+    {'name':'Mula',                 'ka':'მულა',                'ruler':'Ketu',    'deity':'Nirriti',       'symbol':'Root'},
+    {'name':'Purva Ashadha',        'ka':'პ. აშადჰა',          'ruler':'Venus',   'deity':'Apas',          'symbol':'Fan'},
+    {'name':'Uttara Ashadha',       'ka':'უ. აშადჰა',          'ruler':'Sun',     'deity':'Vishwadevas',   'symbol':'Elephant tusk'},
+    {'name':'Shravana',             'ka':'შრავანა',             'ruler':'Moon',    'deity':'Vishnu',        'symbol':'Ear'},
+    {'name':'Dhanishtha',           'ka':'დჰანიშთა',           'ruler':'Mars',    'deity':'Ashta Vasus',   'symbol':'Drum'},
+    {'name':'Shatabhisha',          'ka':'შატაბჰიშა',          'ruler':'Rahu',    'deity':'Varuna',        'symbol':'Empty circle'},
+    {'name':'Purva Bhadrapada',     'ka':'პ. ბჰადრაპადა',      'ruler':'Jupiter', 'deity':'Aja Ekapada',   'symbol':'Sword'},
+    {'name':'Uttara Bhadrapada',    'ka':'უ. ბჰადრაპადა',      'ruler':'Saturn',  'deity':'Ahir Budhnya',  'symbol':'Twins'},
+    {'name':'Revati',               'ka':'რევატი',              'ruler':'Mercury', 'deity':'Pushan',        'symbol':'Fish'},
+]
+
+PADA_SIGNS   = ['Aries','Taurus','Gemini','Cancer','Leo','Virgo',
+                'Libra','Scorpio','Sagittarius','Capricorn','Aquarius','Pisces']
+PADA_RULERS  = ['Mars','Venus','Mercury','Moon','Sun','Mercury',
+                'Venus','Mars','Jupiter','Saturn','Saturn','Jupiter']
+
+VEDIC_SIGNS  = ['Mesha','Vrishabha','Mithuna','Karka','Simha','Kanya',
+                'Tula','Vrischika','Dhanu','Makara','Kumbha','Mina']
+
+def get_nakshatra(sid_deg):
+    deg      = sid_deg % 360
+    nak_size = 360.0 / 27.0
+    pad_size = nak_size / 4.0
+    nak_idx  = int(deg / nak_size)
+    nak_pos  = deg - nak_idx * nak_size
+    pada     = int(nak_pos / pad_size) + 1
+    pada_si  = (nak_idx * 4 + pada - 1) % 12
+    nak      = NAKSHATRAS[nak_idx]
+    return {
+        'nakshatra':       nak['name'],
+        'nakshatra_ka':    nak['ka'],
+        'nakshatra_ruler': nak['ruler'],
+        'deity':           nak['deity'],
+        'symbol':          nak['symbol'],
+        'pada':            pada,
+        'pada_sign':       PADA_SIGNS[pada_si],
+        'pada_ruler':      PADA_RULERS[pada_si],
+        'nak_idx':         nak_idx,
+        'nak_pos':         round(nak_pos, 4),
+        'pct':             round(nak_pos / nak_size * 100, 1),
+    }
+
+def vedic_sign(sid): return VEDIC_SIGNS[int(sid / 30) % 12]
+def vedic_si(sid):   return int(sid / 30) % 12
+
+# ── ROUTES ───────────────────────────────────────────────────────
+
+@app.route('/')
+def index():
+    return jsonify({'status': 'ok', 'message': 'Vedic Astrology API running'})
+
+@app.route('/geocode', methods=['POST'])
+def geocode():
+    try:
+        city = request.json.get('city', '').strip()
+        if not city:
+            return jsonify({'error': 'City name is empty'}), 400
+        try:
+            geolocator = Nominatim(user_agent="vedic-chart-v1", timeout=10)
+            location = geolocator.geocode(city, language='en', exactly_one=True)
+        except:
+            location = None
+        if not location:
+            try:
+                q = urllib.parse.urlencode({'q': city, 'format': 'json', 'limit': 1})
+                req = urllib.request.Request(
+                    f'https://nominatim.openstreetmap.org/search?{q}',
+                    headers={'User-Agent': 'vedic-chart-v1'})
+                with urllib.request.urlopen(req, timeout=10) as resp:
+                    results = _json.loads(resp.read())
+                if results:
+                    r0 = results[0]
+                    lat = float(r0['lat']); lon = float(r0['lon'])
+                    tz_name = tf.timezone_at(lat=lat, lng=lon) or 'UTC'
+                    return jsonify({'lat':lat,'lon':lon,'tz_name':tz_name,'display':r0.get('display_name',city)})
+            except Exception as e2:
+                return jsonify({'error': f'City not found: {city}'}), 404
+        if not location:
+            return jsonify({'error': 'City not found'}), 404
+        lat, lon = location.latitude, location.longitude
+        tz_name = tf.timezone_at(lat=lat, lng=lon) or 'UTC'
+        return jsonify({'lat':lat,'lon':lon,'tz_name':tz_name,'display':location.address})
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
+@app.route('/vedic', methods=['POST'])
+def vedic():
+    swe.set_ephe_path(EPHE_PATH)
+    swe.set_sid_mode(swe.SIDM_LAHIRI)
+
+    data    = request.json
+    year    = int(data['year']);   month  = int(data['month'])
+    day     = int(data['day']);    hour   = int(data['hour'])
+    minute  = int(data['minute']); second = int(data['second'])
+    lat     = float(data['lat']); lon    = float(data['lon'])
+    tz_name = data.get('tz_name', 'UTC')
+
+    jd       = to_jd(year, month, day, hour, minute, second, tz_name)
+    ayanamsa = swe.get_ayanamsa_ut(jd)
+
+    FLAGS = swe.FLG_SWIEPH | swe.FLG_SPEED
+
+    planets = {}
+    MAIN = {
+        'Sun':     swe.SUN,    'Moon':    swe.MOON,
+        'Mars':    swe.MARS,   'Mercury': swe.MERCURY,
+        'Jupiter': swe.JUPITER,'Venus':   swe.VENUS,
+        'Saturn':  swe.SATURN,
+    }
+
+    for name, pid in MAIN.items():
+        pos, _ = swe.calc_ut(jd, pid, FLAGS)
+        trop   = pos[0]
+        sid    = (trop - ayanamsa) % 360
+        nak    = get_nakshatra(sid)
+        planets[name] = {
+            'tropical':    round(trop, 4),
+            'sidereal':    round(sid, 4),
+            'sign':        vedic_sign(sid),
+            'sign_idx':    vedic_si(sid),
+            'sign_degree': round(sid % 30, 4),
+            'dms':         fmtDMS(sid),
+            'retrograde':  pos[3] < 0,
+            'nakshatra':   nak,
+        }
+
+    # Rahu & Ketu
+    try:
+        pos, _ = swe.calc_ut(jd, swe.TRUE_NODE, FLAGS)
+        trop = pos[0]; sid = (trop - ayanamsa) % 360
+        planets['Rahu'] = {
+            'tropical':round(trop,4),'sidereal':round(sid,4),
+            'sign':vedic_sign(sid),'sign_idx':vedic_si(sid),
+            'sign_degree':round(sid%30,4),'dms':fmtDMS(sid),
+            'retrograde':True,'nakshatra':get_nakshatra(sid),
+        }
+        k_sid = (sid + 180) % 360
+        planets['Ketu'] = {
+            'tropical':round((trop+180)%360,4),'sidereal':round(k_sid,4),
+            'sign':vedic_sign(k_sid),'sign_idx':vedic_si(k_sid),
+            'sign_degree':round(k_sid%30,4),'dms':fmtDMS(k_sid),
+            'retrograde':True,'nakshatra':get_nakshatra(k_sid),
+        }
+    except: pass
+
+    # Lagna (Ascendant)
+    _, ascmc   = swe.houses(jd, lat, lon, b'W')
+    asc_trop   = float(ascmc[0])
+    mc_trop    = float(ascmc[1])
+    asc_sid    = (asc_trop - ayanamsa) % 360
+    mc_sid     = (mc_trop  - ayanamsa) % 360
+    lagna_si   = int(asc_sid / 30)
+
+    # Whole-sign houses
+    for name in planets:
+        p_si   = planets[name]['sign_idx']
+        planets[name]['house'] = ((p_si - lagna_si) % 12) + 1
+
+    return jsonify({
+        'planets':      planets,
+        'asc':          round(asc_sid, 4),
+        'mc':           round(mc_sid, 4),
+        'asc_sign':     vedic_sign(asc_sid),
+        'asc_sign_idx': lagna_si,
+        'mc_sign':      vedic_sign(mc_sid),
+        'ayanamsa':     round(ayanamsa, 4),
+        'lagna_nak':    get_nakshatra(asc_sid),
+        'lat':lat,'lon':lon,'tz_name':tz_name
+    })
+
 if __name__ == '__main__':
     port = int(os.environ.get("PORT", 8080))
     app.run(host='0.0.0.0', port=port)
+
+
+# ════════════════════════════════════════════════════════════════
+# VEDIC ASTROLOGY (JYOTISH) — /vedic endpoint
+# ════════════════════════════════════════════════════════════════
+
+# 27 Nakshatras — each spans 13°20' (800 arcmin)
+NAKSHATRAS = [
+    {'name':'Ashwini',     'ka':'აშვინი',      'ruler':'Ketu',    'symbol':'Horse head',   'deity':'Ashwins'},
+    {'name':'Bharani',     'ka':'ბჰარანი',     'ruler':'Venus',   'symbol':'Yoni',         'deity':'Yama'},
+    {'name':'Krittika',    'ka':'კრიტიკა',     'ruler':'Sun',     'symbol':'Razor/Flame',  'deity':'Agni'},
+    {'name':'Rohini',      'ka':'როჰინი',      'ruler':'Moon',    'symbol':'Chariot',      'deity':'Brahma'},
+    {'name':'Mrigashira',  'ka':'მრიგაშირა',   'ruler':'Mars',    'symbol':'Deer head',    'deity':'Soma'},
+    {'name':'Ardra',       'ka':'არდრა',       'ruler':'Rahu',    'symbol':'Teardrop',     'deity':'Rudra'},
+    {'name':'Punarvasu',   'ka':'პუნარვასუ',   'ruler':'Jupiter', 'symbol':'Bow/Quiver',   'deity':'Aditi'},
+    {'name':'Pushya',      'ka':'პუშია',       'ruler':'Saturn',  'symbol':'Flower',       'deity':'Brihaspati'},
+    {'name':'Ashlesha',    'ka':'აშლეშა',      'ruler':'Mercury', 'symbol':'Serpent',      'deity':'Nagas'},
+    {'name':'Magha',       'ka':'მაღა',        'ruler':'Ketu',    'symbol':'Throne',       'deity':'Pitrs'},
+    {'name':'Purva Phalguni','ka':'პურვა ფალგუნი','ruler':'Venus','symbol':'Hammock',     'deity':'Bhaga'},
+    {'name':'Uttara Phalguni','ka':'უტარა ფალგუნი','ruler':'Sun', 'symbol':'Bed',          'deity':'Aryaman'},
+    {'name':'Hasta',       'ka':'ჰასტა',       'ruler':'Moon',    'symbol':'Hand',         'deity':'Savitar'},
+    {'name':'Chitra',      'ka':'ჩიტრა',       'ruler':'Mars',    'symbol':'Pearl',        'deity':'Vishwakarma'},
+    {'name':'Swati',       'ka':'სვატი',       'ruler':'Rahu',    'symbol':'Coral/Sword',  'deity':'Vayu'},
+    {'name':'Vishakha',    'ka':'ვიშახა',      'ruler':'Jupiter', 'symbol':'Arch/Potter wheel','deity':'Indra-Agni'},
+    {'name':'Anuradha',    'ka':'ანურადჰა',    'ruler':'Saturn',  'symbol':'Lotus',        'deity':'Mitra'},
+    {'name':'Jyeshtha',    'ka':'ჯიეშთა',     'ruler':'Mercury', 'symbol':'Umbrella',     'deity':'Indra'},
+    {'name':'Mula',        'ka':'მულა',        'ruler':'Ketu',    'symbol':'Root/Tail',    'deity':'Nirriti'},
+    {'name':'Purva Ashadha','ka':'პურვა აშადჰა','ruler':'Venus',  'symbol':'Fan/Tusk',     'deity':'Apas'},
+    {'name':'Uttara Ashadha','ka':'უტარა აშადჰა','ruler':'Sun',   'symbol':'Elephant tusk','deity':'Vishwadevas'},
+    {'name':'Shravana',    'ka':'შრავანა',     'ruler':'Moon',    'symbol':'Ear/Trident',  'deity':'Vishnu'},
+    {'name':'Dhanishtha',  'ka':'დჰანიშთა',   'ruler':'Mars',    'symbol':'Drum',         'deity':'Ashta Vasus'},
+    {'name':'Shatabhisha', 'ka':'შატაბჰიშა',  'ruler':'Rahu',    'symbol':'Empty circle', 'deity':'Varuna'},
+    {'name':'Purva Bhadrapada','ka':'პურვა ბჰადრაპადა','ruler':'Jupiter','symbol':'Sword/Funeral cot','deity':'Aja Ekapada'},
+    {'name':'Uttara Bhadrapada','ka':'უტარა ბჰადრაპადა','ruler':'Saturn','symbol':'Twins/Back legs','deity':'Ahir Budhnya'},
+    {'name':'Revati',      'ka':'რევატი',      'ruler':'Mercury', 'symbol':'Fish/Drum',    'deity':'Pushan'},
+]
+
+# Pada rulers follow the sequence: Aries, Taurus, Gemini, Cancer (repeating)
+# Sub-lord of each pada = the ruler of that navamsa sign
+PADA_SIGNS = ['Aries','Taurus','Gemini','Cancer','Leo','Virgo',
+              'Libra','Scorpio','Sagittarius','Capricorn','Aquarius','Pisces']
+PADA_RULERS = ['Mars','Venus','Mercury','Moon','Sun','Mercury',
+               'Venus','Mars','Jupiter','Saturn','Saturn','Jupiter']
+
+def get_nakshatra(sidereal_deg):
+    """Get nakshatra, pada and their rulers from sidereal longitude."""
+    deg = sidereal_deg % 360
+    nak_size    = 360.0 / 27.0          # 13.3333°
+    pada_size   = nak_size / 4.0        # 3.3333°
+
+    nak_idx  = int(deg / nak_size)      # 0..26
+    nak_pos  = deg - nak_idx * nak_size # 0..13.333°
+    pada     = int(nak_pos / pada_size) + 1  # 1..4
+
+    # Pada sign cycles through all 12 signs starting from Aries at Ashwini pada 1
+    pada_sign_idx = (nak_idx * 4 + (pada - 1)) % 12
+
+    nak = NAKSHATRAS[nak_idx]
+    return {
+        'nakshatra':      nak['name'],
+        'nakshatra_ka':   nak['ka'],
+        'nakshatra_ruler':nak['ruler'],
+        'deity':          nak['deity'],
+        'symbol':         nak['symbol'],
+        'pada':           pada,
+        'pada_sign':      PADA_SIGNS[pada_sign_idx],
+        'pada_ruler':     PADA_RULERS[pada_sign_idx],
+        'nak_idx':        nak_idx,
+        'nak_pos':        round(nak_pos, 4),  # degrees within nakshatra
+        'pct':            round(nak_pos / nak_size * 100, 1),  # % through nakshatra
+    }
+
+# Ayanamsa — Lahiri (most common in Jyotish)
+def get_ayanamsa(jd):
+    return swe.get_ayanamsa_ut(jd)  # Lahiri by default
+
+VEDIC_SIGNS = [
+    'მეშა','ვრიშაბჰა','მითჰუნა','კარკატა',
+    'სიმჰა','კანია','თულა','ვრიშჩიკა',
+    'დჰანუ','მაკარა','კუმბჰა','მინა'
+]
+
+def vedic_sign(sidereal_deg):
+    return VEDIC_SIGNS[int(sidereal_deg / 30) % 12]
+
+def vedic_sign_idx(sidereal_deg):
+    return int(sidereal_deg / 30) % 12
+
+def fmtDMS(deg):
+    """Format degree as D°MM'SS\" """
+    d = int(deg % 30)
+    m = int((deg % 30 - d) * 60)
+    s = int(((deg % 30 - d) * 60 - m) * 60)
+    return f"{d}°{m:02d}'{s:02d}\""
+
+@app.route('/vedic', methods=['POST'])
+def vedic():
+    swe.set_ephe_path(EPHE_PATH)
+    # Use Lahiri ayanamsa
+    swe.set_sid_mode(swe.SIDM_LAHIRI)
+
+    data    = request.json
+    year    = int(data['year'])
+    month   = int(data['month'])
+    day     = int(data['day'])
+    hour    = int(data['hour'])
+    minute  = int(data['minute'])
+    second  = int(data['second'])
+    lat     = float(data['lat'])
+    lon     = float(data['lon'])
+    tz_name = data.get('tz_name', 'UTC')
+
+    jd = to_jd(year, month, day, hour, minute, second, tz_name)
+    ayanamsa = get_ayanamsa(jd)
+
+    planets = {}
+
+    MAIN = {
+        'Sun':     swe.SUN,
+        'Moon':    swe.MOON,
+        'Mercury': swe.MERCURY,
+        'Venus':   swe.VENUS,
+        'Mars':    swe.MARS,
+        'Jupiter': swe.JUPITER,
+        'Saturn':  swe.SATURN,
+    }
+
+    FLAGS = swe.FLG_SWIEPH | swe.FLG_SPEED
+
+    for name, pid in MAIN.items():
+        pos, _ = swe.calc_ut(jd, pid, FLAGS)
+        trop   = pos[0]
+        sid    = (trop - ayanamsa) % 360
+        retro  = pos[3] < 0
+        nak    = get_nakshatra(sid)
+        planets[name] = {
+            'tropical':    round(trop, 4),
+            'sidereal':    round(sid, 4),
+            'sign':        vedic_sign(sid),
+            'sign_idx':    vedic_sign_idx(sid),
+            'sign_degree': round(sid % 30, 4),
+            'dms':         fmtDMS(sid),
+            'retrograde':  retro,
+            'nakshatra':   nak,
+        }
+
+    # Rahu & Ketu (True Node)
+    try:
+        pos, _ = swe.calc_ut(jd, swe.TRUE_NODE, FLAGS)
+        trop   = pos[0]
+        sid    = (trop - ayanamsa) % 360
+        nak    = get_nakshatra(sid)
+        planets['Rahu'] = {
+            'tropical': round(trop,4), 'sidereal': round(sid,4),
+            'sign': vedic_sign(sid), 'sign_idx': vedic_sign_idx(sid),
+            'sign_degree': round(sid%30,4), 'dms': fmtDMS(sid),
+            'retrograde': True, 'nakshatra': nak,
+        }
+        ketu_sid = (sid + 180) % 360
+        nak_k = get_nakshatra(ketu_sid)
+        planets['Ketu'] = {
+            'tropical': round((trop+180)%360,4), 'sidereal': round(ketu_sid,4),
+            'sign': vedic_sign(ketu_sid), 'sign_idx': vedic_sign_idx(ketu_sid),
+            'sign_degree': round(ketu_sid%30,4), 'dms': fmtDMS(ketu_sid),
+            'retrograde': True, 'nakshatra': nak_k,
+        }
+    except: pass
+
+    # Lagna (Ascendant) — whole sign house system most common in Jyotish
+    cusps_w, ascmc = swe.houses(jd, lat, lon, b'W')  # Whole sign
+    cusps_p, _     = swe.houses(jd, lat, lon, b'P')  # Placidus for reference
+
+    asc_trop = float(ascmc[0])
+    mc_trop  = float(ascmc[1])
+    asc_sid  = (asc_trop - ayanamsa) % 360
+    mc_sid   = (mc_trop  - ayanamsa) % 360
+
+    lagna_sign_idx = int(asc_sid / 30)
+
+    # Assign whole-sign houses
+    for name in planets:
+        p_sid   = planets[name]['sidereal']
+        p_si    = planets[name]['sign_idx']
+        house_n = ((p_si - lagna_sign_idx) % 12) + 1
+        planets[name]['house'] = house_n
+
+    # Whole sign house cusps (sidereal)
+    houses_sid = [((lagna_sign_idx + i) * 30 - ayanamsa + ayanamsa) % 360
+                  for i in range(12)]
+    houses_sid = [lagna_sign_idx * 30 + i * 30 for i in range(12)]
+    houses_sid = [(h % 360) for h in houses_sid]
+
+    # Lagna nakshatra
+    lagna_nak = get_nakshatra(asc_sid)
+
+    return jsonify({
+        'planets':     planets,
+        'asc':         round(asc_sid, 4),
+        'asc_trop':    round(asc_trop, 4),
+        'mc':          round(mc_sid, 4),
+        'mc_trop':     round(mc_trop, 4),
+        'asc_sign':    vedic_sign(asc_sid),
+        'asc_sign_idx':lagna_sign_idx,
+        'mc_sign':     vedic_sign(mc_sid),
+        'ayanamsa':    round(ayanamsa, 4),
+        'lagna_nak':   lagna_nak,
+        'houses':      houses_sid,
+        'lat': lat, 'lon': lon, 'tz_name': tz_name
+    })
