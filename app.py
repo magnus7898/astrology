@@ -350,49 +350,55 @@ def get_nakshatra(sid):
 
 @app.route('/vedic', methods=['POST'])
 def vedic():
-    swe.set_ephe_path(EPHE_PATH)
-    swe.set_sid_mode(swe.SIDM_LAHIRI)
-    d=request.json
-    year,month,day=int(d['year']),int(d['month']),int(d['day'])
-    hour,minute,second=int(d['hour']),int(d['minute']),int(d['second'])
-    lat,lon=float(d['lat']),float(d['lon'])
-    tz_name=d.get('tz_name','UTC')
-    jd=to_jd(year,month,day,hour,minute,second,tz_name)
-    ayanamsa=swe.get_ayanamsa_ut(jd)
-    FLAGS=swe.FLG_SWIEPH|swe.FLG_SPEED
-    planets={}
-    MAIN={'Sun':swe.SUN,'Moon':swe.MOON,'Mars':swe.MARS,'Mercury':swe.MERCURY,
-          'Jupiter':swe.JUPITER,'Venus':swe.VENUS,'Saturn':swe.SATURN}
-    for name,pid in MAIN.items():
-        pos,_=swe.calc_ut(jd,pid,FLAGS); trop=pos[0]; sid=(trop-ayanamsa)%360
-        planets[name]={'tropical':round(trop,4),'sidereal':round(sid,4),
-            'sign':ved_sign(sid),'sign_idx':ved_si(sid),
-            'sign_degree':round(sid%30,4),'dms':fmtDMS(sid),
-            'retrograde':pos[3]<0,'nakshatra':get_nakshatra(sid)}
     try:
-        pos,_=swe.calc_ut(jd,swe.TRUE_NODE,FLAGS); trop=pos[0]; sid=(trop-ayanamsa)%360
-        planets['Rahu']={'tropical':round(trop,4),'sidereal':round(sid,4),
-            'sign':ved_sign(sid),'sign_idx':ved_si(sid),
-            'sign_degree':round(sid%30,4),'dms':fmtDMS(sid),
-            'retrograde':True,'nakshatra':get_nakshatra(sid)}
-        ks=(sid+180)%360
-        planets['Ketu']={'tropical':round((trop+180)%360,4),'sidereal':round(ks,4),
-            'sign':ved_sign(ks),'sign_idx':ved_si(ks),
-            'sign_degree':round(ks%30,4),'dms':fmtDMS(ks),
-            'retrograde':True,'nakshatra':get_nakshatra(ks)}
-    except: pass
-    _,ascmc=swe.houses(jd,lat,lon,b'W')
-    asc_sid=(float(ascmc[0])-ayanamsa)%360
-    mc_sid=(float(ascmc[1])-ayanamsa)%360
-    lagna_si=int(asc_sid/30)
-    for name in planets:
-        planets[name]['house']=((planets[name]['sign_idx']-lagna_si)%12)+1
-    # Reset to tropical for future calls
-    swe.set_sid_mode(swe.SE_SIDM_FAGAN_BRADLEY, 0, 0)  # reset
-    return jsonify({'planets':planets,'asc':round(asc_sid,4),'mc':round(mc_sid,4),
-        'asc_sign':ved_sign(asc_sid),'asc_sign_idx':lagna_si,'mc_sign':ved_sign(mc_sid),
-        'ayanamsa':round(ayanamsa,4),'lagna_nak':get_nakshatra(asc_sid),
-        'lat':lat,'lon':lon,'tz_name':tz_name})
+        swe.set_ephe_path(EPHE_PATH)
+        swe.set_sid_mode(swe.SIDM_LAHIRI, 0, 0)
+        d=request.json
+        year,month,day=int(d['year']),int(d['month']),int(d['day'])
+        hour,minute,second=int(d['hour']),int(d['minute']),int(d['second'])
+        lat,lon=float(d['lat']),float(d['lon'])
+        tz_name=d.get('tz_name','UTC')
+        jd=to_jd(year,month,day,hour,minute,second,tz_name)
+        ayanamsa=swe.get_ayanamsa_ut(jd)
+        FLAGS=swe.FLG_SWIEPH|swe.FLG_SPEED
+        planets={}
+        MAIN={'Sun':swe.SUN,'Moon':swe.MOON,'Mars':swe.MARS,'Mercury':swe.MERCURY,
+              'Jupiter':swe.JUPITER,'Venus':swe.VENUS,'Saturn':swe.SATURN}
+        for name,pid in MAIN.items():
+            pos,_=swe.calc_ut(jd,pid,FLAGS); trop=pos[0]; sid=(trop-ayanamsa)%360
+            planets[name]={'tropical':round(trop,4),'sidereal':round(sid,4),
+                'sign':ved_sign(sid),'sign_idx':ved_si(sid),
+                'sign_degree':round(sid%30,4),'dms':fmtDMS(sid),
+                'retrograde':pos[3]<0,'nakshatra':get_nakshatra(sid)}
+        try:
+            pos,_=swe.calc_ut(jd,swe.TRUE_NODE,FLAGS); trop=pos[0]; sid=(trop-ayanamsa)%360
+            planets['Rahu']={'tropical':round(trop,4),'sidereal':round(sid,4),
+                'sign':ved_sign(sid),'sign_idx':ved_si(sid),
+                'sign_degree':round(sid%30,4),'dms':fmtDMS(sid),
+                'retrograde':True,'nakshatra':get_nakshatra(sid)}
+            ks=(sid+180)%360
+            planets['Ketu']={'tropical':round((trop+180)%360,4),'sidereal':round(ks,4),
+                'sign':ved_sign(ks),'sign_idx':ved_si(ks),
+                'sign_degree':round(ks%30,4),'dms':fmtDMS(ks),
+                'retrograde':True,'nakshatra':get_nakshatra(ks)}
+        except: pass
+        _,ascmc=swe.houses(jd,lat,lon,b'W')
+        asc_sid=(float(ascmc[0])-ayanamsa)%360
+        mc_sid=(float(ascmc[1])-ayanamsa)%360
+        lagna_si=int(asc_sid/30)
+        for name in planets:
+            planets[name]['house']=((planets[name]['sign_idx']-lagna_si)%12)+1
+        return jsonify({'planets':planets,'asc':round(asc_sid,4),'mc':round(mc_sid,4),
+            'asc_sign':ved_sign(asc_sid),'asc_sign_idx':lagna_si,'mc_sign':ved_sign(mc_sid),
+            'ayanamsa':round(ayanamsa,4),'lagna_nak':get_nakshatra(asc_sid),
+            'lat':lat,'lon':lon,'tz_name':tz_name})
+    except Exception as e:
+        import traceback
+        return jsonify({'error':str(e),'trace':traceback.format_exc()}),500
+    finally:
+        try: swe.set_sid_mode(swe.SIDM_TROPICAL, 0, 0)
+        except: pass
+
 
 if __name__ == '__main__':
     port=int(os.environ.get("PORT",8080))
