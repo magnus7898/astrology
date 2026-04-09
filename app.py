@@ -113,18 +113,14 @@ def geocode():
 # WESTERN CHART
 # ════════════════════════════════════════════════════════════════
 
+# Aspect definitions — angles covers BOTH directions
 ASPECTS_DEF = [
-    {'name':'შეერთება',      'angle':0,   'orb':8, 'sym':'☌','color':'#f9c646'},
-    {'name':'სექსტილი',      'angle':60,  'orb':6, 'sym':'⚹','color':'#30c890'},
-    {'name':'კვადრატი',      'angle':90,  'orb':8, 'sym':'□','color':'#e84040'},
-    {'name':'ტრინი',         'angle':120, 'orb':8, 'sym':'△','color':'#a078f0'},
-    {'name':'ოპოზიცია',      'angle':180, 'orb':8, 'sym':'☍','color':'#e89040'},
-    {'name':'კვინკუნქსი',    'angle':150, 'orb':3, 'sym':'⚻','color':'#9ba8b8'},
-    {'name':'ნახ.-სექსტ.',   'angle':30,  'orb':2, 'sym':'⚺','color':'#7080a0'},
-    {'name':'ნახ.-კვად.',    'angle':45,  'orb':2, 'sym':'∠','color':'#c06060'},
-    {'name':'სესკვიკვად.',   'angle':135, 'orb':2, 'sym':'⚼','color':'#c08040'},
-    {'name':'კვინტილი',      'angle':72,  'orb':2, 'sym':'Q', 'color':'#50b0d0'},
-    {'name':'ბიკვინტილი',    'angle':144, 'orb':2, 'sym':'bQ','color':'#60a0c0'},
+    {'name':'შეერთება',  'angles':[0],       'orb':8, 'sym':'☌','color':'#f9c646'},
+    {'name':'ოპოზიცია',  'angles':[180],     'orb':8, 'sym':'☍','color':'#e89040'},
+    {'name':'ტრინი',     'angles':[120,240], 'orb':7, 'sym':'△','color':'#a078f0'},
+    {'name':'კვადრატი',  'angles':[90,270],  'orb':6, 'sym':'□','color':'#e84040'},
+    {'name':'სექსტილი',  'angles':[60,300],  'orb':5, 'sym':'⚹','color':'#30c890'},
+    {'name':'კვინკონსი', 'angles':[150,210], 'orb':3, 'sym':'⚻','color':'#9ba8b8'},
 ]
 
 ASPECT_PLANETS = [
@@ -134,47 +130,43 @@ ASPECT_PLANETS = [
 ]
 
 def calc_aspects(planets):
+    """
+    Check every planet pair. Compute raw angle A→B (0-360°).
+    Match against ALL target angles (both directions):
+      conjunction: 0°          orb ±8°
+      opposition:  180°        orb ±8°
+      trine:       120° or 240° orb ±7°
+      square:      90°  or 270° orb ±6°
+      sextile:     60°  or 300° orb ±5°
+      inconjunction: 150° or 210° orb ±3°
+    """
     aspects = []
     names = [n for n in ASPECT_PLANETS if n in planets]
     for i in range(len(names)):
         for j in range(i+1, len(names)):
-            p1,p2 = names[i],names[j]
-            diff = abs(planets[p1]['degree'] - planets[p2]['degree'])
-            if diff > 180: diff = 360 - diff
+            p1, p2 = names[i], names[j]
+            d1 = planets[p1]['degree']
+            d2 = planets[p2]['degree']
+            raw = (d2 - d1 + 360) % 360  # 0–360°
+            best_asp = None
+            best_orb = 999
             for asp in ASPECTS_DEF:
-                orb = abs(diff - asp['angle'])
-                if orb <= asp['orb']:
-                    aspects.append({'p1':p1,'p2':p2,'type':asp['name'],
-                        'sym':asp['sym'],'color':asp['color'],'orb':round(orb,2),'angle':asp['angle']})
-                    break
+                for target in asp['angles']:
+                    orb = abs(raw - target)
+                    if orb > 180: orb = 360 - orb
+                    if orb <= asp['orb'] and orb < best_orb:
+                        best_orb = orb
+                        best_asp = asp
+            if best_asp:
+                aspects.append({
+                    'p1':p1,'p2':p2,
+                    'type':best_asp['name'],'sym':best_asp['sym'],
+                    'color':best_asp['color'],
+                    'orb':round(best_orb,2),
+                    'angle':best_asp['angles'][0]
+                })
     aspects.sort(key=lambda x: x['orb'])
     return aspects
-
-def calc_lunar_day(jd_ut, tz_offset=0.0):
-    swe.set_ephe_path(EPHE_PATH)
-    sun,_  = swe.calc_ut(jd_ut, swe.SUN)
-    moon,_ = swe.calc_ut(jd_ut, swe.MOON)
-    elong  = (moon[0] - sun[0] + 360) % 360
-    deg_per_day = 12.0
-    age = elong / deg_per_day
-    lunar_day = int(age) + 1
-    pct_elapsed = round((age % 1) * 100, 2)
-    rel_speed = 360.0 / (29.53058868 * 24.0)
-    hours_to_next = round((deg_per_day - elong % deg_per_day) / rel_speed, 2)
-    if elong < 45:    phase = 'ახალი მთვარე'
-    elif elong < 90:  phase = 'მზარდი'
-    elif elong < 135: phase = 'I მეოთხედი'
-    elif elong < 180: phase = 'მზარდი სავსე'
-    elif elong < 225: phase = 'სავსე მთვარე'
-    elif elong < 270: phase = 'კლება'
-    elif elong < 315: phase = 'III მეოთხედი'
-    else:             phase = 'კლება'
-    return {
-        'lunar_day':lunar_day,'pct_elapsed':pct_elapsed,
-        'pct_remaining':round(100-pct_elapsed,2),
-        'hours_to_next':hours_to_next,'elongation':round(elong,2),
-        'phase':phase,'moon_deg':round(moon[0],4),'sun_deg':round(sun[0],4),
-    }
 
 @app.route('/chart', methods=['POST'])
 def chart():
