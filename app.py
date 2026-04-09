@@ -589,6 +589,13 @@ def true_sidereal():
         except:
             lunar = None
 
+        # Aspects — use tropical degrees
+        trop_planets = {}
+        for name,p in planets.items():
+            if 'tropical' in p:
+                trop_planets[name] = {'degree': p['tropical']}
+        aspects = calc_aspects(trop_planets)
+
         return jsonify({
             'planets':  planets,
             'houses':   [round(x,4) for x in cusps],
@@ -598,6 +605,7 @@ def true_sidereal():
             'asc_con_ka': asc_con['ka'],
             'mc_con':   mc_con['name'],
             'lunar':    lunar,
+            'aspects':  aspects,
             'lat':lat,'lon':lon,'tz_name':tz_name,
             'constellations': [{'name':x['name'],'ka':x['ka'],'sym':x['sym'],
                 'start':x['start'],'end':x['end'],'span':round((x['end']-x['start'])%360 or 360,1)}
