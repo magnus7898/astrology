@@ -581,12 +581,25 @@ def true_sidereal():
         except:
             lunar = None
 
-        # Aspects — use tropical degrees
+        # Aspects — use tropical degrees with English names mapped to Georgian for calc_aspects
+        # calc_aspects uses Georgian planet names, so map English→Georgian
+        ENG_TO_KA = {
+            'Sun':'მზე','Moon':'მთვარე','Mercury':'მერკური','Venus':'ვენერა',
+            'Mars':'მარსი','Jupiter':'იუპიტერი','Saturn':'სატურნი',
+            'Uranus':'ურანი','Neptune':'ნეპტუნი','Pluto':'პლუტონი',
+            'Chiron':'ქირონი','North Node':'ჩრდ. კვანძი',
+        }
         trop_planets = {}
         for name,p in planets.items():
             if 'tropical' in p:
-                trop_planets[name] = {'degree': p['tropical']}
+                ka = ENG_TO_KA.get(name, name)
+                trop_planets[ka] = {'degree': p['tropical']}
         aspects = calc_aspects(trop_planets)
+        # Map aspect planet names back to English for frontend
+        KA_TO_ENG = {v:k for k,v in ENG_TO_KA.items()}
+        for asp in aspects:
+            asp['p1'] = KA_TO_ENG.get(asp['p1'], asp['p1'])
+            asp['p2'] = KA_TO_ENG.get(asp['p2'], asp['p2'])
 
         return jsonify({
             'planets':  planets,
