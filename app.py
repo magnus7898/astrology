@@ -411,6 +411,203 @@ def vedic():
         except: pass
 
 
+# ════════════════════════════════════════════════════════════════
+# TRUE SIDEREAL ASTROLOGY — /true_sidereal endpoint
+# 13 constellations with IAU boundaries, Ophiuchus included
+# ════════════════════════════════════════════════════════════════
+
+# IAU ecliptic constellation boundaries (tropical degrees)
+TRUE_CONSTELLATIONS = [
+    {'name':'Aries',       'ka':'ვერძი',       'sym':'♈',  'start': 29.0, 'end': 53.5},
+    {'name':'Taurus',      'ka':'კურო',        'sym':'♉',  'start': 53.5, 'end': 90.0},
+    {'name':'Gemini',      'ka':'ტყუპები',     'sym':'♊',  'start': 90.0, 'end':118.5},
+    {'name':'Cancer',      'ka':'კირჩხიბი',    'sym':'♋',  'start':118.5, 'end':138.5},
+    {'name':'Leo',         'ka':'ლომი',        'sym':'♌',  'start':138.5, 'end':174.0},
+    {'name':'Virgo',       'ka':'ქალწული',     'sym':'♍',  'start':174.0, 'end':217.5},
+    {'name':'Libra',       'ka':'სასწორი',     'sym':'♎',  'start':217.5, 'end':241.0},
+    {'name':'Scorpius',    'ka':'მორიელი',     'sym':'♏',  'start':241.0, 'end':247.5},
+    {'name':'Ophiuchus',   'ka':'გველმჭერი',  'sym':'⛎',  'start':247.5, 'end':266.5},
+    {'name':'Sagittarius', 'ka':'მშვილდოსანი', 'sym':'♐',  'start':266.5, 'end':302.0},
+    {'name':'Capricornus', 'ka':'თხის რქა',   'sym':'♑',  'start':302.0, 'end':327.0},
+    {'name':'Aquarius',    'ka':'მერწყული',    'sym':'♒',  'start':327.0, 'end':351.5},
+    {'name':'Pisces',      'ka':'თევზები',     'sym':'♓',  'start':351.5, 'end':389.0},  # wraps
+]
+
+def get_true_constellation(trop_deg):
+    """Get true IAU constellation from tropical degree."""
+    deg = trop_deg % 360
+    for con in TRUE_CONSTELLATIONS:
+        s = con['start'] % 360
+        e = con['end'] % 360
+        if s < e:
+            if s <= deg < e:
+                pos = deg - s
+                return con, round(pos, 4)
+        else:  # wraps around 0 (Pisces: 351.5-29.0)
+            if deg >= s or deg < e:
+                pos = (deg - s) % 360
+                return con, round(pos, 4)
+    # fallback: Aries
+    return TRUE_CONSTELLATIONS[0], round(deg - 29.0, 4)
+
+def true_sid_fmtDMS(con, pos_in_con):
+    d = int(pos_in_con)
+    m = int((pos_in_con - d) * 60)
+    s = int(((pos_in_con - d) * 60 - m) * 60)
+    return str(d) + chr(176) + str(m).zfill(2) + "'" + str(s).zfill(2) + '"' 
+
+@app.route('/true_sidereal', methods=['POST'])
+def true_sidereal():
+    swe.set_ephe_path(EPHE_PATH)
+    # Use tropical positions — constellation determined by IAU boundaries
+    d = request.json
+    year    = int(d['year']);   month  = int(d['month'])
+    day     = int(d['day']);    hour   = int(d['hour'])
+    minute  = int(d['minute']); second = int(d['second'])
+    lat     = float(d['lat']); lon    = float(d['lon'])
+    tz_name = d.get('tz_name','UTC')
+    time_unknown = d.get('time_unknown', False)
+
+    try:
+        jd = to_jd(year,month,day,hour,minute,second,tz_name)
+        planets = {}
+
+        MAIN = {
+            'Sun':     swe.SUN,    'Moon':    swe.MOON,
+            'Mercury': swe.MERCURY,'Venus':   swe.VENUS,
+            'Mars':    swe.MARS,   'Jupiter': swe.JUPITER,
+            'Saturn':  swe.SATURN, 'Uranus':  swe.URANUS,
+            'Neptune': swe.NEPTUNE,'Pluto':   swe.PLUTO,
+        }
+        FLAGS = swe.FLG_SWIEPH | swe.FLG_SPEED
+
+        for name, pid in MAIN.items():
+            pos,_ = swe.calc_ut(jd, pid, FLAGS)
+            trop  = pos[0]
+            con, pos_in_con = get_true_constellation(trop)
+            span = (con['end'] - con['start']) % 360 or 360
+            pct  = round(pos_in_con / span * 100, 1)
+            planets[name] = {
+                'tropical':     round(trop, 4),
+                'constellation':con['name'],
+                'constellation_ka': con['ka'],
+                'sym':          con['sym'],
+                'pos_in_con':   round(pos_in_con, 4),
+                'dms':          true_sid_fmtDMS(con, pos_in_con),
+                'span':         round(span, 1),
+                'pct':          pct,
+                'retrograde':   pos[3] < 0,
+            }
+
+        # Chiron
+        try:
+            pos,_ = swe.calc_ut(jd, swe.CHIRON, FLAGS)
+            trop = pos[0]; con,pic = get_true_constellation(trop)
+            span = (con['end']-con['start'])%360 or 360
+            planets['Chiron'] = {'tropical':round(trop,4),'constellation':con['name'],
+                'constellation_ka':con['ka'],'sym':con['sym'],'pos_in_con':round(pic,4),
+                'dms':true_sid_fmtDMS(con,pic),'span':round(span,1),'pct':round(pic/span*100,1),'retrograde':pos[3]<0}
+        except: pass
+
+        # Lilith
+        try:
+            pos,_ = swe.calc_ut(jd, swe.MEAN_APOG, FLAGS)
+            trop = pos[0]; con,pic = get_true_constellation(trop)
+            span = (con['end']-con['start'])%360 or 360
+            planets['Lilith'] = {'tropical':round(trop,4),'constellation':con['name'],
+                'constellation_ka':con['ka'],'sym':con['sym'],'pos_in_con':round(pic,4),
+                'dms':true_sid_fmtDMS(con,pic),'span':round(span,1),'pct':round(pic/span*100,1),'retrograde':False}
+        except: pass
+
+        # Selena (White Moon)
+        try:
+            pos,_ = swe.calc_ut(jd, swe.AST_OFFSET+1181, FLAGS)
+            trop = pos[0]; con,pic = get_true_constellation(trop)
+            span = (con['end']-con['start'])%360 or 360
+            planets['Selena'] = {'tropical':round(trop,4),'constellation':con['name'],
+                'constellation_ka':con['ka'],'sym':con['sym'],'pos_in_con':round(pic,4),
+                'dms':true_sid_fmtDMS(con,pic),'span':round(span,1),'pct':round(pic/span*100,1),'retrograde':False}
+        except: pass
+
+        # Juno
+        try:
+            pos,_ = swe.calc_ut(jd, swe.AST_OFFSET+3, FLAGS)
+            trop = pos[0]; con,pic = get_true_constellation(trop)
+            span = (con['end']-con['start'])%360 or 360
+            planets['Juno'] = {'tropical':round(trop,4),'constellation':con['name'],
+                'constellation_ka':con['ka'],'sym':con['sym'],'pos_in_con':round(pic,4),
+                'dms':true_sid_fmtDMS(con,pic),'span':round(span,1),'pct':round(pic/span*100,1),'retrograde':bool(pos[3]<0)}
+        except: pass
+
+        # Nodes
+        try:
+            pos,_ = swe.calc_ut(jd, swe.MEAN_NODE, FLAGS)
+            trop = pos[0]; con,pic = get_true_constellation(trop)
+            span = (con['end']-con['start'])%360 or 360
+            planets['North Node'] = {'tropical':round(trop,4),'constellation':con['name'],
+                'constellation_ka':con['ka'],'sym':con['sym'],'pos_in_con':round(pic,4),
+                'dms':true_sid_fmtDMS(con,pic),'span':round(span,1),'pct':round(pic/span*100,1),'retrograde':True}
+            trop2=(trop+180)%360; con2,pic2=get_true_constellation(trop2)
+            span2=(con2['end']-con2['start'])%360 or 360
+            planets['South Node'] = {'tropical':round(trop2,4),'constellation':con2['name'],
+                'constellation_ka':con2['ka'],'sym':con2['sym'],'pos_in_con':round(pic2,4),
+                'dms':true_sid_fmtDMS(con2,pic2),'span':round(span2,1),'pct':round(pic2/span2*100,1),'retrograde':True}
+        except: pass
+
+        # Houses + ASC/MC (tropical, Placidus)
+        cusps, ascmc = swe.houses(jd, lat, lon, b'P')
+        asc_trop = float(ascmc[0]); mc_trop = float(ascmc[1])
+        asc_con, asc_pic = get_true_constellation(asc_trop)
+        mc_con,  mc_pic  = get_true_constellation(mc_trop)
+
+        # Assign house to each planet
+        for name in planets:
+            planets[name]['house'] = get_house(planets[name]['tropical'], cusps)
+
+        # Vertex + Fortuna (time known only)
+        if not time_unknown:
+            try:
+                vx = float(ascmc[3]); con,pic = get_true_constellation(vx)
+                span=(con['end']-con['start'])%360 or 360
+                planets['Vertex'] = {'tropical':round(vx,4),'constellation':con['name'],
+                    'constellation_ka':con['ka'],'sym':con['sym'],'pos_in_con':round(pic,4),
+                    'dms':true_sid_fmtDMS(con,pic),'span':round(span,1),'pct':round(pic/span*100,1),
+                    'retrograde':False,'house':get_house(vx,cusps)}
+            except: pass
+            try:
+                f=(asc_trop+planets['Moon']['tropical']-planets['Sun']['tropical'])%360
+                con,pic=get_true_constellation(f); span=(con['end']-con['start'])%360 or 360
+                planets['Fortune'] = {'tropical':round(f,4),'constellation':con['name'],
+                    'constellation_ka':con['ka'],'sym':con['sym'],'pos_in_con':round(pic,4),
+                    'dms':true_sid_fmtDMS(con,pic),'span':round(span,1),'pct':round(pic/span*100,1),
+                    'retrograde':False,'house':get_house(f,cusps)}
+            except: pass
+
+        # Lunar day
+        try:
+            lunar = calc_lunar_day(jd)
+        except:
+            lunar = None
+
+        return jsonify({
+            'planets':  planets,
+            'houses':   [round(x,4) for x in cusps],
+            'asc':      round(asc_trop,4),
+            'mc':       round(mc_trop,4),
+            'asc_con':  asc_con['name'],
+            'asc_con_ka': asc_con['ka'],
+            'mc_con':   mc_con['name'],
+            'lunar':    lunar,
+            'lat':lat,'lon':lon,'tz_name':tz_name,
+            'constellations': [{'name':x['name'],'ka':x['ka'],'sym':x['sym'],
+                'start':x['start'],'end':x['end'],'span':round((x['end']-x['start'])%360 or 360,1)}
+                for x in TRUE_CONSTELLATIONS],
+        })
+    except Exception as e:
+        import traceback
+        return jsonify({'error':str(e),'trace':traceback.format_exc()}),500
+
+
 if __name__ == '__main__':
     port=int(os.environ.get("PORT",8080))
     app.run(host='0.0.0.0',port=port)
