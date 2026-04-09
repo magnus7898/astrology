@@ -1,621 +1,669 @@
-import os, math, urllib.request, urllib.parse, json as _json
+<!DOCTYPE html>
+<html lang="ka">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>ნამდვილი სიდერული ასტროლოგია</title>
+<link href="https://fonts.googleapis.com/css2?family=Cinzel+Decorative:wght@400&family=Cinzel:wght@300;400;600&family=IM+Fell+English:ital@0;1&family=Noto+Sans+Georgian:wght@300;400&display=swap" rel="stylesheet">
+<style>
+:root{
+  --void:#04030a;--gold:#c9a84c;--gold-l:#f0d080;--gold-d:#8a6a20;
+  --purple:#a78bfa;--purple-d:#2d1f6e;--txt:#e0d8ff;--dim:rgba(155,168,184,0.6);
+}
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+html{scroll-behavior:smooth}
+body{background:var(--void);color:var(--txt);font-family:'Noto Sans Georgian',sans-serif;
+  min-height:100vh;display:flex;flex-direction:column;align-items:center;
+  padding:0 0 80px;overflow-x:hidden;position:relative;}
+body::before{content:'';position:fixed;inset:0;pointer-events:none;z-index:0;background:
+  radial-gradient(1px 1px at 8% 12%,rgba(255,255,255,.55) 0,transparent 100%),
+  radial-gradient(1px 1px at 23% 35%,rgba(255,255,255,.35) 0,transparent 100%),
+  radial-gradient(1px 1px at 41% 8%,rgba(255,255,255,.45) 0,transparent 100%),
+  radial-gradient(1px 1px at 60% 25%,rgba(255,255,255,.3) 0,transparent 100%),
+  radial-gradient(1px 1px at 77% 13%,rgba(255,255,255,.5) 0,transparent 100%),
+  radial-gradient(1px 1px at 88% 44%,rgba(255,255,255,.35) 0,transparent 100%),
+  radial-gradient(1px 1px at 15% 68%,rgba(255,255,255,.3) 0,transparent 100%),
+  radial-gradient(1px 1px at 50% 75%,rgba(255,255,255,.4) 0,transparent 100%),
+  radial-gradient(1.5px 1.5px at 34% 51%,rgba(167,139,250,.25) 0,transparent 100%),
+  radial-gradient(1.5px 1.5px at 66% 44%,rgba(201,168,76,.18) 0,transparent 100%);}
+body::after{content:'';position:fixed;inset:0;pointer-events:none;z-index:0;background:
+  radial-gradient(ellipse 600px 400px at 20% 20%,rgba(100,40,200,.08) 0,transparent 70%),
+  radial-gradient(ellipse 500px 500px at 80% 70%,rgba(40,80,200,.06) 0,transparent 70%),
+  radial-gradient(ellipse 400px 300px at 50% 90%,rgba(120,50,180,.05) 0,transparent 70%);}
+.hero{position:relative;z-index:1;text-align:center;padding:56px 24px 40px;width:100%}
+.hero-eyebrow{font-size:9px;letter-spacing:7px;text-transform:uppercase;color:var(--gold);opacity:.5;margin-bottom:12px;font-family:'Cinzel',serif}
+.hero-title{font-family:'Cinzel Decorative',serif;font-size:clamp(18px,3.5vw,38px);font-weight:400;letter-spacing:3px;line-height:1.2;
+  background:linear-gradient(160deg,#f5e8ba 0%,var(--gold) 35%,#9a7028 60%,#e8d5a0 80%,#c09040 100%);
+  -webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text;
+  filter:drop-shadow(0 0 28px rgba(201,168,76,.25));}
+.hero-sub{font-family:'IM Fell English',serif;font-style:italic;font-size:13px;color:var(--dim);margin-top:10px}
+.hero-divider{display:flex;align-items:center;gap:14px;margin:24px auto 0;max-width:300px}
+.hero-line{flex:1;height:1px;background:linear-gradient(90deg,transparent,rgba(201,168,76,.35),transparent)}
+.hero-gem{width:5px;height:5px;background:var(--gold);transform:rotate(45deg);opacity:.5;flex-shrink:0}
+.form-card{position:relative;z-index:1;background:rgba(8,6,20,.75);border:1px solid rgba(45,31,110,.6);
+  border-radius:16px;padding:24px;width:100%;max-width:620px;margin:32px auto;backdrop-filter:blur(12px);
+  box-shadow:0 8px 40px rgba(0,0,0,.5),inset 0 1px 0 rgba(167,139,250,.08);}
+.form-card::before{content:'';position:absolute;top:0;left:20%;right:20%;height:1px;
+  background:linear-gradient(90deg,transparent,rgba(167,139,250,.4),transparent);}
+.form-grid{display:grid;grid-template-columns:1fr 1fr 1fr;gap:12px;margin-bottom:12px}
+.field{display:flex;flex-direction:column;gap:5px}
+.field.wide{grid-column:span 3}
+label{font-size:9px;letter-spacing:3px;text-transform:uppercase;color:var(--gold);opacity:.7;font-family:'Cinzel',serif}
+input{background:rgba(10,8,30,.7);border:1px solid rgba(61,42,138,.6);border-radius:8px;
+  color:var(--txt);padding:9px 12px;font-size:13px;font-family:'Noto Sans Georgian',sans-serif;
+  width:100%;transition:border-color .2s,box-shadow .2s;}
+input:focus{outline:none;border-color:var(--purple);box-shadow:0 0 0 3px rgba(124,58,237,.15)}
+input::placeholder{color:rgba(155,168,184,.35)}
+.coords-row{display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:12px}
+.coords input{background:rgba(6,5,18,.7);color:rgba(155,168,184,.6)}
+#city-hint{font-size:11px;color:var(--purple);margin-top:3px;min-height:15px;padding-left:2px}
+#tz-display{font-size:11px;color:var(--gold);margin-bottom:16px;background:rgba(6,5,18,.5);border-radius:6px;padding:6px 10px;border-left:2px solid rgba(201,168,76,.3)}
+.gen-btn{width:100%;background:linear-gradient(135deg,#6d28d9,#4c1d95);color:#fff;
+  border:1px solid rgba(124,58,237,.4);border-radius:10px;padding:13px;font-size:13px;
+  cursor:pointer;letter-spacing:2px;font-family:'Cinzel',serif;transition:all .3s;
+  box-shadow:0 4px 20px rgba(109,40,217,.3);}
+.gen-btn:hover{background:linear-gradient(135deg,#7c3aed,#5b21b6);transform:translateY(-1px)}
+.time-disabled input{opacity:.3;pointer-events:none}
+#chart-area{position:relative;z-index:1;width:100%;max-width:800px;padding:0 16px}
+svg#wheel{width:100%;height:auto;display:block;overflow:visible}
+.sec-title{font-family:'Cinzel',serif;font-size:11px;letter-spacing:4px;color:var(--gold);
+  text-transform:uppercase;text-align:center;margin:32px 0 16px;display:flex;align-items:center;gap:14px;}
+.sec-title::before,.sec-title::after{content:'';flex:1;height:1px;background:linear-gradient(90deg,transparent,rgba(201,168,76,.3),transparent)}
+.tables-wrap{display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-bottom:8px}
+@media(max-width:600px){.tables-wrap{grid-template-columns:1fr}}
+.data-card{background:rgba(8,6,20,.75);border:1px solid rgba(45,31,110,.5);border-radius:12px;overflow:hidden;backdrop-filter:blur(8px)}
+.data-card-title{background:rgba(167,139,250,.07);padding:10px 16px;font-family:'Cinzel',serif;font-size:10px;letter-spacing:3px;color:var(--purple);text-transform:uppercase;border-bottom:1px solid rgba(45,31,110,.5)}
+table{width:100%;border-collapse:collapse;font-size:12px}
+th{color:rgba(155,168,184,.5);padding:7px 12px;text-align:left;font-weight:400;font-size:9px;text-transform:uppercase;letter-spacing:1px;border-bottom:1px solid rgba(45,31,110,.4)}
+td{padding:6px 12px;border-bottom:1px solid rgba(15,13,40,.8);vertical-align:middle;font-size:12px}
+tr:last-child td{border-bottom:none}
+tr:hover td{background:rgba(19,16,58,.6)}
+.retro{color:#f87171;font-size:9px;margin-left:2px}
+.house-badge{display:inline-block;background:rgba(26,21,69,.8);border:1px solid rgba(61,42,138,.6);border-radius:4px;padding:1px 6px;font-size:10px;color:var(--purple);font-family:'Cinzel',serif}
+.deg-val{font-family:'Cinzel',serif;font-size:11px;color:#c8d8f0;white-space:nowrap}
+.moon-sym{color:#b8d8ff;text-shadow:0 0 8px rgba(100,160,255,.9),0 0 16px rgba(80,130,255,.5);font-size:20px;font-family:serif}
+.p-sym{font-family:serif;font-size:18px;line-height:1;display:inline-block}
+.pct-bar{display:inline-block;width:48px;height:3px;background:rgba(255,255,255,.08);border-radius:2px;vertical-align:middle;margin-left:5px;position:relative}
+.pct-fill{position:absolute;left:0;top:0;height:100%;border-radius:2px;background:linear-gradient(90deg,var(--purple),var(--gold))}
+@media(max-width:480px){td{padding:5px 8px;font-size:10px}th{font-size:9px;padding:5px 8px}}
+</style>
+</head>
+<body>
+<div class="hero">
+  <svg width="56" height="56" viewBox="0 0 56 56" fill="none" style="margin:0 auto 20px;display:block;opacity:.7">
+    <circle cx="28" cy="28" r="26.5" stroke="rgba(201,168,76,.25)" stroke-width=".5"/>
+    <circle cx="28" cy="28" r="17" stroke="rgba(201,168,76,.18)" stroke-width=".5"/>
+    <polygon points="28,3 51,43 5,43" stroke="rgba(201,168,76,.38)" stroke-width=".5" fill="none"/>
+    <polygon points="28,53 5,13 51,13" stroke="rgba(201,168,76,.38)" stroke-width=".5" fill="none"/>
+    <circle cx="28" cy="28" r="2.5" fill="rgba(201,168,76,.7)"/>
+  </svg>
+  <div class="hero-eyebrow">ასტრონომიული · IAU კონსტელაციები · ოფიუქუსი</div>
+  <h1 class="hero-title">ნამდვილი სიდერული ასტროლოგია</h1>
+  <p class="hero-sub">True Sidereal · 13 Constellations · IAU Boundaries · Ophiuchus ⛎</p>
+  <div class="hero-divider"><div class="hero-line"></div><div class="hero-gem"></div><div class="hero-line"></div></div>
+</div>
 
-# ── EPHE PATH ──────────────────────────────────────────────────
-BASE_DIR  = os.path.dirname(os.path.abspath(__file__))
-EPHE_PATH = os.path.join(BASE_DIR, 'ephe')
-os.makedirs(EPHE_PATH, exist_ok=True)
-os.environ['SE_EPHE_PATH'] = EPHE_PATH
+<div class="form-card">
+  <div class="field wide" style="margin-bottom:12px">
+    <label>სახელი</label><input id="name" placeholder="შეიყვანეთ სახელი">
+  </div>
+  <div class="form-grid">
+    <div class="field"><label>დღე</label><input type="number" id="day" value="1" min="1" max="31"></div>
+    <div class="field"><label>თვე</label><input type="number" id="month" value="1" min="1" max="12"></div>
+    <div class="field"><label>წელი</label><input type="number" id="year" value="1990"></div>
+  </div>
+  <div class="form-grid" id="time-fields">
+    <div class="field"><label>საათი</label><input type="number" id="hour" value="12" min="0" max="23"></div>
+    <div class="field"><label>წუთი</label><input type="number" id="minute" value="0" min="0" max="59"></div>
+    <div class="field"><label>წამი</label><input type="number" id="second" value="0" min="0" max="59"></div>
+  </div>
+  <div style="margin-bottom:12px;display:flex;align-items:center;gap:10px">
+    <label style="display:flex;align-items:center;gap:8px;cursor:pointer;font-size:11px;color:rgba(167,139,250,0.7);letter-spacing:1px;text-transform:none">
+      <input type="checkbox" id="time-unknown" onchange="toggleTimeUnknown()" style="width:16px;height:16px;accent-color:#7c3aed;cursor:pointer">
+      დრო უცნობია (time unknown)
+    </label>
+  </div>
+  <div class="field wide" style="margin-bottom:8px">
+    <label>ქალაქი</label>
+    <input id="city" placeholder="მაგ. თბილისი, London, Paris..." oninput="searchCity()">
+    <div id="city-hint"></div>
+  </div>
+  <div class="coords-row">
+    <div class="field"><label>განედი (Lat)</label><input type="number" id="lat" step="0.0001" readonly></div>
+    <div class="field"><label>გრძედი (Lon)</label><input type="number" id="lon" step="0.0001" readonly></div>
+  </div>
+  <div id="tz-display">⏳ ქალაქის შეყვანის შემდეგ სარტყელი განისაზღვრება</div>
+  <input type="hidden" id="tz_name" value="UTC">
+  <button class="gen-btn" onclick="generateChart()">✦ რუქის გენერაცია ✦</button>
+</div>
 
-import swisseph as swe
-swe.set_ephe_path(EPHE_PATH)
+<div id="chart-area" style="display:none">
+  <div id="lunar-badge" style="display:none;text-align:center;margin-bottom:12px;padding:10px 20px;background:rgba(8,6,22,.8);border:1px solid rgba(100,70,200,.4);border-radius:12px;backdrop-filter:blur(8px)">
+    <span style="font-size:20px;margin-right:8px">🌙</span>
+    <span id="lunar-day" style="font-family:'Cinzel',serif;font-size:13px;color:#c8d8f0;font-weight:600"></span>
+    <span style="color:rgba(150,120,220,.5);margin:0 6px">·</span>
+    <span id="lunar-pct" style="font-size:11px;color:rgba(180,150,255,.65)"></span>
+  </div>
+  <div class="sec-title">სიდერული ბორბალი · 13 კონსტელაცია</div>
+  <svg id="wheel" viewBox="0 0 700 700" xmlns="http://www.w3.org/2000/svg"></svg>
 
-from flask import Flask, request, jsonify
-from flask_cors import CORS
-from geopy.geocoders import Nominatim
-from timezonefinder import TimezoneFinder
-from datetime import datetime
-import pytz
+  <div class="sec-title">პლანეტები · Planets</div>
+  <div class="tables-wrap">
+    <div class="data-card">
+      <div class="data-card-title">🪐 პლანეტები</div>
+      <table><thead><tr><th></th><th>სახელი</th><th>პოზიცია</th><th>კონსტელაცია</th><th>სახ.</th><th>℞</th></tr></thead>
+      <tbody id="planet-tbody"></tbody></table>
+    </div>
+    <div class="data-card">
+      <div class="data-card-title">🏠 სახლები · Placidus Houses</div>
+      <table><thead><tr><th>სახლი</th><th>კონსტელაცია</th><th>გრადუსი</th></tr></thead>
+      <tbody id="house-tbody"></tbody></table>
+    </div>
+  </div>
 
-app = Flask(__name__)
-CORS(app, origins="*")
-tf = TimezoneFinder()
+  <div class="sec-title">ასპექტები · Aspects</div>
+  <div class="data-card" style="margin-bottom:8px">
+    <div class="data-card-title">⚡ მთავარი ასპექტები</div>
+    <table><thead><tr><th>პლანეტა 1</th><th>ასპ.</th><th>პლანეტა 2</th><th>ტიპი</th><th>ორბი</th></tr></thead>
+    <tbody id="aspect-tbody"></tbody></table>
+  </div>
 
-# ════════════════════════════════════════════════════════════════
-# SHARED HELPERS
-# ════════════════════════════════════════════════════════════════
+  <div class="sec-title">კონსტელაციების განაწილება</div>
+  <div class="data-card" style="margin-bottom:8px">
+    <div class="data-card-title">📐 IAU კონსტელაციები · ეკლიპტიკაზე</div>
+    <table><thead><tr><th>კონსტელაცია</th><th>დასაწყისი</th><th>დასასრული</th><th>სიგანე</th><th>%</th></tr></thead>
+    <tbody id="con-tbody"></tbody></table>
+  </div>
+</div>
 
-def to_jd(year, month, day, hour, minute, second, tz_name):
-    try:
-        tz = pytz.timezone(tz_name)
-        local_dt = tz.localize(datetime(year, month, day, hour, minute, second), is_dst=None)
-        u = local_dt.utctimetuple()
-        utc_h = u.tm_hour + u.tm_min/60 + u.tm_sec/3600
-        return swe.julday(u.tm_year, u.tm_mon, u.tm_mday, utc_h)
-    except:
-        return swe.julday(year, month, day, hour + minute/60 + second/3600)
+<script>
+const BACKEND='https://astrology-production-b165.up.railway.app';
+const CX=350,CY=350,R1=270,R2=202,R3=135,R4=105;
 
-def deg_to_display(degree):
-    d = int(degree % 30)
-    m = (degree % 30 - d) * 60
-    return d, round(m / 60 * 100)
+// Planet info matching astro.html
+const PI={
+  'Sun':    {sym:'sun',  color:'#f9c646'},
+  'Moon':   {sym:'\u263d',color:'#c8d8f0'},
+  'Mercury':{sym:'\u263f',color:'#a0c8d0'},
+  'Venus':  {sym:'\u2640',color:'#e87878'},
+  'Mars':   {sym:'\u2642',color:'#e84040'},
+  'Jupiter':{sym:'\u2643',color:'#e89040'},
+  'Saturn': {sym:'\u2644',color:'#c8c840'},
+  'Uranus': {sym:'\u2645',color:'#50c8d8'},
+  'Neptune':{sym:'\u2646',color:'#6070d8'},
+  'Pluto':  {sym:'\u2bd3',color:'#c050a0'},
+  'Chiron': {sym:'\u26b7',color:'#d08040'},
+  'Lilith': {sym:'\u26b8',color:'#904060'},
+  'Selena': {sym:'\u2bdd\ufe0e',color:'#d0e8f8'},
+  'Juno':   {sym:'\u26b5',color:'#c890d0'},
+  'North Node':{sym:'\u260a',color:'#60c060'},
+  'South Node':{sym:'\u260b',color:'#c06060'},
+  'Vertex': {sym:'Vx',  color:'#8090d0'},
+  'Fortune':{sym:'\u2295',color:'#f0c060'},
+};
+const PORDER=['Sun','Moon','Mercury','Venus','Mars','Jupiter','Saturn',
+  'Uranus','Neptune','Pluto','Chiron','Lilith','Selena','Juno',
+  'North Node','South Node','Vertex','Fortune'];
 
-def fmtDMS(deg):
-    d = int(deg % 30)
-    m = int((deg % 30 - d) * 60)
-    s = int(((deg % 30 - d) * 60 - m) * 60)
-    return f"{d}\u00b0{m:02d}'{s:02d}\""
+// Element colors by constellation
+const CON_COLORS={
+  'Aries':'#e05252','Taurus':'#8aab6e','Gemini':'#89b4d4','Cancer':'#5b8ec4',
+  'Leo':'#d4602e','Virgo':'#7a9e6a','Libra':'#7fb8d8','Scorpius':'#4a7ab0',
+  'Ophiuchus':'#9060d0','Sagittarius':'#c84a32','Capricornus':'#6b9062',
+  'Aquarius':'#90c0dc','Pisces':'#6688c0'
+};
+const CON_FILLS={
+  'Aries':'#1a0808','Taurus':'#081008','Gemini':'#08101a','Cancer':'#08101a',
+  'Leo':'#1a0a06','Virgo':'#081008','Libra':'#08101a','Scorpius':'#100818',
+  'Ophiuchus':'#0e0818','Sagittarius':'#1a0808','Capricornus':'#081008',
+  'Aquarius':'#08101a','Pisces':'#080c18'
+};
 
-TROPICAL_SIGNS = [
-    'ვერძი','კურო','ტყუპები','კირჩხიბი',
-    'ლომი','ქალწული','სასწორი','მორიელი',
-    'მშვილდოსანი','თხის რქა','მერწყული','თევზები'
-]
-VEDIC_SIGNS = [
-    'Mesha','Vrishabha','Mithuna','Karka','Simha','Kanya',
-    'Tula','Vrischika','Dhanu','Makara','Kumbha','Mina'
-]
+// ROMAN numerals
+const ROMAN=['I','II','III','IV','V','VI','VII','VIII','IX','X','XI','XII'];
+const SIGN_KA={'Aries':'ვერძი','Taurus':'კურო','Gemini':'ტყუპები','Cancer':'კირჩხიბი',
+  'Leo':'ლომი','Virgo':'ქალწული','Libra':'სასწორი','Scorpius':'მორიელი',
+  'Ophiuchus':'გველმჭერი','Sagittarius':'მშვილდოსანი','Capricornus':'თხის რქა',
+  'Aquarius':'მერწყული','Pisces':'თევზები'};
 
-def trop_sign(deg): return TROPICAL_SIGNS[int(deg/30)%12]
-def ved_sign(deg):  return VEDIC_SIGNS[int(deg/30)%12]
-def ved_si(deg):    return int(deg/30)%12
+// Constellation data loaded from backend
+let CONS=[];
 
-def get_house(degree, cusps):
-    for i in range(12):
-        s, e = cusps[i], cusps[(i+1)%12]
-        if s <= e:
-            if s <= degree < e: return i+1
-        else:
-            if degree >= s or degree < e: return i+1
-    return 1
+function sunSVG(sz=22){
+  return `<svg width="${sz}" height="${sz}" viewBox="0 0 22 22" xmlns="http://www.w3.org/2000/svg" style="vertical-align:middle;display:inline-block;overflow:visible">
+    <defs><filter id="svf${sz}" x="-80%" y="-80%" width="260%" height="260%">
+      <feGaussianBlur stdDeviation="2.5" result="b"/>
+      <feMerge><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge>
+    </filter></defs>
+    <circle cx="11" cy="11" r="9" fill="none" stroke="#f9c646" stroke-width="1.8" filter="url(#svf${sz})"/>
+    <circle cx="11" cy="11" r="9" fill="none" stroke="#ffe8a0" stroke-width="0.7"/>
+    <circle cx="11" cy="11" r="2.5" fill="#f9c646" filter="url(#svf${sz})"/>
+    <circle cx="11" cy="11" r="1.2" fill="#fff7d0"/>
+  </svg>`;
+}
 
-# ════════════════════════════════════════════════════════════════
-# GEOCODE
-# ════════════════════════════════════════════════════════════════
+function toggleTimeUnknown(){
+  document.getElementById('time-fields').classList.toggle('time-disabled',
+    document.getElementById('time-unknown').checked);
+}
 
-@app.route('/')
-def index():
-    return jsonify({'status':'ok','message':'Astrology API — Western + Vedic'})
+function displayLunarBadge(data){
+  try{
+    const L=data.lunar; if(!L) return;
+    const hrs=L.hours_to_next, pct=L.pct_elapsed;
+    let nextStr=hrs<1?`${Math.round(hrs*60)} წთ-ში`:`${Math.floor(hrs)} სთ ${Math.round((hrs%1)*60)} წთ-ში`;
+    document.getElementById('lunar-day').textContent=`🌙 მთვარის მე-${L.lunar_day} დღე`;
+    document.getElementById('lunar-pct').textContent=`შემდეგი ${nextStr} · ${pct}% გასული`;
+    document.getElementById('lunar-badge').style.display='block';
+  }catch(e){}
+}
 
-@app.route('/geocode', methods=['POST'])
-def geocode():
-    try:
-        city = request.json.get('city','').strip()
-        if not city:
-            return jsonify({'error':'City name is empty'}), 400
-        # Try geopy first
-        try:
-            geo = Nominatim(user_agent="astro-api-v3", timeout=10)
-            loc = geo.geocode(city, language='en', exactly_one=True)
-        except:
-            loc = None
-        # Fallback: direct HTTP
-        if not loc:
-            try:
-                q = urllib.parse.urlencode({'q':city,'format':'json','limit':1})
-                req = urllib.request.Request(
-                    f'https://nominatim.openstreetmap.org/search?{q}',
-                    headers={'User-Agent':'astro-api-v3'})
-                with urllib.request.urlopen(req, timeout=10) as r:
-                    res = _json.loads(r.read())
-                if res:
-                    lat,lon = float(res[0]['lat']),float(res[0]['lon'])
-                    tz = tf.timezone_at(lat=lat,lng=lon) or 'UTC'
-                    return jsonify({'lat':lat,'lon':lon,'tz_name':tz,'display':res[0].get('display_name',city)})
-            except: pass
-            return jsonify({'error':'City not found: '+city}), 404
-        lat,lon = loc.latitude, loc.longitude
-        tz = tf.timezone_at(lat=lat,lng=lon) or 'UTC'
-        return jsonify({'lat':lat,'lon':lon,'tz_name':tz,'display':loc.address})
-    except Exception as e:
-        return jsonify({'error':str(e)}), 500
+let cityTimer=null;
+function searchCity(){
+  clearTimeout(cityTimer);
+  cityTimer=setTimeout(async()=>{
+    const city=document.getElementById('city').value;
+    if(city.length<2) return;
+    const hint=document.getElementById('city-hint');
+    hint.textContent='⏳ ძიება...';
+    try{
+      const r=await fetch(`${BACKEND}/geocode`,{method:'POST',
+        headers:{'Content-Type':'application/json'},body:JSON.stringify({city})});
+      const d=await r.json();
+      if(d.error){hint.textContent='❌ '+d.error;return;}
+      document.getElementById('lat').value=d.lat.toFixed(4);
+      document.getElementById('lon').value=d.lon.toFixed(4);
+      hint.textContent='📍 '+d.display;
+      document.getElementById('tz_name').value=d.tz_name||'UTC';
+      document.getElementById('tz-display').textContent='🕐 '+d.tz_name;
+    }catch(e){hint.textContent='❌ '+e.message;}
+  },600);
+}
 
-# ════════════════════════════════════════════════════════════════
-# WESTERN CHART
-# ════════════════════════════════════════════════════════════════
-
-ASPECTS_DEF = [
-    {'name':'შეერთება',      'angle':0,   'orb':8, 'sym':'☌','color':'#f9c646'},
-    {'name':'სექსტილი',      'angle':60,  'orb':6, 'sym':'⚹','color':'#30c890'},
-    {'name':'კვადრატი',      'angle':90,  'orb':8, 'sym':'□','color':'#e84040'},
-    {'name':'ტრინი',         'angle':120, 'orb':8, 'sym':'△','color':'#a078f0'},
-    {'name':'ოპოზიცია',      'angle':180, 'orb':8, 'sym':'☍','color':'#e89040'},
-    {'name':'კვინკუნქსი',    'angle':150, 'orb':3, 'sym':'⚻','color':'#9ba8b8'},
-    {'name':'ნახ.-სექსტ.',   'angle':30,  'orb':2, 'sym':'⚺','color':'#7080a0'},
-    {'name':'ნახ.-კვად.',    'angle':45,  'orb':2, 'sym':'∠','color':'#c06060'},
-    {'name':'სესკვიკვად.',   'angle':135, 'orb':2, 'sym':'⚼','color':'#c08040'},
-    {'name':'კვინტილი',      'angle':72,  'orb':2, 'sym':'Q', 'color':'#50b0d0'},
-    {'name':'ბიკვინტილი',    'angle':144, 'orb':2, 'sym':'bQ','color':'#60a0c0'},
-]
-
-ASPECT_PLANETS = [
-    'მზე','მთვარე','მერკური','ვენერა','მარსი',
-    'იუპიტერი','სატურნი','ურანი','ნეპტუნი','პლუტონი',
-    'ქირონი','ჩრდ. კვანძი'
-]
-
-def calc_aspects(planets):
-    aspects = []
-    names = [n for n in ASPECT_PLANETS if n in planets]
-    for i in range(len(names)):
-        for j in range(i+1, len(names)):
-            p1,p2 = names[i],names[j]
-            diff = abs(planets[p1]['degree'] - planets[p2]['degree'])
-            if diff > 180: diff = 360 - diff
-            for asp in ASPECTS_DEF:
-                orb = abs(diff - asp['angle'])
-                if orb <= asp['orb']:
-                    aspects.append({'p1':p1,'p2':p2,'type':asp['name'],
-                        'sym':asp['sym'],'color':asp['color'],'orb':round(orb,2),'angle':asp['angle']})
-                    break
-    aspects.sort(key=lambda x: x['orb'])
-    return aspects
-
-def calc_lunar_day(jd_ut, tz_offset=0.0):
-    swe.set_ephe_path(EPHE_PATH)
-    sun,_  = swe.calc_ut(jd_ut, swe.SUN)
-    moon,_ = swe.calc_ut(jd_ut, swe.MOON)
-    elong  = (moon[0] - sun[0] + 360) % 360
-    deg_per_day = 12.0
-    age = elong / deg_per_day
-    lunar_day = int(age) + 1
-    pct_elapsed = round((age % 1) * 100, 2)
-    rel_speed = 360.0 / (29.53058868 * 24.0)
-    hours_to_next = round((deg_per_day - elong % deg_per_day) / rel_speed, 2)
-    if elong < 45:    phase = 'ახალი მთვარე'
-    elif elong < 90:  phase = 'მზარდი'
-    elif elong < 135: phase = 'I მეოთხედი'
-    elif elong < 180: phase = 'მზარდი სავსე'
-    elif elong < 225: phase = 'სავსე მთვარე'
-    elif elong < 270: phase = 'კლება'
-    elif elong < 315: phase = 'III მეოთხედი'
-    else:             phase = 'კლება'
-    return {
-        'lunar_day':lunar_day,'pct_elapsed':pct_elapsed,
-        'pct_remaining':round(100-pct_elapsed,2),
-        'hours_to_next':hours_to_next,'elongation':round(elong,2),
-        'phase':phase,'moon_deg':round(moon[0],4),'sun_deg':round(sun[0],4),
+async function generateChart(){
+  const lat=document.getElementById('lat').value;
+  const lon=document.getElementById('lon').value;
+  if(!lat||!lon){alert('პირველ შეიყვანეთ ქალაქი');return;}
+  const btn=document.querySelector('.gen-btn');
+  btn.textContent='⏳ გთხოვთ დაელოდოთ...';btn.disabled=true;
+  const timeUnknown=document.getElementById('time-unknown').checked;
+  const year=+document.getElementById('year').value;
+  const month=+document.getElementById('month').value;
+  const day=+document.getElementById('day').value;
+  const tz_name=document.getElementById('tz_name').value;
+  const hour=timeUnknown?12:+document.getElementById('hour').value;
+  const minute=timeUnknown?0:+document.getElementById('minute').value;
+  const second=timeUnknown?0:+document.getElementById('second').value;
+  try{
+    const r=await fetch(`${BACKEND}/true_sidereal`,{method:'POST',
+      headers:{'Content-Type':'application/json'},
+      body:JSON.stringify({year,month,day,hour,minute,second,lat:+lat,lon:+lon,tz_name,time_unknown:timeUnknown})});
+    const raw=await r.text();
+    let data;
+    try{data=JSON.parse(raw);}catch(e){throw new Error('Backend error ('+r.status+'): '+raw.slice(0,200));}
+    if(data.error) throw new Error(data.error+(data.trace?'\n'+data.trace.slice(0,300):''));
+    data._timeUnknown=timeUnknown;
+    CONS=data.constellations;
+    // Moon path for time-unknown
+    if(timeUnknown){
+      try{
+        const lr=await fetch(`${BACKEND}/lunar`,{method:'POST',
+          headers:{'Content-Type':'application/json'},
+          body:JSON.stringify({year,month,day,hour:12,minute:0,second:0,tz_name,time_unknown:true})});
+        const ld=await lr.json();
+        // Tropical moon path is correct for true sidereal (IAU uses tropical coords)
+        if(ld.moon_path) data._moonPath=ld.moon_path;
+      }catch(e){console.log('moon path error',e);}
     }
+    document.getElementById('chart-area').style.display='block';
+    drawWheel(data);
+    drawPlanetTable(data);
+    drawHouseTable(data);
+    drawAspectTable(data);
+    drawConTable(data);
+    displayLunarBadge(data);
+    document.getElementById('chart-area').scrollIntoView({behavior:'smooth',block:'start'});
+  }catch(e){alert('შეცდომა: '+e.message);}
+  finally{btn.textContent='✦ რუქის გენერაცია ✦';btn.disabled=false;}
+}
 
-@app.route('/chart', methods=['POST'])
-def chart():
-    swe.set_ephe_path(EPHE_PATH)
-    d = request.json
-    year,month,day = int(d['year']),int(d['month']),int(d['day'])
-    hour,minute,second = int(d['hour']),int(d['minute']),int(d['second'])
-    lat,lon = float(d['lat']),float(d['lon'])
-    tz_name = d.get('tz_name','UTC')
-    time_unknown = d.get('time_unknown', False)
+// ── SVG HELPERS ──
+const NS='http://www.w3.org/2000/svg';
+function el(tag,attrs,parent){
+  const e=document.createElementNS(NS,tag);
+  for(const[k,v] of Object.entries(attrs)) e.setAttribute(k,v);
+  if(parent) parent.appendChild(e);return e;
+}
+function txt(parent,s,x,y,attrs={}){
+  const t=el('text',{'text-anchor':'middle','dominant-baseline':'central',x,y,...attrs},parent);
+  t.textContent=s;return t;
+}
+function toRad(d){return d*Math.PI/180;}
+// True sidereal: 0° = Aries start (29° tropical), wheel starts at left
+// Tropical degree → angle on wheel
+// Aries starts at 29° tropical = left (π)
+const ARIES_START=29.0; // tropical (Aries IAU start)
+function t2a(trop_deg, ref=ARIES_START){
+  // Place ref degree at left (π), everything else rotates accordingly
+  return toRad(-((trop_deg - ref + 360) % 360)) + Math.PI;
+}
+function ascConStart(asc_trop){
+  // Find the IAU constellation containing asc, return its start degree
+  // Use hardcoded boundaries (same as backend)
+  const BOUNDS=[
+    [29.0,53.5],[53.5,90.0],[90.0,118.5],[118.5,138.5],[138.5,174.0],
+    [174.0,217.5],[217.5,241.0],[241.0,247.5],[247.5,266.5],[266.5,302.0],
+    [302.0,327.0],[327.0,351.5],[351.5,389.0]
+  ];
+  const d=((asc_trop%360)+360)%360;
+  for(const [s,e] of BOUNDS){
+    const ss=s%360, ee=e%360;
+    if(ss<ee?ss<=d&&d<ee:d>=ss||d<ee) return ss;
+  }
+  return ARIES_START;
+}
+function pxy(a,r){return{x:CX+Math.cos(a)*r,y:CY+Math.sin(a)*r};}
 
-    jd = to_jd(year,month,day,hour,minute,second,tz_name)
-    planets = {}
+function drawWheel(data){
+  const svg=document.getElementById('wheel');
+  svg.innerHTML='';
+  // Rising constellation start at left
+  // ASC degree at left (9 o'clock position)
+  const ascRef=data._timeUnknown?ARIES_START:data.asc;
+  // ── DEFS ──
+  const defs=el('defs',{},svg);
+  const bgG=el('radialGradient',{id:'bgG',cx:'50%',cy:'50%',r:'50%'},defs);
+  el('stop',{offset:'0%','stop-color':'#120e2a'},bgG);
+  el('stop',{offset:'60%','stop-color':'#0a0820'},bgG);
+  el('stop',{offset:'100%','stop-color':'#04030e'},bgG);
+  const sf=el('filter',{id:'sunF',x:'-60%',y:'-60%',width:'220%',height:'220%'},defs);
+  el('feGaussianBlur',{stdDeviation:'3',result:'blur'},sf);
+  const sfm=el('feMerge',{},sf);el('feMergeNode',{in:'blur'},sfm);el('feMergeNode',{in:'SourceGraphic'},sfm);
+  const mf=el('filter',{id:'moonF',x:'-60%',y:'-60%',width:'220%',height:'220%'},defs);
+  el('feGaussianBlur',{stdDeviation:'2.5',result:'blur'},mf);
+  const mfc=el('feFlood',{'flood-color':'#4090ff','flood-opacity':'0.45','result':'color'},mf);
+  el('feComposite',{in:'color',in2:'blur',operator:'in','result':'cb'},mf);
+  const mfmg=el('feMerge',{},mf);el('feMergeNode',{in:'cb'},mfmg);el('feMergeNode',{in:'SourceGraphic'},mfmg);
+  el('rect',{width:700,height:700,fill:'url(#bgG)'},svg);
 
-    MAIN = {'მზე':swe.SUN,'მთვარე':swe.MOON,'მერკური':swe.MERCURY,
-            'ვენერა':swe.VENUS,'მარსი':swe.MARS,'იუპიტერი':swe.JUPITER,
-            'სატურნი':swe.SATURN,'ურანი':swe.URANUS,'ნეპტუნი':swe.NEPTUNE,'პლუტონი':swe.PLUTO}
+  // ── CONSTELLATION SEGMENTS (variable size!) ──
+  for(const con of CONS){
+    const color=CON_COLORS[con.name]||'#8888aa';
+    const fill=CON_FILLS[con.name]||'#08081a';
+    const a0=t2a(con.start,ascRef), a1=t2a(con.end%360,ascRef);
+    // span > 180 needs large arc flag
+    const span=con.span;
+    const la=span>180?1:0;
 
-    for name,pid in MAIN.items():
-        pos,_ = swe.calc_ut(jd,pid)
-        deg = pos[0]; dv,c = deg_to_display(deg)
-        planets[name] = {'degree':round(deg,4),'sign':trop_sign(deg),
-            'sign_degree':dv,'centesimal':c,'retrograde':bool(pos[3]<0) if len(pos)>3 else False}
+    const p=(a,r)=>`${CX+Math.cos(a)*r},${CY+Math.sin(a)*r}`;
 
-    for name,pid,key in [
-        ('ქირონი',swe.CHIRON,'chiron'),
-        ('ლილიტი',swe.MEAN_APOG,'lilith')]:
-        try:
-            pos,_ = swe.calc_ut(jd,pid); deg=pos[0]; dv,c=deg_to_display(deg)
-            planets[name]={'degree':round(deg,4),'sign':trop_sign(deg),
-                'sign_degree':dv,'centesimal':c,'retrograde':bool(pos[3]<0) if len(pos)>3 else False}
-        except: pass
+    // Outer zodiac ring R2→R1
+    el('path',{
+      d:`M${p(a0,R2)} L${p(a0,R1)} A${R1},${R1} 0 ${la},0 ${p(a1,R1)} L${p(a1,R2)} A${R2},${R2} 0 ${la},1 ${p(a0,R2)} Z`,
+      fill
+    },svg);
+    // Colored inner edge arc
+    el('path',{d:`M${p(a0,R2)} A${R2},${R2} 0 ${la},0 ${p(a1,R2)}`,
+      fill:'none',stroke:color,'stroke-width':2,opacity:.6},svg);
+    // House band R3→R2
+    el('path',{
+      d:`M${p(a0,R3)} L${p(a0,R2)} A${R2},${R2} 0 ${la},0 ${p(a1,R2)} L${p(a1,R3)} A${R3},${R3} 0 ${la},1 ${p(a0,R3)} Z`,
+      fill:(CONS.indexOf(con)%2)?'rgba(6,5,18,1)':'rgba(10,8,26,1)'
+    },svg);
+    // Divider line at start
+    el('line',{x1:CX+Math.cos(a0)*R1,y1:CY+Math.sin(a0)*R1,
+      x2:CX+Math.cos(a0)*R2,y2:CY+Math.sin(a0)*R2,
+      stroke:color,'stroke-width':1.2,opacity:.85},svg);
 
-    try:
-        pos,_ = swe.calc_ut(jd,swe.AST_OFFSET+1181); deg=pos[0]; dv,c=deg_to_display(deg)
-        planets['თეთრი მთვარე']={'degree':round(deg,4),'sign':trop_sign(deg),
-            'sign_degree':dv,'centesimal':c,'retrograde':False}
-    except:
-        try:
-            pos,_ = swe.calc_ut(jd,56); deg=pos[0]; dv,c=deg_to_display(deg)
-            planets['თეთრი მთვარე']={'degree':round(deg,4),'sign':trop_sign(deg),
-                'sign_degree':dv,'centesimal':c,'retrograde':False}
-        except: pass
+    // Symbol at midpoint of outer ring
+    const midTrop=(con.start+(con.end%360))/2;
+    // Handle Pisces wrap
+    let mt=midTrop;
+    if(con.name==='Pisces') mt=(con.start+29+360)/2;  // mid between 351.5 and 389(=29)
+    const amid=t2a(mt%360,ascRef);
+    const Rzs=(R1+R2)/2;
+    const symText=el('text',{'text-anchor':'middle','dominant-baseline':'central',
+      x:CX+Math.cos(amid)*Rzs,y:CY+Math.sin(amid)*Rzs,
+      fill:color,'font-size':con.name==='Scorpius'?14:con.name==='Ophiuchus'?17:19,
+      'font-family':'serif','font-weight':'bold'},svg);
+    symText.textContent=con.sym+'\ufe0e';
 
-    try:
-        pos,_ = swe.calc_ut(jd,swe.MEAN_NODE); nn=pos[0]; dv,c=deg_to_display(nn)
-        planets['ჩრდ. კვანძი']={'degree':round(nn,4),'sign':trop_sign(nn),'sign_degree':dv,'centesimal':c,'retrograde':True}
-        sn=(nn+180)%360; dv,c=deg_to_display(sn)
-        planets['სამხ. კვანძი']={'degree':round(sn,4),'sign':trop_sign(sn),'sign_degree':dv,'centesimal':c,'retrograde':True}
-    except: pass
+    // No inner names
+  }
 
-    try:
-        pos,_ = swe.calc_ut(jd,swe.AST_OFFSET+3); deg=pos[0]; dv,c=deg_to_display(deg)
-        planets['იუნო']={'degree':round(deg,4),'sign':trop_sign(deg),'sign_degree':dv,'centesimal':c,'retrograde':bool(pos[3]<0) if len(pos)>3 else False}
-    except: pass
+  // ── MOON PATH (time-unknown) ──
+  if(data._timeUnknown && data._moonPath){
+    const mp=data._moonPath;
+    const R_outer=R1-1, R_inner=R1-8;
+    const span=((mp.end-mp.start)+360)%360;
+    const la=span>180?1:0;
+    const a0=t2a(mp.start,ascRef), a1e=t2a(mp.end,ascRef);
+    const x0o=CX+Math.cos(a0)*R_outer, y0o=CY+Math.sin(a0)*R_outer;
+    const x1o=CX+Math.cos(a1e)*R_outer,y1o=CY+Math.sin(a1e)*R_outer;
+    const x1i=CX+Math.cos(a1e)*R_inner,y1i=CY+Math.sin(a1e)*R_inner;
+    const x0i=CX+Math.cos(a0)*R_inner, y0i=CY+Math.sin(a0)*R_inner;
+    el('path',{
+      d:`M${x0o},${y0o} A${R_outer},${R_outer} 0 ${la},0 ${x1o},${y1o} L${x1i},${y1i} A${R_inner},${R_inner} 0 ${la},1 ${x0i},${y0i} Z`,
+      fill:'rgba(100,160,255,0.35)',stroke:'none'},svg);
+  }
 
-    cusps,ascmc = swe.houses(jd,lat,lon,b'P')
-    asc=float(ascmc[0]); mc=float(ascmc[1])
+  // ── INNERMOST FILL ──
+  el('circle',{cx:CX,cy:CY,r:R4,fill:'rgba(4,3,14,1)'},svg);
 
-    if not time_unknown:
-        try:
-            vx=float(ascmc[3]); dv,c=deg_to_display(vx)
-            planets['ვერტექსი']={'degree':round(vx,4),'sign':trop_sign(vx),'sign_degree':dv,'centesimal':c,'retrograde':False}
-        except: pass
-        try:
-            f=(asc+planets['მთვარე']['degree']-planets['მზე']['degree'])%360; dv,c=deg_to_display(f)
-            planets['ბედის ვარსკვლავი']={'degree':round(f,4),'sign':trop_sign(f),'sign_degree':dv,'centesimal':c,'retrograde':False}
-        except: pass
+  // ── DEGREE TICKS — all identical ──
+  for(let deg=0;deg<360;deg++){
+    const trop=(ARIES_START+deg)%360;
+    const a=t2a(trop,ascRef);
+    el('line',{x1:CX+Math.cos(a)*R1,y1:CY+Math.sin(a)*R1,
+      x2:CX+Math.cos(a)*(R1-7),y2:CY+Math.sin(a)*(R1-7),
+      stroke:'rgba(90,60,155,0.6)','stroke-width':0.6},svg);
+  }
 
-    for name in planets:
-        planets[name]['house'] = get_house(planets[name]['degree'],cusps)
+  // ── CIRCLES ──
+  el('circle',{cx:CX,cy:CY,r:R1,fill:'none',stroke:'rgba(140,90,230,.85)','stroke-width':1.8},svg);
+  el('circle',{cx:CX,cy:CY,r:R2,fill:'none',stroke:'rgba(100,65,200,.8)','stroke-width':1.5},svg);
+  el('circle',{cx:CX,cy:CY,r:R3,fill:'none',stroke:'rgba(70,45,160,.75)','stroke-width':1.2},svg);
+  el('circle',{cx:CX,cy:CY,r:R4,fill:'none',stroke:'rgba(50,32,120,.7)','stroke-width':1},svg);
 
-    try:
-        tz_offset=0.0
-        try:
-            tz_obj=pytz.timezone(tz_name)
-            ld=tz_obj.localize(datetime(year,month,day,hour,minute,second))
-            tz_offset=ld.utcoffset().total_seconds()/3600
-        except: pass
-        lunar=calc_lunar_day(jd,tz_offset)
-    except:
-        lunar=None
+  // ── PLACIDUS HOUSE LINES + NUMBERS + ASC/MC ──
+  if(!data._timeUnknown){
+    const angCol='#e8c06e';
+    const Rhn=(R2+R3)/2;
+    const ROMAN12=['I','II','III','IV','V','VI','VII','VIII','IX','X','XI','XII'];
+    for(let i=0;i<12;i++){
+      const ha=t2a(data.houses[i],ascRef);
+      const isAngle=[0,3,6,9].includes(i);
+      el('line',{x1:CX+Math.cos(ha)*R2,y1:CY+Math.sin(ha)*R2,
+        x2:CX+Math.cos(ha)*R3,y2:CY+Math.sin(ha)*R3,
+        stroke:isAngle?angCol:'rgba(100,65,200,.55)',
+        'stroke-width':isAngle?2:.7},svg);
+      const next=data.houses[(i+1)%12];
+      let mid=data.houses[i]+((next-data.houses[i]+360)%360)/2;
+      if(mid>=360) mid-=360;
+      const ma=t2a(mid,ascRef);
+      txt(svg,ROMAN12[i],CX+Math.cos(ma)*Rhn,CY+Math.sin(ma)*Rhn,
+        {fill:'rgba(180,150,255,0.8)','font-size':11,'font-family':'Cinzel,serif','font-weight':'bold'});
+    }
+    // ASC line
+    const ascA=t2a(data.asc,ascRef);
+    el('line',{x1:CX+Math.cos(ascA)*R1,y1:CY+Math.sin(ascA)*R1,
+      x2:CX+Math.cos(ascA)*(R1+28),y2:CY+Math.sin(ascA)*(R1+28),
+      stroke:angCol,'stroke-width':2.5},svg);
+    txt(svg,'AC',CX+Math.cos(ascA)*(R1+42),CY+Math.sin(ascA)*(R1+42),
+      {fill:angCol,'font-size':12,'font-weight':'bold','font-family':'Cinzel,serif'});
+    // MC circle
+    const mcA=t2a(data.mc,ascRef);
+    const mcDist=R1+52,mcR=19;
+    const mcCX=CX+Math.cos(mcA)*mcDist,mcCY=CY+Math.sin(mcA)*mcDist;
+    el('line',{x1:CX+Math.cos(mcA)*R1,y1:CY+Math.sin(mcA)*R1,
+      x2:CX+Math.cos(mcA)*(mcDist-mcR-2),y2:CY+Math.sin(mcA)*(mcDist-mcR-2),
+      stroke:angCol,'stroke-width':2.5},svg);
+    el('circle',{cx:mcCX,cy:mcCY,r:mcR,fill:'rgba(10,8,20,.95)',stroke:angCol,'stroke-width':2},svg);
+    txt(svg,'MC',mcCX,mcCY,{fill:angCol,'font-size':11,'font-weight':'bold','font-family':'Cinzel,serif'});
+  }
 
-    return jsonify({
-        'planets':planets,'houses':[round(c,4) for c in cusps],
-        'asc':round(asc,4),'mc':round(mc,4),
-        'asc_sign':trop_sign(asc),'mc_sign':trop_sign(mc),
-        'aspects':calc_aspects(planets),'lunar':lunar,
-        'lat':lat,'lon':lon,'tz_name':tz_name
-    })
+  // ── ASPECT LINES — inside center circle ──
+  if(data.aspects){
+    for(const asp of data.aspects){
+      if(!data.planets[asp.p1]||!data.planets[asp.p2]) continue;
+      const a1=t2a(data.planets[asp.p1].tropical,ascRef);
+      const a2=t2a(data.planets[asp.p2].tropical,ascRef);
+      const p1=pxy(a1,R4-4),p2=pxy(a2,R4-4);
+      const isDash=asp.angle===90||asp.angle===180;
+      el('line',{x1:p1.x,y1:p1.y,x2:p2.x,y2:p2.y,
+        stroke:asp.color,'stroke-width':isDash?0.7:0.9,
+        opacity:isDash?.4:.6,'stroke-dasharray':isDash?'3 3':''},svg);
+    }
+  }
 
-@app.route('/lunar', methods=['POST'])
-def lunar():
-    swe.set_ephe_path(EPHE_PATH)
-    d=request.json
-    year,month,day=int(d['year']),int(d['month']),int(d['day'])
-    hour,minute,second=int(d.get('hour',12)),int(d.get('minute',0)),int(d.get('second',0))
-    tz_name=d.get('tz_name','UTC')
-    time_unknown=d.get('time_unknown',False)
-    jd=to_jd(year,month,day,hour,minute,second,tz_name)
-    try:
-        tz_offset=0.0
-        try:
-            tz_obj=pytz.timezone(tz_name)
-            ld=tz_obj.localize(datetime(year,month,day,hour,minute,second))
-            tz_offset=ld.utcoffset().total_seconds()/3600
-        except: pass
-        lunar_data=calc_lunar_day(jd,tz_offset)
-    except Exception as e:
-        return jsonify({'error':str(e)}),500
-    result={'lunar':lunar_data}
-    if time_unknown:
-        try:
-            jd0=to_jd(year,month,day,0,0,0,tz_name)
-            jd1=to_jd(year,month,day,23,59,59,tz_name)
-            m0,_=swe.calc_ut(jd0,swe.MOON)
-            m1,_=swe.calc_ut(jd1,swe.MOON)
-            # Tropical positions
-            result['moon_path']={'start':round(m0[0],4),'end':round(m1[0],4)}
-            # Sidereal positions (Lahiri) for Vedic chart
-            swe.set_sid_mode(swe.SIDM_LAHIRI,0,0)
-            ayan0=swe.get_ayanamsa_ut(jd0)
-            ayan1=swe.get_ayanamsa_ut(jd1)
-            result['moon_path_sid']={
-                'start':round((m0[0]-ayan0)%360,4),
-                'end':  round((m1[0]-ayan1)%360,4)
-            }
-            swe.set_sid_mode(swe.SIDM_TROPICAL,0,0)
-        except: pass
-    return jsonify(result)
+  // ── PLANETS outside wheel ──
+  const present=PORDER.filter(n=>data.planets[n]);
+  const trueA={};
+  for(const n of present) trueA[n]=t2a(data.planets[n].tropical,ascRef);
+  const sorted=[...present].sort((a,b)=>trueA[a]-trueA[b]);
+  const dispA={};
+  for(const n of present) dispA[n]=trueA[n];
+  const Rg=R1+30, MINGAP=24/Rg;
 
-@app.route('/test')
-def test():
-    swe.set_ephe_path(EPHE_PATH)
-    return jsonify({'status':'ok','ephe_files':os.listdir(EPHE_PATH)})
-
-# ════════════════════════════════════════════════════════════════
-# VEDIC CHART
-# ════════════════════════════════════════════════════════════════
-
-NAKSHATRAS=[
-    {'name':'Ashwini',          'ka':'აშვინი',         'ruler':'Ketu',   'deity':'Ashwins',     'symbol':'Horse head'},
-    {'name':'Bharani',          'ka':'ბჰარანი',        'ruler':'Venus',  'deity':'Yama',         'symbol':'Yoni'},
-    {'name':'Krittika',         'ka':'კრიტიკა',        'ruler':'Sun',    'deity':'Agni',         'symbol':'Flame'},
-    {'name':'Rohini',           'ka':'როჰინი',         'ruler':'Moon',   'deity':'Brahma',       'symbol':'Chariot'},
-    {'name':'Mrigashira',       'ka':'მრიგაშირა',      'ruler':'Mars',   'deity':'Soma',         'symbol':'Deer head'},
-    {'name':'Ardra',            'ka':'არდრა',          'ruler':'Rahu',   'deity':'Rudra',        'symbol':'Teardrop'},
-    {'name':'Punarvasu',        'ka':'პუნარვასუ',      'ruler':'Jupiter','deity':'Aditi',        'symbol':'Bow'},
-    {'name':'Pushya',           'ka':'პუშია',          'ruler':'Saturn', 'deity':'Brihaspati',   'symbol':'Flower'},
-    {'name':'Ashlesha',         'ka':'აშლეშა',         'ruler':'Mercury','deity':'Nagas',        'symbol':'Serpent'},
-    {'name':'Magha',            'ka':'მაღა',           'ruler':'Ketu',   'deity':'Pitrs',        'symbol':'Throne'},
-    {'name':'Purva Phalguni',   'ka':'პ. ფალგუნი',    'ruler':'Venus',  'deity':'Bhaga',        'symbol':'Hammock'},
-    {'name':'Uttara Phalguni',  'ka':'უ. ფალგუნი',    'ruler':'Sun',    'deity':'Aryaman',      'symbol':'Bed'},
-    {'name':'Hasta',            'ka':'ჰასტა',          'ruler':'Moon',   'deity':'Savitar',      'symbol':'Hand'},
-    {'name':'Chitra',           'ka':'ჩიტრა',          'ruler':'Mars',   'deity':'Vishwakarma',  'symbol':'Pearl'},
-    {'name':'Swati',            'ka':'სვატი',          'ruler':'Rahu',   'deity':'Vayu',         'symbol':'Coral'},
-    {'name':'Vishakha',         'ka':'ვიშახა',         'ruler':'Jupiter','deity':'Indra-Agni',   'symbol':'Arch'},
-    {'name':'Anuradha',         'ka':'ანურადჰა',       'ruler':'Saturn', 'deity':'Mitra',        'symbol':'Lotus'},
-    {'name':'Jyeshtha',         'ka':'ჯიეშთა',        'ruler':'Mercury','deity':'Indra',        'symbol':'Umbrella'},
-    {'name':'Mula',             'ka':'მულა',           'ruler':'Ketu',   'deity':'Nirriti',      'symbol':'Root'},
-    {'name':'Purva Ashadha',    'ka':'პ. აშადჰა',     'ruler':'Venus',  'deity':'Apas',         'symbol':'Fan'},
-    {'name':'Uttara Ashadha',   'ka':'უ. აშადჰა',     'ruler':'Sun',    'deity':'Vishwadevas',  'symbol':'Tusk'},
-    {'name':'Shravana',         'ka':'შრავანა',        'ruler':'Moon',   'deity':'Vishnu',       'symbol':'Ear'},
-    {'name':'Dhanishtha',       'ka':'დჰანიშთა',      'ruler':'Mars',   'deity':'Ashta Vasus',  'symbol':'Drum'},
-    {'name':'Shatabhisha',      'ka':'შატაბჰიშა',     'ruler':'Rahu',   'deity':'Varuna',       'symbol':'Circle'},
-    {'name':'Purva Bhadrapada', 'ka':'პ. ბჰადრაპადა', 'ruler':'Jupiter','deity':'Aja Ekapada',  'symbol':'Sword'},
-    {'name':'Uttara Bhadrapada','ka':'უ. ბჰადრაპადა', 'ruler':'Saturn', 'deity':'Ahir Budhnya', 'symbol':'Twins'},
-    {'name':'Revati',           'ka':'რევატი',         'ruler':'Mercury','deity':'Pushan',       'symbol':'Fish'},
-]
-
-PADA_SIGNS  =['Aries','Taurus','Gemini','Cancer','Leo','Virgo','Libra','Scorpio','Sagittarius','Capricorn','Aquarius','Pisces']
-PADA_RULERS =['Mars','Venus','Mercury','Moon','Sun','Mercury','Venus','Mars','Jupiter','Saturn','Saturn','Jupiter']
-
-def get_nakshatra(sid):
-    deg=sid%360; sz=360/27; pz=sz/4
-    ni=int(deg/sz); np2=deg-ni*sz; pada=int(np2/pz)+1
-    psi=(ni*4+pada-1)%12
-    n=NAKSHATRAS[ni]
-    return {'nakshatra':n['name'],'nakshatra_ka':n['ka'],'nakshatra_ruler':n['ruler'],
-            'deity':n['deity'],'symbol':n['symbol'],'pada':pada,
-            'pada_sign':PADA_SIGNS[psi],'pada_ruler':PADA_RULERS[psi],
-            'nak_idx':ni,'nak_pos':round(np2,4),'pct':round(np2/sz*100,1)}
-
-@app.route('/vedic', methods=['POST'])
-def vedic():
-    try:
-        swe.set_ephe_path(EPHE_PATH)
-        swe.set_sid_mode(swe.SIDM_LAHIRI, 0, 0)
-        d=request.json
-        year,month,day=int(d['year']),int(d['month']),int(d['day'])
-        hour,minute,second=int(d['hour']),int(d['minute']),int(d['second'])
-        lat,lon=float(d['lat']),float(d['lon'])
-        tz_name=d.get('tz_name','UTC')
-        jd=to_jd(year,month,day,hour,minute,second,tz_name)
-        ayanamsa=swe.get_ayanamsa_ut(jd)
-        FLAGS=swe.FLG_SWIEPH|swe.FLG_SPEED
-        planets={}
-        MAIN={'Sun':swe.SUN,'Moon':swe.MOON,'Mars':swe.MARS,'Mercury':swe.MERCURY,
-              'Jupiter':swe.JUPITER,'Venus':swe.VENUS,'Saturn':swe.SATURN,
-              'Uranus':swe.URANUS,'Neptune':swe.NEPTUNE}
-        for name,pid in MAIN.items():
-            pos,_=swe.calc_ut(jd,pid,FLAGS); trop=pos[0]; sid=(trop-ayanamsa)%360
-            planets[name]={'tropical':round(trop,4),'sidereal':round(sid,4),
-                'sign':ved_sign(sid),'sign_idx':ved_si(sid),
-                'sign_degree':round(sid%30,4),'dms':fmtDMS(sid),
-                'retrograde':pos[3]<0,'nakshatra':get_nakshatra(sid)}
-        try:
-            pos,_=swe.calc_ut(jd,swe.TRUE_NODE,FLAGS); trop=pos[0]; sid=(trop-ayanamsa)%360
-            planets['Rahu']={'tropical':round(trop,4),'sidereal':round(sid,4),
-                'sign':ved_sign(sid),'sign_idx':ved_si(sid),
-                'sign_degree':round(sid%30,4),'dms':fmtDMS(sid),
-                'retrograde':True,'nakshatra':get_nakshatra(sid)}
-            ks=(sid+180)%360
-            planets['Ketu']={'tropical':round((trop+180)%360,4),'sidereal':round(ks,4),
-                'sign':ved_sign(ks),'sign_idx':ved_si(ks),
-                'sign_degree':round(ks%30,4),'dms':fmtDMS(ks),
-                'retrograde':True,'nakshatra':get_nakshatra(ks)}
-        except: pass
-        _,ascmc=swe.houses(jd,lat,lon,b'W')
-        asc_sid=(float(ascmc[0])-ayanamsa)%360
-        mc_sid=(float(ascmc[1])-ayanamsa)%360
-        lagna_si=int(asc_sid/30)
-        for name in planets:
-            planets[name]['house']=((planets[name]['sign_idx']-lagna_si)%12)+1
-        return jsonify({'planets':planets,'asc':round(asc_sid,4),'mc':round(mc_sid,4),
-            'asc_sign':ved_sign(asc_sid),'asc_sign_idx':lagna_si,'mc_sign':ved_sign(mc_sid),
-            'ayanamsa':round(ayanamsa,4),'lagna_nak':get_nakshatra(asc_sid),
-            'lat':lat,'lon':lon,'tz_name':tz_name})
-    except Exception as e:
-        import traceback
-        return jsonify({'error':str(e),'trace':traceback.format_exc()}),500
-    finally:
-        try: swe.set_sid_mode(swe.SIDM_TROPICAL, 0, 0)
-        except: pass
-
-
-# ════════════════════════════════════════════════════════════════
-# TRUE SIDEREAL ASTROLOGY — /true_sidereal endpoint
-# 13 constellations with IAU boundaries, Ophiuchus included
-# ════════════════════════════════════════════════════════════════
-
-# IAU ecliptic constellation boundaries (tropical degrees)
-TRUE_CONSTELLATIONS = [
-    {'name':'Aries',       'ka':'ვერძი',       'sym':'♈',  'start': 29.0, 'end': 53.5},
-    {'name':'Taurus',      'ka':'კურო',        'sym':'♉',  'start': 53.5, 'end': 90.0},
-    {'name':'Gemini',      'ka':'ტყუპები',     'sym':'♊',  'start': 90.0, 'end':118.5},
-    {'name':'Cancer',      'ka':'კირჩხიბი',    'sym':'♋',  'start':118.5, 'end':138.5},
-    {'name':'Leo',         'ka':'ლომი',        'sym':'♌',  'start':138.5, 'end':174.0},
-    {'name':'Virgo',       'ka':'ქალწული',     'sym':'♍',  'start':174.0, 'end':217.5},
-    {'name':'Libra',       'ka':'სასწორი',     'sym':'♎',  'start':217.5, 'end':241.0},
-    {'name':'Scorpius',    'ka':'მორიელი',     'sym':'♏',  'start':241.0, 'end':247.5},
-    {'name':'Ophiuchus',   'ka':'გველმჭერი',  'sym':'⛎',  'start':247.5, 'end':266.5},
-    {'name':'Sagittarius', 'ka':'მშვილდოსანი', 'sym':'♐',  'start':266.5, 'end':302.0},
-    {'name':'Capricornus', 'ka':'თხის რქა',   'sym':'♑',  'start':302.0, 'end':327.0},
-    {'name':'Aquarius',    'ka':'მერწყული',    'sym':'♒',  'start':327.0, 'end':351.5},
-    {'name':'Pisces',      'ka':'თევზები',     'sym':'♓',  'start':351.5, 'end':389.0},  # wraps
-]
-
-def get_true_constellation(trop_deg):
-    """Get true IAU constellation from tropical degree."""
-    deg = trop_deg % 360
-    for con in TRUE_CONSTELLATIONS:
-        s = con['start'] % 360
-        e = con['end'] % 360
-        if s < e:
-            if s <= deg < e:
-                pos = deg - s
-                return con, round(pos, 4)
-        else:  # wraps around 0 (Pisces: 351.5-29.0)
-            if deg >= s or deg < e:
-                pos = (deg - s) % 360
-                return con, round(pos, 4)
-    # fallback: Aries
-    return TRUE_CONSTELLATIONS[0], round(deg - 29.0, 4)
-
-def true_sid_fmtDMS(con, pos_in_con):
-    d = int(pos_in_con)
-    m = int((pos_in_con - d) * 60)
-    s = int(((pos_in_con - d) * 60 - m) * 60)
-    return str(d) + chr(176) + str(m).zfill(2) + "'" + str(s).zfill(2) + '"' 
-
-@app.route('/true_sidereal', methods=['POST'])
-def true_sidereal():
-    swe.set_ephe_path(EPHE_PATH)
-    # Use tropical positions — constellation determined by IAU boundaries
-    d = request.json
-    year    = int(d['year']);   month  = int(d['month'])
-    day     = int(d['day']);    hour   = int(d['hour'])
-    minute  = int(d['minute']); second = int(d['second'])
-    lat     = float(d['lat']); lon    = float(d['lon'])
-    tz_name = d.get('tz_name','UTC')
-    time_unknown = d.get('time_unknown', False)
-
-    try:
-        jd = to_jd(year,month,day,hour,minute,second,tz_name)
-        planets = {}
-
-        MAIN = {
-            'Sun':     swe.SUN,    'Moon':    swe.MOON,
-            'Mercury': swe.MERCURY,'Venus':   swe.VENUS,
-            'Mars':    swe.MARS,   'Jupiter': swe.JUPITER,
-            'Saturn':  swe.SATURN, 'Uranus':  swe.URANUS,
-            'Neptune': swe.NEPTUNE,'Pluto':   swe.PLUTO,
+  for(let it=0;it<600;it++){
+    let moved=false;
+    for(let i=0;i<sorted.length;i++){
+      for(let j=i+1;j<sorted.length;j++){
+        const a=sorted[i],b=sorted[j];
+        let d=dispA[b]-dispA[a];
+        while(d>Math.PI) d-=2*Math.PI; while(d<-Math.PI) d+=2*Math.PI;
+        if(Math.abs(d)<MINGAP&&Math.abs(d)>0.0001){
+          const push=(MINGAP-Math.abs(d))/2,dir=d>0?1:-1;
+          dispA[a]-=push*dir;dispA[b]+=push*dir;moved=true;
         }
-        FLAGS = swe.FLG_SWIEPH | swe.FLG_SPEED
+      }
+    }
+    if(!moved) break;
+  }
 
-        for name, pid in MAIN.items():
-            pos,_ = swe.calc_ut(jd, pid, FLAGS)
-            trop  = pos[0]
-            con, pos_in_con = get_true_constellation(trop)
-            span = (con['end'] - con['start']) % 360 or 360
-            pct  = round(pos_in_con / span * 100, 1)
-            planets[name] = {
-                'tropical':     round(trop, 4),
-                'constellation':con['name'],
-                'constellation_ka': con['ka'],
-                'sym':          con['sym'],
-                'pos_in_con':   round(pos_in_con, 4),
-                'dms':          true_sid_fmtDMS(con, pos_in_con),
-                'span':         round(span, 1),
-                'pct':          pct,
-                'retrograde':   pos[3] < 0,
-            }
+  for(const name of present){
+    const info=PI[name]||{sym:'?',color:'#fff'};
+    const p=data.planets[name];
+    const tA=trueA[name],color=info.color;
+    let diff=dispA[name]-tA;
+    while(diff>Math.PI) diff-=2*Math.PI; while(diff<-Math.PI) diff+=2*Math.PI;
+    const wasMoved=Math.abs(diff)>0.015;
+    const gxy=pxy(wasMoved?dispA[name]:tA,Rg);
+    el('line',{x1:CX+Math.cos(tA)*(R1+1),y1:CY+Math.sin(tA)*(R1+1),
+      x2:CX+Math.cos(tA)*(R1+9),y2:CY+Math.sin(tA)*(R1+9),stroke:color,'stroke-width':1.5},svg);
+    el('circle',{cx:CX+Math.cos(tA)*(R1+1),cy:CY+Math.sin(tA)*(R1+1),r:1.8,fill:color},svg);
+    if(wasMoved) el('line',{x1:CX+Math.cos(tA)*(R1+10),y1:CY+Math.sin(tA)*(R1+10),
+      x2:gxy.x,y2:gxy.y,stroke:color,'stroke-width':.5,opacity:.45,'stroke-dasharray':'2 2'},svg);
+    if(name==='Sun'){
+      const sg=el('g',{},svg);
+      el('circle',{cx:gxy.x,cy:gxy.y,r:12,fill:'rgba(249,198,70,.12)'},sg);
+      el('circle',{cx:gxy.x,cy:gxy.y,r:9,fill:'none',stroke:'#f9c646','stroke-width':'2',filter:'url(#sunF)'},sg);
+      el('circle',{cx:gxy.x,cy:gxy.y,r:9,fill:'none',stroke:'#ffe8a0','stroke-width':'.8'},sg);
+      el('circle',{cx:gxy.x,cy:gxy.y,r:2.5,fill:'#f9c646',filter:'url(#sunF)'},sg);
+      el('circle',{cx:gxy.x,cy:gxy.y,r:1.2,fill:'#fff7d0'},sg);
+    } else if(name==='Moon'){
+      const mg=el('g',{filter:'url(#moonF)'},svg);
+      txt(mg,'\u263d',gxy.x,gxy.y,{fill:'#b8d8ff','font-size':22,'font-family':'serif'});
+    } else {
+      txt(svg,info.sym,gxy.x,gxy.y,{fill:color,'font-size':20,'font-family':'serif'});
+    }
+    if(p.retrograde) txt(svg,'\u211e',gxy.x+11,gxy.y-9,{fill:'#f87171','font-size':8,'font-family':'serif'});
+  }
+}
 
-        # Chiron
-        try:
-            pos,_ = swe.calc_ut(jd, swe.CHIRON, FLAGS)
-            trop = pos[0]; con,pic = get_true_constellation(trop)
-            span = (con['end']-con['start'])%360 or 360
-            planets['Chiron'] = {'tropical':round(trop,4),'constellation':con['name'],
-                'constellation_ka':con['ka'],'sym':con['sym'],'pos_in_con':round(pic,4),
-                'dms':true_sid_fmtDMS(con,pic),'span':round(span,1),'pct':round(pic/span*100,1),'retrograde':pos[3]<0}
-        except: pass
+// ── PLANET TABLE ──
+function drawPlanetTable(data){
+  const tbody=document.getElementById('planet-tbody');
+  tbody.innerHTML='';
+  for(const name of PORDER){
+    if(!data.planets[name]) continue;
+    const info=PI[name]||{sym:'?',color:'#aaa'};
+    const p=data.planets[name];
+    const color=CON_COLORS[p.constellation]||'#8888aa';
+    let symCell=name==='Sun'?sunSVG(20)
+      :name==='Moon'?'<span class="moon-sym">\u263d</span>'
+      :name==='Selena'?`<svg width="18" height="18" viewBox="0 0 18 18" style="vertical-align:middle"><path d="M11,2 A7,7 0 1,0 11,16 A5,5 0 1,1 11,2 Z" fill="${info.color}" opacity="0.9"/></svg>`
+      :`<span class="p-sym" style="color:${info.color}">${info.sym}</span>`;
+    const tr=document.createElement('tr');
+    tr.innerHTML=`
+      <td>${symCell}</td>
+      <td style="color:${info.color};font-size:11px;white-space:nowrap">${name}</td>
+      <td class="deg-val">${p.dms}</td>
+      <td><span style="font-size:16px;font-family:serif;color:${color}">${p.sym}\ufe0e</span> <span style="font-size:10px;color:${color}">${p.constellation_ka||p.constellation}</span></td>
+      <td><span class="house-badge">${p.house||'?'}</span></td>
+      <td>${p.retrograde?'<span class="retro">\u211e</span>':''}</td>`;
+    tbody.appendChild(tr);
+  }
+}
 
-        # Lilith
-        try:
-            pos,_ = swe.calc_ut(jd, swe.MEAN_APOG, FLAGS)
-            trop = pos[0]; con,pic = get_true_constellation(trop)
-            span = (con['end']-con['start'])%360 or 360
-            planets['Lilith'] = {'tropical':round(trop,4),'constellation':con['name'],
-                'constellation_ka':con['ka'],'sym':con['sym'],'pos_in_con':round(pic,4),
-                'dms':true_sid_fmtDMS(con,pic),'span':round(span,1),'pct':round(pic/span*100,1),'retrograde':False}
-        except: pass
+// ── HOUSE TABLE ──
+function drawHouseTable(data){
+  const tbody=document.getElementById('house-tbody');
+  tbody.innerHTML='';
+  const ANG={0:'AC',3:'IC',6:'DC',9:'MC'};
+  for(let i=0;i<12;i++){
+    const deg=data.houses[i];
+    // Find which constellation this tropical degree falls in
+    let conName='?',conSym='?',conColor='#aaa',conKa='?';
+    for(const con of CONS){
+      const s=con.start%360, e=con.end%360;
+      const d=deg%360;
+      if(s<e?s<=d&&d<e:d>=s||d<e){
+        conName=con.name;conSym=con.sym;conColor=CON_COLORS[con.name]||'#aaa';conKa=con.ka||con.name;break;
+      }
+    }
+    const ang=ANG[i];
+    const tr=document.createElement('tr');
+    tr.innerHTML=`
+      <td style="color:${ang?'#e8c06e':'rgba(180,150,255,.7)'};font-family:'Cinzel',serif;font-size:11px;font-weight:${ang?600:400}">${ROMAN[i]}${ang?` <span style="font-size:9px">${ang}</span>`:''}</td>
+      <td><span style="font-size:14px;font-family:serif;color:${conColor}">${conSym}\ufe0e</span> <span style="font-size:10px;color:${conColor}">${conKa}</span></td>
+      <td class="deg-val">${Math.floor(deg%30)}°${String(Math.floor((deg%30-Math.floor(deg%30))*60)).padStart(2,'0')}'</td>`;
+    tbody.appendChild(tr);
+  }
+}
 
-        # Selena (White Moon)
-        try:
-            pos,_ = swe.calc_ut(jd, swe.AST_OFFSET+1181, FLAGS)
-            trop = pos[0]; con,pic = get_true_constellation(trop)
-            span = (con['end']-con['start'])%360 or 360
-            planets['Selena'] = {'tropical':round(trop,4),'constellation':con['name'],
-                'constellation_ka':con['ka'],'sym':con['sym'],'pos_in_con':round(pic,4),
-                'dms':true_sid_fmtDMS(con,pic),'span':round(span,1),'pct':round(pic/span*100,1),'retrograde':False}
-        except: pass
+// ── ASPECT TABLE ──
+function drawAspectTable(data){
+  const tbody=document.getElementById('aspect-tbody');
+  tbody.innerHTML='';
+  if(!data.aspects||!data.aspects.length){
+    tbody.innerHTML='<tr><td colspan="5" style="color:rgba(100,80,150,.5);text-align:center;padding:16px">ასპექტები არ მოიძებნა</td></tr>';
+    return;
+  }
+  for(const asp of data.aspects){
+    const i1=PI[asp.p1]||{sym:'?',color:'#aaa'};
+    const i2=PI[asp.p2]||{sym:'?',color:'#aaa'};
+    const s1=asp.p1==='Sun'?sunSVG(16):`<span style="color:${i1.color};font-size:15px;font-family:serif">${i1.sym}</span>`;
+    const s2=asp.p2==='Sun'?sunSVG(16):`<span style="color:${i2.color};font-size:15px;font-family:serif">${i2.sym}</span>`;
+    const tr=document.createElement('tr');
+    tr.innerHTML=`
+      <td>${s1} <span style="font-size:10px;color:${i1.color}">${asp.p1}</span></td>
+      <td><span style="font-size:16px;font-family:serif;color:${asp.color}">${asp.sym}</span></td>
+      <td>${s2} <span style="font-size:10px;color:${i2.color}">${asp.p2}</span></td>
+      <td style="color:${asp.color};font-size:10px;white-space:nowrap">${asp.type}</td>
+      <td style="color:rgba(140,100,200,.7);font-size:10px">${asp.orb}°</td>`;
+    tbody.appendChild(tr);
+  }
+}
 
-        # Juno
-        try:
-            pos,_ = swe.calc_ut(jd, swe.AST_OFFSET+3, FLAGS)
-            trop = pos[0]; con,pic = get_true_constellation(trop)
-            span = (con['end']-con['start'])%360 or 360
-            planets['Juno'] = {'tropical':round(trop,4),'constellation':con['name'],
-                'constellation_ka':con['ka'],'sym':con['sym'],'pos_in_con':round(pic,4),
-                'dms':true_sid_fmtDMS(con,pic),'span':round(span,1),'pct':round(pic/span*100,1),'retrograde':bool(pos[3]<0)}
-        except: pass
-
-        # Nodes
-        try:
-            pos,_ = swe.calc_ut(jd, swe.MEAN_NODE, FLAGS)
-            trop = pos[0]; con,pic = get_true_constellation(trop)
-            span = (con['end']-con['start'])%360 or 360
-            planets['North Node'] = {'tropical':round(trop,4),'constellation':con['name'],
-                'constellation_ka':con['ka'],'sym':con['sym'],'pos_in_con':round(pic,4),
-                'dms':true_sid_fmtDMS(con,pic),'span':round(span,1),'pct':round(pic/span*100,1),'retrograde':True}
-            trop2=(trop+180)%360; con2,pic2=get_true_constellation(trop2)
-            span2=(con2['end']-con2['start'])%360 or 360
-            planets['South Node'] = {'tropical':round(trop2,4),'constellation':con2['name'],
-                'constellation_ka':con2['ka'],'sym':con2['sym'],'pos_in_con':round(pic2,4),
-                'dms':true_sid_fmtDMS(con2,pic2),'span':round(span2,1),'pct':round(pic2/span2*100,1),'retrograde':True}
-        except: pass
-
-        # Houses + ASC/MC (tropical, Placidus)
-        cusps, ascmc = swe.houses(jd, lat, lon, b'P')
-        asc_trop = float(ascmc[0]); mc_trop = float(ascmc[1])
-        asc_con, asc_pic = get_true_constellation(asc_trop)
-        mc_con,  mc_pic  = get_true_constellation(mc_trop)
-
-        # Assign house to each planet
-        for name in planets:
-            planets[name]['house'] = get_house(planets[name]['tropical'], cusps)
-
-        # Vertex + Fortuna (time known only)
-        if not time_unknown:
-            try:
-                vx = float(ascmc[3]); con,pic = get_true_constellation(vx)
-                span=(con['end']-con['start'])%360 or 360
-                planets['Vertex'] = {'tropical':round(vx,4),'constellation':con['name'],
-                    'constellation_ka':con['ka'],'sym':con['sym'],'pos_in_con':round(pic,4),
-                    'dms':true_sid_fmtDMS(con,pic),'span':round(span,1),'pct':round(pic/span*100,1),
-                    'retrograde':False,'house':get_house(vx,cusps)}
-            except: pass
-            try:
-                f=(asc_trop+planets['Moon']['tropical']-planets['Sun']['tropical'])%360
-                con,pic=get_true_constellation(f); span=(con['end']-con['start'])%360 or 360
-                planets['Fortune'] = {'tropical':round(f,4),'constellation':con['name'],
-                    'constellation_ka':con['ka'],'sym':con['sym'],'pos_in_con':round(pic,4),
-                    'dms':true_sid_fmtDMS(con,pic),'span':round(span,1),'pct':round(pic/span*100,1),
-                    'retrograde':False,'house':get_house(f,cusps)}
-            except: pass
-
-        # Lunar day
-        try:
-            lunar = calc_lunar_day(jd)
-        except:
-            lunar = None
-
-        # Aspects — use tropical degrees
-        trop_planets = {}
-        for name,p in planets.items():
-            if 'tropical' in p:
-                trop_planets[name] = {'degree': p['tropical']}
-        aspects = calc_aspects(trop_planets)
-
-        return jsonify({
-            'planets':  planets,
-            'houses':   [round(x,4) for x in cusps],
-            'asc':      round(asc_trop,4),
-            'mc':       round(mc_trop,4),
-            'asc_con':  asc_con['name'],
-            'asc_con_ka': asc_con['ka'],
-            'mc_con':   mc_con['name'],
-            'lunar':    lunar,
-            'aspects':  aspects,
-            'lat':lat,'lon':lon,'tz_name':tz_name,
-            'constellations': [{'name':x['name'],'ka':x['ka'],'sym':x['sym'],
-                'start':x['start'],'end':x['end'],'span':round((x['end']-x['start'])%360 or 360,1)}
-                for x in TRUE_CONSTELLATIONS],
-        })
-    except Exception as e:
-        import traceback
-        return jsonify({'error':str(e),'trace':traceback.format_exc()}),500
-
-
-if __name__ == '__main__':
-    port=int(os.environ.get("PORT",8080))
-    app.run(host='0.0.0.0',port=port)
+// ── CONSTELLATION TABLE ──
+function drawConTable(data){
+  const tbody=document.getElementById('con-tbody');
+  tbody.innerHTML='';
+  for(const con of CONS){
+    const color=CON_COLORS[con.name]||'#8888aa';
+    const pct=(con.span/360*100).toFixed(1);
+    const tr=document.createElement('tr');
+    tr.innerHTML=`
+      <td><span style="font-size:18px;font-family:serif;color:${color}">${con.sym}\ufe0e</span> <span style="font-size:11px;color:${color}">${con.ka||con.name}</span></td>
+      <td class="deg-val">${con.start}°</td>
+      <td class="deg-val">${con.end%360}°</td>
+      <td class="deg-val">${con.span}°</td>
+      <td><span style="font-size:10px;color:var(--gold)">${pct}%</span>
+          <span class="pct-bar"><span class="pct-fill" style="width:${pct}%"></span></span></td>`;
+    tbody.appendChild(tr);
+  }
+}
+</script>
+</body>
+</html>
