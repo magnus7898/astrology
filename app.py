@@ -363,7 +363,8 @@ def vedic():
         FLAGS=swe.FLG_SWIEPH|swe.FLG_SPEED
         planets={}
         MAIN={'Sun':swe.SUN,'Moon':swe.MOON,'Mars':swe.MARS,'Mercury':swe.MERCURY,
-              'Jupiter':swe.JUPITER,'Venus':swe.VENUS,'Saturn':swe.SATURN}
+              'Jupiter':swe.JUPITER,'Venus':swe.VENUS,'Saturn':swe.SATURN,
+              'Uranus':swe.URANUS,'Neptune':swe.NEPTUNE}
         for name,pid in MAIN.items():
             pos,_=swe.calc_ut(jd,pid,FLAGS); trop=pos[0]; sid=(trop-ayanamsa)%360
             planets[name]={'tropical':round(trop,4),'sidereal':round(sid,4),
