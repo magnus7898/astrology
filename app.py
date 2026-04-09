@@ -292,7 +292,17 @@ def lunar():
             jd1=to_jd(year,month,day,23,59,59,tz_name)
             m0,_=swe.calc_ut(jd0,swe.MOON)
             m1,_=swe.calc_ut(jd1,swe.MOON)
+            # Tropical positions
             result['moon_path']={'start':round(m0[0],4),'end':round(m1[0],4)}
+            # Sidereal positions (Lahiri) for Vedic chart
+            swe.set_sid_mode(swe.SIDM_LAHIRI,0,0)
+            ayan0=swe.get_ayanamsa_ut(jd0)
+            ayan1=swe.get_ayanamsa_ut(jd1)
+            result['moon_path_sid']={
+                'start':round((m0[0]-ayan0)%360,4),
+                'end':  round((m1[0]-ayan1)%360,4)
+            }
+            swe.set_sid_mode(swe.SIDM_TROPICAL,0,0)
         except: pass
     return jsonify(result)
 
