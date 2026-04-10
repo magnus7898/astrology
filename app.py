@@ -391,9 +391,27 @@ def vedic():
         lagna_si=int(asc_sid/30)
         for name in planets:
             planets[name]['house']=((planets[name]['sign_idx']-lagna_si)%12)+1
+        # Aspects using sidereal degrees, map Eng→Georgian for calc_aspects
+        ENG_TO_KA = {
+            'Sun':'მზე','Moon':'მთვარე','Mercury':'მერკური','Venus':'ვენერა',
+            'Mars':'მარსი','Jupiter':'იუპიტერი','Saturn':'სატურნი',
+            'Uranus':'ურანი','Neptune':'ნეპტუნი',
+            'Rahu':'ჩრდ. კვანძი','Ketu':'სამხ. კვანძი',
+        }
+        KA_TO_ENG = {v:k for k,v in ENG_TO_KA.items()}
+        asp_planets = {}
+        for name,p in planets.items():
+            ka = ENG_TO_KA.get(name, name)
+            asp_planets[ka] = {'degree': p['sidereal']}
+        aspects = calc_aspects(asp_planets)
+        for asp in aspects:
+            asp['p1'] = KA_TO_ENG.get(asp['p1'], asp['p1'])
+            asp['p2'] = KA_TO_ENG.get(asp['p2'], asp['p2'])
+
         return jsonify({'planets':planets,'asc':round(asc_sid,4),'mc':round(mc_sid,4),
             'asc_sign':ved_sign(asc_sid),'asc_sign_idx':lagna_si,'mc_sign':ved_sign(mc_sid),
             'ayanamsa':round(ayanamsa,4),'lagna_nak':get_nakshatra(asc_sid),
+            'aspects':aspects,
             'lat':lat,'lon':lon,'tz_name':tz_name})
     except Exception as e:
         import traceback
