@@ -1,9 +1,8 @@
-flask
-flask-cors
-pyswisseph
-geopy
-timezonefinder
-pytz
-astropy
-numpy
- 
+flask>=2.3
+flask-cors>=4.0
+pyswisseph>=2.10.3.2
+geopy>=2.4
+timezonefinder>=6.5
+pytz>=2024.1
+astropy>=6.0
+numpy>=1.26
