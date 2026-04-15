@@ -36,10 +36,6 @@ from datetime import datetime
 import pytz
 import numpy as np
 
-# Astropy for high-accuracy moon age
-from astropy.time import Time
-from astropy.coordinates import get_body_barycentric_posvel
-
 app = Flask(__name__)
 CORS(app, origins="*")
 tf = TimezoneFinder()
@@ -219,24 +215,33 @@ def _local_to_utc_str(date_str, time_str, tz_name):
 
 
 def _astropy_moon_age(utc_str):
-    """Compute moon elongation and age using Astropy barycentric positions."""
-    t     = Time(utc_str, scale='utc')
-    sun   = get_body_barycentric_posvel('sun',   t)[0]
-    moon  = get_body_barycentric_posvel('moon',  t)[0]
-    earth = get_body_barycentric_posvel('earth', t)[0]
-
-    sv    = sun  - earth
-    mv    = moon - earth
-
-    sun_lon  = np.degrees(np.arctan2(sv.y.value, sv.x.value)) % 360
-    moon_lon = np.degrees(np.arctan2(mv.y.value, mv.x.value)) % 360
-
-    elong    = (moon_lon - sun_lon) % 360
+    """Moon age using swisseph — same result, no astropy needed."""
+    dt = datetime.strptime(utc_str, '%Y-%m-%dT%H:%M:%S')
+    jd = swe.julday(dt.year, dt.month, dt.day,
+                    dt.hour + dt.minute / 60 + dt.second / 3600)
+    elong = _elongation(jd)
     age_days = elong / 360 * 29.53059
-    illum    = round((1 - np.cos(np.radians(elong))) / 2 * 100, 1)
-
+    illum = round((1 - math.cos(math.radians(elong))) / 2 * 100, 1)
     phases = ['🌑','🌒','🌓','🌔','🌕','🌖','🌗','🌘']
     emoji  = phases[int(age_days / 29.53059 * 8) % 8]
+
+    def phase_name(a):
+        if   a < 1.85:  return 'New Moon'
+        elif a < 7.38:  return 'Waxing Crescent'
+        elif a < 9.22:  return 'First Quarter'
+        elif a < 14.77: return 'Waxing Gibbous'
+        elif a < 16.61: return 'Full Moon'
+        elif a < 22.15: return 'Waning Gibbous'
+        elif a < 23.99: return 'Last Quarter'
+        else:           return 'Waning Crescent'
+
+    return {
+        'age_days':     round(age_days, 3),
+        'elongation':   round(elong, 3),
+        'illumination': illum,
+        'phase':        phase_name(age_days),
+        'emoji':        emoji,
+    }
 
     def phase_name(a):
         if   a < 1.85:  return 'New Moon'
