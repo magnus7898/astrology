@@ -28,7 +28,7 @@ os.environ['SE_EPHE_PATH'] = EPHE_PATH
 import swisseph as swe
 swe.set_ephe_path(EPHE_PATH)
 
-from flask import Flask, request, jsonify
+from flask import Flask, request, jsonify, render_template
 from flask_cors import CORS
 from geopy.geocoders import Nominatim
 from timezonefinder import TimezoneFinder
@@ -314,6 +314,22 @@ def calc_aspects(planets):
 @app.route('/')
 def index():
     return jsonify({'status': 'ok', 'message': 'Astrology API — Western + Vedic + True Sidereal + Moon Age'})
+
+@app.route('/astro')
+def page_astro():
+    return render_template('astro.html')
+
+@app.route('/moon')
+def page_moon():
+    return render_template('moon.html')
+
+@app.route('/vedic-chart')
+def page_vedic():
+    return render_template('vedic.html')
+
+@app.route('/true-sidereal')
+def page_true_sidereal():
+    return render_template('true_sidereal.html')
 
 
 @app.route('/test')
