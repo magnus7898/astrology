@@ -4,6 +4,5 @@ pyswisseph>=2.10.3.2
 geopy>=2.4
 timezonefinder>=6.5
 pytz>=2024.1
-astropy==6.1.7
 numpy>=1.26
 gunicorn>=21.0
