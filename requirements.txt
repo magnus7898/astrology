@@ -1,8 +1,9 @@
 flask
 flask-cors
-gunicorn
+pyswisseph
 geopy
 timezonefinder
 pytz
-requests
+astropy
+numpy
  
