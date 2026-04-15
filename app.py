@@ -37,7 +37,7 @@ import pytz
 import numpy as np
 
 app = Flask(__name__)
-CORS(app, origins="*")
+CORS(app, origins="*", methods=["GET", "POST", "OPTIONS"], allow_headers=["Content-Type"])
 tf = TimezoneFinder()
 
 
