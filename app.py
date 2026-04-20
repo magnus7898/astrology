@@ -326,7 +326,7 @@ def geocode():
 
         # --- 1) geopy attempt ---
     try:
-        q = urllib.parse.urlencode({"q": place, "limit": 1})
+        q = urllib.parse.urlencode({"q": city, "limit": 1})
         req = urllib.request.Request(
             f"https://photon.komoot.io/api/?{q}",
             headers={"User-Agent": "astro-app/1.0"}
@@ -337,11 +337,12 @@ def geocode():
             coords = res["features"][0]["geometry"]["coordinates"]
             lon = coords[0]
             lat = coords[1]
-            display = place
+            tz = tf.timezone_at(lat=lat, lng=lon) or 'UTC'
+            return jsonify ({'lat': lat, 'lon': lon, 'tz_name': tz, 'display': city})
         else:
-            raise ValueError(f"Could not find location: {place!r}")
+            return ValueError({'error': f'City not found: {city}'}), 404
     except Exception as e:
-        raise ValueError(f"Geocoding service error: {e}")
+        return ValueError({'error': f'Geocoding error: {e}'}), 502
 
     except Exception as e:
         return jsonify({'error': str(e)}), 500
