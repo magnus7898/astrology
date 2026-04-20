@@ -410,23 +410,52 @@ def analyze(personality: List[Activation], design: List[Activation]) -> Dict:
 
 
 # ---------- Geocoding ----------
-_geocoder = Nominatim(user_agent="human-design-chart/1.0")
 _tf = TimezoneFinder()
 
 
 def geocode(place: str) -> Tuple[float, float, str, str]:
-    """Return (lat, lon, display_name, tz_name)."""
+    """Return (lat, lon, display_name, tz_name).
+
+    Tries geopy's Nominatim first, then falls back to a direct HTTP call
+    to nominatim.openstreetmap.org (same fallback the main /geocode
+    endpoint uses — works reliably on Railway).
+    """
+    import urllib.request, urllib.parse, json as _json
+
+    lat = lon = None
+    display = place
+
+    # 1) try geopy
     try:
-        loc = _geocoder.geocode(place, timeout=10)
-    except (GeocoderTimedOut, GeocoderServiceError) as e:
-        raise ValueError(f"Geocoding service error: {e}")
-    if loc is None:
+        _geocoder = Nominatim(user_agent="astro-api-hd/1.0", timeout=10)
+        loc = _geocoder.geocode(place, language="en", exactly_one=True)
+        if loc is not None:
+            lat, lon, display = loc.latitude, loc.longitude, loc.address
+    except (GeocoderTimedOut, GeocoderServiceError, Exception):
+        lat = lon = None
+
+    # 2) fallback: direct HTTPS to nominatim
+    if lat is None:
+        try:
+            q = urllib.parse.urlencode({"q": place, "format": "json", "limit": 1})
+            req = urllib.request.Request(
+                f"https://nominatim.openstreetmap.org/search?{q}",
+                headers={"User-Agent": "astro-api-hd/1.0"},
+            )
+            with urllib.request.urlopen(req, timeout=15) as r:
+                res = _json.loads(r.read())
+            if res:
+                lat = float(res[0]["lat"])
+                lon = float(res[0]["lon"])
+                display = res[0].get("display_name", place)
+        except Exception as e:
+            raise ValueError(f"Geocoding service error: {e}")
+
+    if lat is None or lon is None:
         raise ValueError(f"Could not find location: {place!r}")
-    tz = _tf.timezone_at(lat=loc.latitude, lng=loc.longitude)
-    if tz is None:
-        # fallback rough utc offset by longitude
-        tz = "UTC"
-    return loc.latitude, loc.longitude, loc.address, tz
+
+    tz = _tf.timezone_at(lat=lat, lng=lon) or "UTC"
+    return lat, lon, display, tz
 
 
 # ---------- Top-level entry point ----------
