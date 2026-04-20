@@ -340,9 +340,9 @@ def geocode():
             tz = tf.timezone_at(lat=lat, lng=lon) or 'UTC'
             return jsonify ({'lat': lat, 'lon': lon, 'tz_name': tz, 'display': city})
         else:
-            return ValueError({'error': f'City not found: {city}'}), 404
+            return jsonify ({'error': f'City not found: {city}'}), 404
     except Exception as e:
-        return ValueError({'error': f'Geocoding error: {e}'}), 502
+        return jsonify ({'error': f'Geocoding error: {e}'}), 502
 
     except Exception as e:
         return jsonify({'error': str(e)}), 500
