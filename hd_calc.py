@@ -425,32 +425,24 @@ def geocode(place: str) -> Tuple[float, float, str, str]:
     lat = lon = None
     display = place
 
-    # 1) try geopy
+    # 1) try geopy​
     try:
-        _geocoder = Nominatim(user_agent="astro-api-hd/1.0", timeout=10)
-        loc = _geocoder.geocode(place, language="en", exactly_one=True)
-        if loc is not None:
-            lat, lon, display = loc.latitude, loc.longitude, loc.address
-    except (GeocoderTimedOut, GeocoderServiceError, Exception):
-        lat = lon = None
-
-    # 2) fallback: direct HTTPS to nominatim
-    if lat is None:
-        try:
-            q = urllib.parse.urlencode({"q": place, "format": "json", "limit": 1})
-            req = urllib.request.Request(
-                f"https://nominatim.openstreetmap.org/search?{q}",
-                headers={"User-Agent": "astro-api-hd/1.0"},
-            )
-            with urllib.request.urlopen(req, timeout=15) as r:
-                res = _json.loads(r.read())
-            if res:
-                lat = float(res[0]["lat"])
-                lon = float(res[0]["lon"])
-                display = res[0].get("display_name", place)
-        except Exception as e:
-            raise ValueError(f"Geocoding service error: {e}")
-
+        q = urllib.parse.urlencode({"q": place, "limit": 1})
+        req = urllib.request.Request(
+            f"https://photon.komoot.io/api/?{q}",
+            headers={"User-Agent": "astro-app/1.0"}
+        )
+        with urllib.request.urlopen(req, timeout=15) as r:
+            res = _json.loads(r.read())
+        if res.get("features"):
+            coords = res["features"][0]["geometry"]["coordinates"]
+            lon = coords[0]
+            lat = coords[1]
+            display = place
+        else:
+            raise ValueError(f"Could not find location: {place!r}")
+    except Exception as e:
+        raise ValueError(f"Geocoding service error: {e}")
     if lat is None or lon is None:
         raise ValueError(f"Could not find location: {place!r}")
 
