@@ -5,7 +5,7 @@ Combines the existing astrology backend (/chart, /vedic, /true_sidereal,
 /moon, /geocode) with a new Human Design module (/hd, /api/hd_chart).
 
 Sub-pages served:
-    /                  - landing page (astro.html if present, else index)
+    /                  - landing page (astro.html if present, else index) 
     /astro             - western chart         (astro.html)
     /moon              - lunar day             (moon.html)
     /vedic             - vedic chart           (vedic.html)
