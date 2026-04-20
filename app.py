@@ -325,41 +325,23 @@ def geocode():
             return jsonify({'error': 'City name is empty'}), 400
 
         # --- 1) geopy attempt ---
-        loc = None
-        try:
-            geo = Nominatim(user_agent="astro-api-v3/1.0 (contact@example.com)",
-                            timeout=15)
-            loc = geo.geocode(city, language='en', exactly_one=True)
-        except Exception as e:
-            app.logger.warning(f"geopy geocode failed: {e}")
-            loc = None
-
-        if loc is not None:
-            lat, lon = loc.latitude, loc.longitude
-            tz = tf.timezone_at(lat=lat, lng=lon) or 'UTC'
-            return jsonify({'lat': lat, 'lon': lon, 'tz_name': tz,
-                            'display': loc.address})
-
-        # --- 2) direct HTTPS fallback ---
-        try:
-            q = urllib.parse.urlencode({'q': city, 'format': 'json', 'limit': 1})
-            req = urllib.request.Request(
-                f'https://nominatim.openstreetmap.org/search?{q}',
-                headers={'User-Agent': 'astro-api-v3/1.0 (contact@example.com)',
-                         'Accept-Language': 'en'},
-            )
-            with urllib.request.urlopen(req, timeout=15) as r:
-                res = _json.loads(r.read())
-            if res:
-                lat = float(res[0]['lat'])
-                lon = float(res[0]['lon'])
-                tz = tf.timezone_at(lat=lat, lng=lon) or 'UTC'
-                return jsonify({'lat': lat, 'lon': lon, 'tz_name': tz,
-                                'display': res[0].get('display_name', city)})
-            return jsonify({'error': f'City not found: {city}'}), 404
-        except Exception as e:
-            app.logger.error(f"direct geocode fallback failed: {e}")
-            return jsonify({'error': f'Geocoding service unreachable: {e}'}), 502
+    try:
+        q = urllib.parse.urlencode({"q": place, "limit": 1})
+        req = urllib.request.Request(
+            f"https://photon.komoot.io/api/?{q}",
+            headers={"User-Agent": "astro-app/1.0"}
+        )
+        with urllib.request.urlopen(req, timeout=15) as r:
+            res = _json.loads(r.read())
+        if res.get("features"):
+            coords = res["features"][0]["geometry"]["coordinates"]
+            lon = coords[0]
+            lat = coords[1]
+            display = place
+        else:
+            raise ValueError(f"Could not find location: {place!r}")
+    except Exception as e:
+        raise ValueError(f"Geocoding service error: {e}")
 
     except Exception as e:
         return jsonify({'error': str(e)}), 500
