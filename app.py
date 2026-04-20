@@ -313,34 +313,56 @@ def page_hd():
 
 @app.route('/geocode', methods=['POST'])
 def geocode():
+    """Geocode a city name to (lat, lon, tz_name).
+
+    Tries geopy first (fast when it works), falls back to a direct HTTPS
+    request to nominatim.openstreetmap.org. The fallback exists because
+    geopy occasionally fails on cloud hosts due to DNS/user-agent quirks.
+    """
     try:
-        city = request.json.get('city','').strip()
+        city = request.json.get('city', '').strip()
         if not city:
-            return jsonify({'error':'City name is empty'}), 400
+            return jsonify({'error': 'City name is empty'}), 400
+
+        # --- 1) geopy attempt ---
+        loc = None
         try:
-            geo = Nominatim(user_agent="astro-api-v3", timeout=10)
+            geo = Nominatim(user_agent="astro-api-v3/1.0 (contact@example.com)",
+                            timeout=15)
             loc = geo.geocode(city, language='en', exactly_one=True)
-        except:
+        except Exception as e:
+            app.logger.warning(f"geopy geocode failed: {e}")
             loc = None
-        if not loc:
-            try:
-                q = urllib.parse.urlencode({'q':city,'format':'json','limit':1})
-                req = urllib.request.Request(
-                    f'https://nominatim.openstreetmap.org/search?{q}',
-                    headers={'User-Agent':'astro-api-v3'})
-                with urllib.request.urlopen(req, timeout=10) as r:
-                    res = _json.loads(r.read())
-                if res:
-                    lat,lon = float(res[0]['lat']),float(res[0]['lon'])
-                    tz = tf.timezone_at(lat=lat,lng=lon) or 'UTC'
-                    return jsonify({'lat':lat,'lon':lon,'tz_name':tz,'display':res[0].get('display_name',city)})
-            except: pass
-            return jsonify({'error':'City not found: '+city}), 404
-        lat,lon = loc.latitude, loc.longitude
-        tz = tf.timezone_at(lat=lat,lng=lon) or 'UTC'
-        return jsonify({'lat':lat,'lon':lon,'tz_name':tz,'display':loc.address})
+
+        if loc is not None:
+            lat, lon = loc.latitude, loc.longitude
+            tz = tf.timezone_at(lat=lat, lng=lon) or 'UTC'
+            return jsonify({'lat': lat, 'lon': lon, 'tz_name': tz,
+                            'display': loc.address})
+
+        # --- 2) direct HTTPS fallback ---
+        try:
+            q = urllib.parse.urlencode({'q': city, 'format': 'json', 'limit': 1})
+            req = urllib.request.Request(
+                f'https://nominatim.openstreetmap.org/search?{q}',
+                headers={'User-Agent': 'astro-api-v3/1.0 (contact@example.com)',
+                         'Accept-Language': 'en'},
+            )
+            with urllib.request.urlopen(req, timeout=15) as r:
+                res = _json.loads(r.read())
+            if res:
+                lat = float(res[0]['lat'])
+                lon = float(res[0]['lon'])
+                tz = tf.timezone_at(lat=lat, lng=lon) or 'UTC'
+                return jsonify({'lat': lat, 'lon': lon, 'tz_name': tz,
+                                'display': res[0].get('display_name', city)})
+            return jsonify({'error': f'City not found: {city}'}), 404
+        except Exception as e:
+            app.logger.error(f"direct geocode fallback failed: {e}")
+            return jsonify({'error': f'Geocoding service unreachable: {e}'}), 502
+
     except Exception as e:
-        return jsonify({'error':str(e)}), 500
+        return jsonify({'error': str(e)}), 500
 
 # ════════════════════════════════════════════════════════════════
 # WESTERN CHART  (original /chart endpoint kept intact)
