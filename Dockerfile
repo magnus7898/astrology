@@ -23,4 +23,4 @@ RUN python -c "import swisseph; print('swisseph READY')"
 
 COPY . .
 
-CMD [ "sh", "-c" "gunicorn app:app --bind 0.0.0.0:$PORT --workers 1 --timeout 120"] 
+CMD [ "sh", "-c" "gunicorn app:app --bind 0.0.0.0:$PORT --workers 1 --timeout 120"]
