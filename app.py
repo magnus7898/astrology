@@ -1,4 +1,31 @@
-import os, math, urllib.request, urllib.parse, json as _json
+"""
+Unified astrology site.
+
+Combines the existing astrology backend (/chart, /vedic, /true_sidereal,
+/moon, /geocode) with a new Human Design module (/hd, /api/hd_chart).
+
+Sub-pages served:
+    /                  - landing page (astro.html if present, else index)
+    /astro             - western chart         (astro.html)
+    /moon              - lunar day             (moon.html)
+    /vedic             - vedic chart           (vedic.html)
+    /true_sidereal     - true sidereal chart   (true_sidereal.html)
+    /hd                - Human Design chart    (hd.html)
+
+HD-specific:
+    /api/hd_chart      - POST {date, time, place}  returns the HD chart JSON
+    /static/...        - served the merged human_prepared.svg and assets
+"""
+
+import os
+import math
+import subprocess
+import sys
+import urllib.request
+import urllib.parse
+import json as _json
+from datetime import datetime
+from pathlib import Path
 
 # ── EPHE PATH ──────────────────────────────────────────────────
 BASE_DIR  = os.path.dirname(os.path.abspath(__file__))
@@ -9,19 +36,50 @@ os.environ['SE_EPHE_PATH'] = EPHE_PATH
 import swisseph as swe
 swe.set_ephe_path(EPHE_PATH)
 
-from flask import Flask, request, jsonify, render_template
+from flask import Flask, request, jsonify, render_template, send_from_directory
 from flask_cors import CORS
 from geopy.geocoders import Nominatim
 from timezonefinder import TimezoneFinder
-from datetime import datetime
 import pytz
+
+# HD module
+from hd_calc import calculate_chart as hd_calculate_chart
+
+
+# ────────────────────────────────────────────────────────────────
+# HD SVG PRE-FLIGHT: run prepare_svg.py once if human_prepared.svg
+# is missing (merges human.svg + details.svg).
+# ────────────────────────────────────────────────────────────────
+ROOT = Path(__file__).parent
+def _ensure_hd_svg():
+    prepared  = ROOT / "static" / "human_prepared.svg"
+    positions = ROOT / "static" / "gate_positions.json"
+    if prepared.exists() and positions.exists():
+        return
+    human   = ROOT / "static" / "human.svg"
+    details = ROOT / "static" / "details.svg"
+    if not human.exists() or not details.exists():
+        print("[hd] skipping SVG prep — human.svg or details.svg missing",
+              file=sys.stderr)
+        return
+    print(f"[hd] preparing merged SVG from {human.name} + {details.name} ...")
+    try:
+        subprocess.check_call(
+            [sys.executable, str(ROOT / "prepare_svg.py")],
+            cwd=str(ROOT),
+        )
+    except subprocess.CalledProcessError as e:
+        print(f"[hd] prepare_svg failed: {e}", file=sys.stderr)
+
+_ensure_hd_svg()
+
 
 app = Flask(__name__)
 CORS(app, origins="*")
 tf = TimezoneFinder()
 
 # ════════════════════════════════════════════════════════════════
-# SHARED HELPERS
+# SHARED HELPERS  (unchanged from original app.py)
 # ════════════════════════════════════════════════════════════════
 
 def to_jd(year, month, day, hour, minute, second, tz_name):
@@ -117,11 +175,10 @@ def calc_lunar_day(jd, tz_offset=0.0):
     }
 
 # ════════════════════════════════════════════════════════════════
-# MOON AGE API  — timezone-aware, uses same to_jd as chart
+# MOON API
 # ════════════════════════════════════════════════════════════════
 
 def _utc_meta(date_str, time_str, tz_name):
-    """Return UTC datetime string + offset + dst for a local date/time."""
     tz       = pytz.timezone(tz_name)
     naive_dt = datetime.strptime(f'{date_str} {time_str}', '%Y-%m-%d %H:%M')
     try:
@@ -196,12 +253,63 @@ def api_timezones():
     return jsonify(sorted(pytz.all_timezones))
 
 # ════════════════════════════════════════════════════════════════
-# GEOCODE
+# PAGE ROUTES  ← sub-pages are served from templates/
 # ════════════════════════════════════════════════════════════════
 
 @app.route('/')
 def index():
-    return jsonify({'status':'ok','message':'Astrology API — Western + Vedic'})
+    """Landing page. If templates/index.html exists use it; else show a
+    minimal hub that links to all sub-pages."""
+    tpl = ROOT / "templates" / "index.html"
+    if tpl.exists():
+        return render_template('index.html')
+    return """
+    <!doctype html>
+    <html lang="ka"><head><meta charset="utf-8"><title>Astrology Hub</title>
+    <style>
+      body{font-family:system-ui;background:#0c0a1a;color:#eee;
+           margin:0;min-height:100vh;display:flex;align-items:center;
+           justify-content:center;flex-direction:column;gap:18px}
+      h1{font-size:2rem;margin:0 0 1rem}
+      a{color:#f9c646;text-decoration:none;padding:14px 28px;
+        border:1px solid #f9c646;border-radius:10px;font-size:1.05rem}
+      a:hover{background:#f9c646;color:#0c0a1a}
+      nav{display:flex;gap:14px;flex-wrap:wrap;justify-content:center;max-width:640px}
+    </style></head><body>
+      <h1>ასტროლოგია</h1>
+      <nav>
+        <a href="/astro">დასავლური</a>
+        <a href="/vedic">ვედური</a>
+        <a href="/true_sidereal">ჭეშმარიტი</a>
+        <a href="/moon">მთვარის დღე</a>
+        <a href="/hd">ადამიანის დიზაინი</a>
+      </nav>
+    </body></html>
+    """
+
+@app.route('/astro')
+def page_astro():
+    return render_template('astro.html')
+
+@app.route('/moon')
+def page_moon():
+    return render_template('moon.html')
+
+@app.route('/vedic')
+def page_vedic():
+    return render_template('vedic.html')
+
+@app.route('/true_sidereal')
+def page_true_sidereal():
+    return render_template('true_sidereal.html')
+
+@app.route('/hd')
+def page_hd():
+    return render_template('hd.html')
+
+# ════════════════════════════════════════════════════════════════
+# GEOCODE
+# ════════════════════════════════════════════════════════════════
 
 @app.route('/geocode', methods=['POST'])
 def geocode():
@@ -235,7 +343,7 @@ def geocode():
         return jsonify({'error':str(e)}), 500
 
 # ════════════════════════════════════════════════════════════════
-# WESTERN CHART
+# WESTERN CHART  (original /chart endpoint kept intact)
 # ════════════════════════════════════════════════════════════════
 
 ASPECTS_DEF = [
@@ -670,6 +778,44 @@ def true_sidereal():
         import traceback
         return jsonify({'error':str(e),'trace':traceback.format_exc()}),500
 
+# ════════════════════════════════════════════════════════════════
+# HUMAN DESIGN
+# ════════════════════════════════════════════════════════════════
+
+@app.route('/api/hd_chart', methods=['POST'])
+def hd_chart():
+    """Human Design chart endpoint.
+    Body: {date: 'YYYY-MM-DD', time: 'HH:MM', place: 'City, Country'}
+    Returns full HD chart JSON (type, profile, authority, gate activations,
+    defined channels & centers, integration detail id, planets P/D, etc.)
+    """
+    try:
+        data = request.get_json(force=True)
+        date_str = data.get("date", "").strip()
+        time_str = data.get("time", "").strip()
+        place    = data.get("place", "").strip()
+        if not date_str or not time_str or not place:
+            return jsonify({"error": "date, time and place are all required"}), 400
+        result = hd_calculate_chart(date_str, time_str, place)
+        return jsonify(result)
+    except ValueError as ve:
+        return jsonify({"error": str(ve)}), 400
+    except Exception as e:
+        import traceback
+        app.logger.exception("hd_chart error")
+        return jsonify({"error": f"{type(e).__name__}: {e}",
+                        "trace": traceback.format_exc()}), 500
+
+
+# ════════════════════════════════════════════════════════════════
+# STATIC
+# ════════════════════════════════════════════════════════════════
+
+@app.route('/static/<path:filename>')
+def static_files(filename):
+    return send_from_directory(app.static_folder, filename)
+
+
 if __name__ == '__main__':
-    port=int(os.environ.get("PORT",8080))
-    app.run(host='0.0.0.0',port=port)
+    port = int(os.environ.get("PORT", 8080))
+    app.run(host='0.0.0.0', port=port)
