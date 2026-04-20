@@ -1,6 +1,6 @@
 """Human Design calculations.
 
-Uses the Swiss Ephemeris (pyswisseph) to compute planet positions for both
+Uses the Swiss Ephemeris (pyswisseph) to compute planet positions for both 
 the Personality (birth moment) and Design (when the Sun was 88° earlier
 in ecliptic longitude — roughly 88 days before birth).
 
