@@ -325,24 +325,24 @@ def geocode():
             return jsonify({'error': 'City name is empty'}), 400
 
         # --- 1) geopy attempt ---
-    try:
-        q = urllib.parse.urlencode({"q": city, "limit": 1})
-        req = urllib.request.Request(
-            f"https://photon.komoot.io/api/?{q}",
-            headers={"User-Agent": "astro-app/1.0"}
-        )
-        with urllib.request.urlopen(req, timeout=15) as r:
-            res = _json.loads(r.read())
-        if res.get("features"):
-            coords = res["features"][0]["geometry"]["coordinates"]
-            lon = coords[0]
-            lat = coords[1]
-            tz = tf.timezone_at(lat=lat, lng=lon) or 'UTC'
-            return jsonify ({'lat': lat, 'lon': lon, 'tz_name': tz, 'display': city})
-        else:
-            return jsonify ({'error': f'City not found: {city}'}), 404
-    except Exception as e:
-        return jsonify ({'error': f'Geocoding error: {e}'}), 502
+            try:
+                q = urllib.parse.urlencode({"q": city, "limit": 1})
+                req = urllib.request.Request(
+                    f"https://photon.komoot.io/api/?{q}",
+                    headers={"User-Agent": "astro-app/1.0"}
+                )
+                with urllib.request.urlopen(req, timeout=15) as r:
+                    res = _json.loads(r.read())
+                if res.get("features"):
+                    coords = res["features"][0]["geometry"]["coordinates"]
+                    lon = coords[0]
+                    lat = coords[1]
+                    tz = tf.timezone_at(lat=lat, lng=lon) or 'UTC'
+                    return jsonify ({'lat': lat, 'lon': lon, 'tz_name': tz, 'display': city})
+                else:
+                    return jsonify ({'error': f'City not found: {city}'}), 404
+            except Exception as e:
+                return jsonify ({'error': f'Geocoding error: {e}'}), 502
 
     except Exception as e:
         return jsonify({'error': str(e)}), 500
