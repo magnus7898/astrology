@@ -311,41 +311,42 @@ def page_hd():
 # GEOCODE
 # ════════════════════════════════════════════════════════════════
 
+@app.route('/')
+def index():
+    return jsonify({'status':'ok','message':'Astrology API — Western + Vedic'})
+ 
 @app.route('/geocode', methods=['POST'])
 def geocode():
-    """Geocode a city name to (lat, lon, tz_name).
-
-    Tries geopy first (fast when it works), falls back to a direct HTTPS
-    request to nominatim.openstreetmap.org. The fallback exists because
-    geopy occasionally fails on cloud hosts due to DNS/user-agent quirks.
-    """
     try:
-        city = request.json.get('city', '').strip()
+        city = request.json.get('city','').strip()
         if not city:
-            return jsonify({'error': 'City name is empty'}), 400
-
-        # --- 1) geopy attempt ---
+            return jsonify({'error':'City name is empty'}), 400
+        # Try geopy first
+        try:
+            geo = Nominatim(user_agent="astro-api-v3", timeout=10)
+            loc = geo.geocode(city, language='en', exactly_one=True)
+        except:
+            loc = None
+        # Fallback: direct HTTP
+        if not loc:
             try:
-                q = urllib.parse.urlencode({"q": city, "limit": 1})
+                q = urllib.parse.urlencode({'q':city,'format':'json','limit':1})
                 req = urllib.request.Request(
-                    f"https://photon.komoot.io/api/?{q}",
-                    headers={"User-Agent": "astro-app/1.0"}
-                )
-                with urllib.request.urlopen(req, timeout=15) as r:
+                    f'https://nominatim.openstreetmap.org/search?{q}',
+                    headers={'User-Agent':'astro-api-v3'})
+                with urllib.request.urlopen(req, timeout=10) as r:
                     res = _json.loads(r.read())
-                if res.get("features"):
-                    coords = res["features"][0]["geometry"]["coordinates"]
-                    lon = coords[0]
-                    lat = coords[1]
-                    tz = tf.timezone_at(lat=lat, lng=lon) or 'UTC'
-                    return jsonify ({'lat': lat, 'lon': lon, 'tz_name': tz, 'display': city})
-                else:
-                    return jsonify ({'error': f'City not found: {city}'}), 404
-            except Exception as e:
-                return jsonify ({'error': f'Geocoding error: {e}'}), 502
-
+                if res:
+                    lat,lon = float(res[0]['lat']),float(res[0]['lon'])
+                    tz = tf.timezone_at(lat=lat,lng=lon) or 'UTC'
+                    return jsonify({'lat':lat,'lon':lon,'tz_name':tz,'display':res[0].get('display_name',city)})
+            except: pass
+            return jsonify({'error':'City not found: '+city}), 404
+        lat,lon = loc.latitude, loc.longitude
+        tz = tf.timezone_at(lat=lat,lng=lon) or 'UTC'
+        return jsonify({'lat':lat,'lon':lon,'tz_name':tz,'display':loc.address})
     except Exception as e:
-        return jsonify({'error': str(e)}), 500
+        return jsonify({'error':str(e)}), 500
 
 # ════════════════════════════════════════════════════════════════
 # WESTERN CHART  (original /chart endpoint kept intact)
