@@ -323,51 +323,63 @@ def page_hd():
 def geocode():
     """Geocode a city name to (lat, lon, tz_name).
 
-    Tries geopy first (fast when it works), falls back to a direct HTTPS
-    request to nominatim.openstreetmap.org. The fallback exists because
-    geopy occasionally fails on cloud hosts due to DNS/user-agent quirks.
+    Railway blocks all public Nominatim/Photon geocoders from cloud IPs.
+    Strategy:
+    1. Built-in city cache (instant, works offline)
+    2. OpenCage API if OPENCAGE_API_KEY env var is set (free: 2500 req/day)
     """
+    import os
     try:
         city = request.json.get('city', '').strip()
         if not city:
             return jsonify({'error': 'City name is empty'}), 400
 
-        # --- 1) geopy attempt ---
-        loc = None
-        try:
-            geo = Nominatim(user_agent="astro-api-v3/1.0 (contact@example.com)",
-                            timeout=15)
-            loc = geo.geocode(city, language='en', exactly_one=True)
-        except Exception as e:
-            app.logger.warning(f"geopy geocode failed: {e}")
-            loc = None
+        # Shared cache (same as hd_calc._CITY_CACHE — import it)
+        from hd_calc import _CITY_CACHE, _tf as hd_tf
 
-        if loc is not None:
-            lat, lon = loc.latitude, loc.longitude
-            tz = tf.timezone_at(lat=lat, lng=lon) or 'UTC'
-            return jsonify({'lat': lat, 'lon': lon, 'tz_name': tz,
-                            'display': loc.address})
+        key = city.lower()
+        city_only = key.split(",")[0].strip()
+        for k in (key, city_only):
+            if k in _CITY_CACHE:
+                lat, lon, display, tz = _CITY_CACHE[k]
+                return jsonify({'lat': lat, 'lon': lon, 'tz_name': tz, 'display': display})
 
-        # --- 2) direct HTTPS fallback ---
-        try:
-            q = urllib.parse.urlencode({'q': city, 'format': 'json', 'limit': 1})
-            req = urllib.request.Request(
-                f'https://nominatim.openstreetmap.org/search?{q}',
-                headers={'User-Agent': 'astro-api-v3/1.0 (contact@example.com)',
-                         'Accept-Language': 'en'},
+        # OpenCage API fallback
+        api_key = os.environ.get('OPENCAGE_API_KEY', '').strip()
+        if api_key:
+            try:
+                q = urllib.parse.urlencode({
+                    'q': city, 'key': api_key, 'limit': 1,
+                    'no_annotations': 1, 'language': 'en'
+                })
+                req = urllib.request.Request(
+                    f'https://api.opencagedata.com/geocode/v1/json?{q}',
+                    headers={'User-Agent': 'astro-api/1.0'},
+                )
+                with urllib.request.urlopen(req, timeout=15) as r:
+                    data = _json.loads(r.read())
+                if data.get('results'):
+                    res = data['results'][0]
+                    lat = float(res['geometry']['lat'])
+                    lon = float(res['geometry']['lng'])
+                    display = res.get('formatted', city)
+                    tz_info = res.get('annotations', {}).get('timezone', {})
+                    tz = tz_info.get('name') or hd_tf.timezone_at(lat=lat, lng=lon) or 'UTC'
+                    return jsonify({'lat': lat, 'lon': lon, 'tz_name': tz, 'display': display})
+                return jsonify({'error': f'City not found: {city}'}), 404
+            except Exception as e:
+                app.logger.error(f'OpenCage error: {e}')
+                return jsonify({'error': f'Geocoding error: {e}'}), 502
+
+        # Neither cache nor API key — tell user what to do
+        cache_sample = ", ".join(list(_CITY_CACHE.keys())[:10])
+        return jsonify({
+            'error': (
+                f"City '{city}' not in cache. Available cities include: {cache_sample}... "
+                f"To geocode any city, set OPENCAGE_API_KEY in Railway environment variables "
+                f"(free key at https://opencagedata.com — 2500 requests/day)."
             )
-            with urllib.request.urlopen(req, timeout=15) as r:
-                res = _json.loads(r.read())
-            if res:
-                lat = float(res[0]['lat'])
-                lon = float(res[0]['lon'])
-                tz = tf.timezone_at(lat=lat, lng=lon) or 'UTC'
-                return jsonify({'lat': lat, 'lon': lon, 'tz_name': tz,
-                                'display': res[0].get('display_name', city)})
-            return jsonify({'error': f'City not found: {city}'}), 404
-        except Exception as e:
-            app.logger.error(f"direct geocode fallback failed: {e}")
-            return jsonify({'error': f'Geocoding service unreachable: {e}'}), 502
+        }), 404
 
     except Exception as e:
         return jsonify({'error': str(e)}), 500
