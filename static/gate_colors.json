@@ -3,420 +3,360 @@
     "dark": "#FF0000",
     "light": "#FF3333",
     "p_blue": "#292562",
-    "dark_class": "st22",
-    "light_class": "st24"
+    "design": "#67308F"
   },
   "35": {
     "dark": "#E60000",
     "light": "#FF4D4D",
-    "p_blue": "#292563",
-    "dark_class": "st23",
-    "light_class": "st25"
+    "p_blue": "#292562",
+    "design": "#67308F"
   },
   "22": {
     "dark": "#CC0000",
     "light": "#FF6666",
-    "p_blue": "#292564",
-    "dark_class": "st27",
-    "light_class": "st26"
+    "p_blue": "#292562",
+    "design": "#67308F"
   },
   "12": {
     "dark": "#B30000",
     "light": "#FF8080",
-    "p_blue": "#292565",
-    "dark_class": "st29",
-    "light_class": "st28"
+    "p_blue": "#292562",
+    "design": "#67308F"
   },
   "37": {
     "dark": "#990000",
     "light": "#FF9999",
-    "p_blue": "#292566",
-    "dark_class": "st35",
-    "light_class": "st36"
+    "p_blue": "#292562",
+    "design": "#67308F"
   },
   "40": {
     "dark": "#FF8000",
     "light": "#FF9933",
-    "p_blue": "#292572",
-    "dark_class": "st34",
-    "light_class": "st37"
+    "p_blue": "#292562",
+    "design": "#67308F"
   },
   "21": {
     "dark": "#E67300",
     "light": "#FFA34D",
-    "p_blue": "#292573",
-    "dark_class": "st33",
-    "light_class": "st32"
+    "p_blue": "#292562",
+    "design": "#67308F"
   },
   "45": {
     "dark": "#CC6600",
     "light": "#FFAD66",
-    "p_blue": "#292574",
-    "dark_class": "st30",
-    "light_class": "st31"
+    "p_blue": "#292562",
+    "design": "#67308F"
   },
   "51": {
     "dark": "#B35900",
     "light": "#FFB880",
-    "p_blue": "#292575",
-    "dark_class": "st66",
-    "light_class": "st67"
+    "p_blue": "#292562",
+    "design": "#67308F"
   },
   "25": {
     "dark": "#994D00",
     "light": "#FFC299",
-    "p_blue": "#292576",
-    "dark_class": "st63",
-    "light_class": "st65"
+    "p_blue": "#292562",
+    "design": "#67308F"
   },
   "6": {
     "dark": "#FFFF00",
     "light": "#FFFF33",
-    "p_blue": "#292582",
-    "dark_class": "st42",
-    "light_class": "st43"
+    "p_blue": "#292562",
+    "design": "#67308F"
   },
   "59": {
     "dark": "#E6E600",
     "light": "#FFFF4D",
-    "p_blue": "#292583",
-    "dark_class": "st44",
-    "light_class": "st111"
+    "p_blue": "#292562",
+    "design": "#67308F"
   },
   "27": {
     "dark": "#CCCC00",
     "light": "#FFFF66",
-    "p_blue": "#292584",
-    "dark_class": "st39",
-    "light_class": "st38"
+    "p_blue": "#292562",
+    "design": "#67308F"
   },
   "50": {
     "dark": "#B3B300",
     "light": "#FFFF80",
-    "p_blue": "#292585",
-    "dark_class": "st41",
-    "light_class": "st40"
+    "p_blue": "#292562",
+    "design": "#67308F"
   },
   "26": {
     "dark": "#999900",
     "light": "#FFFF99",
-    "p_blue": "#292586",
-    "dark_class": "st14",
-    "light_class": "st15"
+    "p_blue": "#292562",
+    "design": "#67308F"
   },
   "44": {
     "dark": "#00FF00",
     "light": "#33FF33",
-    "p_blue": "#292592",
-    "dark_class": "st13",
-    "light_class": "st16"
+    "p_blue": "#292562",
+    "design": "#67308F"
   },
   "48": {
     "dark": "#00E600",
     "light": "#4DFF4D",
-    "p_blue": "#292593",
-    "dark_class": "st20",
-    "light_class": "st16"
+    "p_blue": "#292562",
+    "design": "#67308F"
   },
   "16": {
     "dark": "#00CC00",
     "light": "#66FF66",
-    "p_blue": "#292594",
-    "dark_class": "st21",
-    "light_class": "st19"
+    "p_blue": "#292562",
+    "design": "#67308F"
   },
   "30": {
     "dark": "#00B300",
     "light": "#80FF80",
-    "p_blue": "#292595",
-    "dark_class": "st60",
-    "light_class": "st59"
+    "p_blue": "#292562",
+    "design": "#67308F"
   },
   "41": {
     "dark": "#009900",
     "light": "#99FF99",
-    "p_blue": "#292596",
-    "dark_class": "st62",
-    "light_class": "st61"
+    "p_blue": "#292562",
+    "design": "#67308F"
   },
   "55": {
     "dark": "#00FFFF",
     "light": "#33FFFF",
-    "p_blue": "#292602",
-    "dark_class": "st57",
-    "light_class": "st58"
+    "p_blue": "#292562",
+    "design": "#67308F"
   },
   "39": {
     "dark": "#00E6E6",
     "light": "#4DFFFF",
-    "p_blue": "#292603",
-    "dark_class": "st56",
-    "light_class": "st55"
+    "p_blue": "#292562",
+    "design": "#67308F"
   },
   "49": {
     "dark": "#00CCCC",
     "light": "#66FFFF",
-    "p_blue": "#292604",
-    "dark_class": "st54",
-    "light_class": "st53"
+    "p_blue": "#292562",
+    "design": "#67308F"
   },
   "19": {
     "dark": "#00B3B3",
     "light": "#80FFFF",
-    "p_blue": "#292605",
-    "dark_class": "st52",
-    "light_class": "st51"
+    "p_blue": "#292562",
+    "design": "#67308F"
   },
   "58": {
     "dark": "#009999",
     "light": "#99FFFF",
-    "p_blue": "#292606",
-    "dark_class": "st119",
-    "light_class": "st120"
+    "p_blue": "#292562",
+    "design": "#67308F"
   },
   "18": {
     "dark": "#0000FF",
     "light": "#3333FF",
-    "p_blue": "#292612",
-    "dark_class": "st49",
-    "light_class": "st50"
+    "p_blue": "#292562",
+    "design": "#67308F"
   },
   "38": {
     "dark": "#0000E6",
     "light": "#4D4DFF",
-    "p_blue": "#292613",
-    "dark_class": "st117",
-    "light_class": "st118"
+    "p_blue": "#292562",
+    "design": "#67308F"
   },
   "28": {
     "dark": "#0000CC",
     "light": "#6666FF",
-    "p_blue": "#292614",
-    "dark_class": "st48",
-    "light_class": "st47"
+    "p_blue": "#292562",
+    "design": "#67308F"
   },
   "54": {
     "dark": "#0000B3",
     "light": "#8080FF",
-    "p_blue": "#292615",
-    "dark_class": "st116",
-    "light_class": "st115"
+    "p_blue": "#292562",
+    "design": "#67308F"
   },
   "32": {
     "dark": "#000099",
     "light": "#9999FF",
-    "p_blue": "#292616",
-    "dark_class": "st45",
-    "light_class": "st46"
+    "p_blue": "#292562",
+    "design": "#67308F"
   },
   "52": {
     "dark": "#800080",
     "light": "#9933FF",
-    "p_blue": "#292622",
-    "dark_class": "st113",
-    "light_class": "st112"
+    "p_blue": "#292562",
+    "design": "#67308F"
   },
   "9": {
     "dark": "#730073",
     "light": "#A34DFF",
-    "p_blue": "#292623",
-    "dark_class": "st111",
-    "light_class": "st71"
+    "p_blue": "#292562",
+    "design": "#67308F"
   },
   "60": {
     "dark": "#660066",
     "light": "#AD66FF",
-    "p_blue": "#292624",
-    "dark_class": "st111",
-    "light_class": "st110"
+    "p_blue": "#292562",
+    "design": "#67308F"
   },
   "3": {
     "dark": "#590059",
     "light": "#B880FF",
-    "p_blue": "#292625",
-    "dark_class": "st109",
-    "light_class": "st108"
+    "p_blue": "#292562",
+    "design": "#67308F"
   },
   "53": {
     "dark": "#4D004D",
     "light": "#C299FF",
-    "p_blue": "#292626",
-    "dark_class": "st106",
-    "light_class": "st107"
+    "p_blue": "#292562",
+    "design": "#67308F"
   },
   "42": {
     "dark": "#FF00FF",
     "light": "#FF33FF",
-    "p_blue": "#292632",
-    "dark_class": "st104",
-    "light_class": "st105"
+    "p_blue": "#292562",
+    "design": "#67308F"
   },
   "29": {
     "dark": "#E600E6",
     "light": "#FF4DFF",
-    "p_blue": "#292633",
-    "dark_class": "st11",
-    "light_class": "st10"
+    "p_blue": "#292562",
+    "design": "#67308F"
   },
   "14": {
     "dark": "#CC00CC",
     "light": "#FF66FF",
-    "p_blue": "#292634",
-    "dark_class": "st9",
-    "light_class": "st8"
+    "p_blue": "#292562",
+    "design": "#67308F"
   },
   "5": {
     "dark": "#B300B3",
     "light": "#FF80FF",
-    "p_blue": "#292635",
-    "dark_class": "st6",
-    "light_class": "st7"
+    "p_blue": "#292562",
+    "design": "#67308F"
   },
   "46": {
     "dark": "#990099",
     "light": "#FF99FF",
-    "p_blue": "#292636",
-    "dark_class": "st5",
-    "light_class": "st4"
+    "p_blue": "#292562",
+    "design": "#67308F"
   },
   "2": {
     "dark": "#8B4513",
     "light": "#A0522D",
-    "p_blue": "#292642",
-    "dark_class": "st3",
-    "light_class": "st2"
+    "p_blue": "#292562",
+    "design": "#67308F"
   },
   "15": {
     "dark": "#7A3C12",
     "light": "#B05A2F",
-    "p_blue": "#292643",
-    "dark_class": "st1",
-    "light_class": "st0"
+    "p_blue": "#292562",
+    "design": "#67308F"
   },
   "13": {
     "dark": "#693310",
     "light": "#C06231",
-    "p_blue": "#292644",
-    "dark_class": "st101",
-    "light_class": "st102"
+    "p_blue": "#292562",
+    "design": "#67308F"
   },
   "1": {
     "dark": "#582A0E",
     "light": "#D06A33",
-    "p_blue": "#292645",
-    "dark_class": "st99",
-    "light_class": "st97"
+    "p_blue": "#292562",
+    "design": "#67308F"
   },
   "7": {
     "dark": "#47210C",
     "light": "#E07235",
-    "p_blue": "#292646",
-    "dark_class": "st92",
-    "light_class": "st94"
+    "p_blue": "#292562",
+    "design": "#67308F"
   },
   "33": {
     "dark": "#808080",
     "light": "#999999",
-    "p_blue": "#292652",
-    "dark_class": "st100",
-    "light_class": "st103"
+    "p_blue": "#292562",
+    "design": "#67308F"
   },
   "8": {
     "dark": "#737373",
     "light": "#A6A6A6",
-    "p_blue": "#292653",
-    "dark_class": "st98",
-    "light_class": "st96"
+    "p_blue": "#292562",
+    "design": "#67308F"
   },
   "31": {
     "dark": "#666666",
     "light": "#B3B3B3",
-    "p_blue": "#292654",
-    "dark_class": "st93",
-    "light_class": "st95"
+    "p_blue": "#292562",
+    "design": "#67308F"
   },
   "56": {
     "dark": "#595959",
     "light": "#BFBFBF",
-    "p_blue": "#292655",
-    "dark_class": "st89",
-    "light_class": "st90"
+    "p_blue": "#292562",
+    "design": "#67308F"
   },
   "23": {
     "dark": "#4D4D4D",
     "light": "#CCCCCC",
-    "p_blue": "#292656",
-    "dark_class": "st87",
-    "light_class": "st85"
+    "p_blue": "#292562",
+    "design": "#67308F"
   },
   "62": {
     "dark": "#FAD0C4",
     "light": "#C1E1C1",
-    "p_blue": "#292662",
-    "dark_class": "st83",
-    "light_class": "st80"
+    "p_blue": "#292562",
+    "design": "#67308F"
   },
   "11": {
     "dark": "#F8C8DC",
     "light": "#B39EB5",
-    "p_blue": "#292663",
-    "dark_class": "st88",
-    "light_class": "st91"
+    "p_blue": "#292562",
+    "design": "#67308F"
   },
   "43": {
     "dark": "#F3E5AB",
     "light": "#AED9E0",
-    "p_blue": "#292664",
-    "dark_class": "st86",
-    "light_class": "st84"
+    "p_blue": "#292562",
+    "design": "#67308F"
   },
   "17": {
     "dark": "#E6E6FA",
     "light": "#98D8C8",
-    "p_blue": "#292665",
-    "dark_class": "st82",
-    "light_class": "st81"
+    "p_blue": "#292562",
+    "design": "#67308F"
   },
   "4": {
     "dark": "#D4F1F4",
     "light": "#88C5B9",
-    "p_blue": "#292666",
-    "dark_class": "st76",
-    "light_class": "st77"
+    "p_blue": "#292562",
+    "design": "#67308F"
   },
   "63": {
     "dark": "#2C3E50",
     "light": "#F1C40F",
-    "p_blue": "#292672",
-    "dark_class": "st78",
-    "light_class": "st79"
+    "p_blue": "#292562",
+    "design": "#67308F"
   },
   "24": {
     "dark": "#34495E",
     "light": "#F39C12",
-    "p_blue": "#292673",
-    "dark_class": "st72",
-    "light_class": "st73"
+    "p_blue": "#292562",
+    "design": "#67308F"
   },
   "61": {
     "dark": "#2980B9",
     "light": "#E67E22",
-    "p_blue": "#292674",
-    "dark_class": "st74",
-    "light_class": "st75"
+    "p_blue": "#292562",
+    "design": "#67308F"
   },
   "64": {
     "dark": "#1ABC9C",
     "light": "#D35400",
-    "p_blue": "#292675",
-    "dark_class": "st68",
-    "light_class": "st69"
+    "p_blue": "#292562",
+    "design": "#67308F"
   },
   "47": {
     "dark": "#16A085",
     "light": "#E74C3C",
-    "p_blue": "#292676",
-    "dark_class": "st70",
-    "light_class": "st71"
+    "p_blue": "#292562",
+    "design": "#67308F"
   }
 }
