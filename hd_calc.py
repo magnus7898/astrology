@@ -583,14 +583,18 @@ def geocode(place: str) -> Tuple[float, float, str, str]:
     )
 
 
-# ---------- Top-level entry point ----------
-def calculate_chart(date_str: str, time_str: str, place: str) -> Dict:
-    """Inputs are strings: 'YYYY-MM-DD', 'HH:MM', 'City, Country'.
+# ---------- Top-level entry points ----------
 
-    Returns a dict ready for jsonify.
+def calculate_chart_from_coords(
+    date_str: str, time_str: str,
+    lat: float, lon: float, tz_name: str,
+    resolved_place: str = ""
+) -> Dict:
+    """Like calculate_chart() but accepts coordinates directly.
+
+    Used when the frontend has already geocoded the city via /geocode.
+    No geocoding happens here — coordinates are used as-is.
     """
-    lat, lon_loc, addr, tz_name = geocode(place)
-
     local_dt = datetime.strptime(f"{date_str} {time_str}", "%Y-%m-%d %H:%M")
     try:
         local_tz = pytz.timezone(tz_name)
@@ -604,22 +608,22 @@ def calculate_chart(date_str: str, time_str: str, place: str) -> Dict:
         utc_dt.hour + utc_dt.minute / 60 + utc_dt.second / 3600,
     )
     personality = calc_planets(jd_ut)
-    design_jd  = find_design_jd(jd_ut)
-    design     = calc_planets(design_jd)
+    design_jd   = find_design_jd(jd_ut)
+    design      = calc_planets(design_jd)
 
-    analysis = analyze(personality, design)
-    design_utc = swe.revjul(design_jd)   # (y, m, d, frac_hour)
+    analysis   = analyze(personality, design)
+    design_utc = swe.revjul(design_jd)
 
-    # Integration cluster (gates 10, 57, 34, 20) — detail number 1..256.
     p_gate_set = {a.gate for a in personality}
     d_gate_set = {a.gate for a in design}
     integration = integration_condition(p_gate_set, d_gate_set)
 
     return {
         "input": {
-            "date": date_str, "time": time_str, "place": place,
-            "resolved_place": addr,
-            "lat": lat, "lon": lon_loc,
+            "date": date_str, "time": time_str,
+            "place": resolved_place or f"{lat:.4f}, {lon:.4f}",
+            "resolved_place": resolved_place or f"{lat:.4f}, {lon:.4f}",
+            "lat": lat, "lon": lon,
             "tz": tz_name,
             "utc_time": utc_dt.strftime("%Y-%m-%d %H:%M UTC"),
         },
@@ -632,3 +636,13 @@ def calculate_chart(date_str: str, time_str: str, place: str) -> Dict:
         "integration": integration,
         **analysis,
     }
+
+
+def calculate_chart(date_str: str, time_str: str, place: str) -> Dict:
+    """Inputs are strings: 'YYYY-MM-DD', 'HH:MM', 'City, Country'.
+
+    Geocodes the place first, then computes the chart.
+    Prefer calculate_chart_from_coords() when coordinates are already known.
+    """
+    lat, lon_loc, addr, tz_name = geocode(place)
+    return calculate_chart_from_coords(date_str, time_str, lat, lon_loc, tz_name, addr)
