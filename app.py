@@ -826,20 +826,39 @@ def true_sidereal():
 
 @app.route('/api/hd_chart', methods=['POST'])
 def hd_chart():
-    """Human Design chart endpoint.
-    Body: {date: 'YYYY-MM-DD', time: 'HH:MM', place: 'City, Country'}
-    Returns full HD chart JSON (type, profile, authority, gate activations,
-    defined channels & centers, integration detail id, planets P/D, etc.)
+    """Human Design chart.
+
+    Format A — coords from frontend geocoding (preferred):
+      {date, time, lat, lon, tz_name, place}
+
+    Format B — place string, geocoded on backend:
+      {date, time, place}
     """
     try:
         data = request.get_json(force=True)
         date_str = data.get("date", "").strip()
         time_str = data.get("time", "").strip()
-        place    = data.get("place", "").strip()
-        if not date_str or not time_str or not place:
-            return jsonify({"error": "date, time and place are all required"}), 400
+        if not date_str or not time_str:
+            return jsonify({"error": "date and time are required"}), 400
+
+        # Format A: lat/lon/tz_name already provided by frontend /geocode call
+        if data.get("lat") is not None and data.get("lon") is not None and data.get("tz_name"):
+            from hd_calc import calculate_chart_from_coords
+            result = calculate_chart_from_coords(
+                date_str, time_str,
+                float(data["lat"]), float(data["lon"]),
+                data["tz_name"],
+                resolved_place=data.get("place", ""),
+            )
+            return jsonify(result)
+
+        # Format B: place string — backend geocodes (uses cache or OpenCage)
+        place = data.get("place", "").strip()
+        if not place:
+            return jsonify({"error": "Either lat/lon/tz_name or place is required"}), 400
         result = hd_calculate_chart(date_str, time_str, place)
         return jsonify(result)
+
     except ValueError as ve:
         return jsonify({"error": str(ve)}), 400
     except Exception as e:
