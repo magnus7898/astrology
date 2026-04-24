@@ -60,7 +60,7 @@ CENTER_GATES: Dict[str, List[int]] = {
     "Solar Plexus": [6, 22, 30, 36, 37, 49, 55],
     "Spleen":       [18, 28, 32, 44, 48, 50, 57],
     "Sacral":       [3, 5, 9, 14, 27, 29, 34, 42, 59],
-    "Root":         [19, 38, 39, 41, 52, 53, 54, 58],
+    "Root":         [19, 38, 39, 41, 52, 53, 54, 58, 60],
 }
 GATE_TO_CENTER: Dict[int, str] = {
     g: c for c, gates in CENTER_GATES.items() for g in gates
