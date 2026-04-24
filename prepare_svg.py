@@ -195,17 +195,25 @@ details_svg = DETAILS_SRC.read_text(encoding="utf-8")
 print(f"[info] loaded details.svg ({len(details_svg):,} chars)")
 
 # Extract style from details.svg (for color classes)
+# PREFIX all details classes with "det-" to avoid colliding with human.svg classes
+# (e.g. both use .st0, .st1 etc. but with different colors — details.st0=#FFFFFF
+#  would override human.st0=#D9FFFC and wipe out the silhouette)
 det_style = ""
 ds = re.search(r'<style[^>]*>(.*?)</style>', details_svg, re.DOTALL)
 if ds:
-    det_style = ds.group(1).strip()
+    raw_style = ds.group(1).strip()
+    # Prefix every .stN class with .det-stN
+    det_style = re.sub(r'\.(st\d+)\b', r'.det-\1', raw_style)
 
 # Strip to just the graphic content (no xml decl, svg tag, style, defs)
 det_body = details_svg
 for pat in [r'<\?xml[^?]*\?>', r'<!DOCTYPE[^>]*>', r'<svg[^>]*>', r'</svg>',
             r'<style[^>]*>.*?</style>', r'<defs[^>]*>.*?</defs>']:
     det_body = re.sub(pat, '', det_body, flags=re.DOTALL)
-det_body = det_body.strip()
+
+# Prefix all class="stN" in the details body with "det-stN"
+det_body = re.sub(r'\bclass="(st\d+)"', lambda m: f'class="det-{m.group(1)}"',
+                  det_body.strip())
 
 # Find grid bounds of the details artboards
 all_x, all_y = [], []
