@@ -106,7 +106,8 @@ RULES_RAW = """
 47	#16A085	#E74C3C	#292676
 """
 
-DESIGN_PURPLE = "#67308F"
+DESIGN_PURPLE    = "#67308F"
+PERSONALITY_BLUE = "#292562"   # matches details.svg st1 (personality blue)
 
 RULES = {}
 for line in RULES_RAW.strip().split("\n"):
@@ -957,7 +958,7 @@ detail_rules = "\n".join(
 # change the fill of its dark and light elements when .active-p / .active-d / .active-both
 per_gate_css = []
 for gate, rule in RULES.items():
-    p_blue = rule["p_blue"]
+    p_blue = PERSONALITY_BLUE
     purple = DESIGN_PURPLE
     # Personality only: both lines → p_blue
     per_gate_css.append(
