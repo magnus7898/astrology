@@ -172,10 +172,10 @@ def _tag_center(m):
         return tag
     name = _center_name(float(pm.group(1)), float(pm.group(2)))
     print(f"[info] center {name:15} start=({pm.group(1)},{pm.group(2)})")
-    return re.sub(r'class="st124"',
-                  f'class="st124 chakra" data-center="{name}"', tag, count=1)
+    return re.sub(r'class="st127"',
+                  f'class="st127 chakra" data-center="{name}"', tag, count=1)
 
-svg = re.sub(r'<path\b[^>]+class="st124"[^>]*/>', _tag_center, svg)
+svg = re.sub(r'<path\b[^>]+class="st127"[^>]*/>', _tag_center, svg)
 
 # ── 4. Integration anchor ─────────────────────────────────────
 # Use bounding box of integration gate positions, aligned top-left
