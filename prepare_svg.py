@@ -124,10 +124,10 @@ def _tag_circle(m):
     if gate is None:
         return tag
     gate_positions[gate] = {"cx": round(cx,1), "cy": round(cy,1)}
-    return re.sub(r'class="(st125)"',
+    return re.sub(r'class="(st128)"',
                   f'class="\\1 gate-circle" data-gate="{gate}"', tag, count=1)
 
-svg = re.sub(r'<circle\b[^>]+class="st125"[^>]*/>', _tag_circle, svg)
+svg = re.sub(r'<circle\b[^>]+class="st128"[^>]*/>', _tag_circle, svg)
 
 def _tag_text(m):
     tag = m.group(0)
@@ -137,10 +137,10 @@ def _tag_text(m):
     g = int(gm.group(1))
     if g not in text_pos:
         return tag
-    return re.sub(r'class="(st126 st127)"',
+    return re.sub(r'class="(st129 st130)"',
                   f'class="\\1 gate-text" data-gate="{g}"', tag, count=1)
 
-svg = re.sub(r'<text\b[^>]+class="st126 st127"[^>]*>[\d]+</text>', _tag_text, svg)
+svg = re.sub(r'<text\b[^>]+class="st129 st130"[^>]*>[\d]+</text>', _tag_text, svg)
 
 for g, (tx, ty) in text_pos.items():
     if g not in gate_positions:
