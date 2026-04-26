@@ -156,26 +156,10 @@ POS_JSON.write_text(json.dumps(gate_positions, indent=2))
 print(f"wrote {POS_JSON}  ({len(gate_positions)} gates)")
 
 # Add synthetic circles for gates that have no real st128 circle
-# (gate 25 is a side gate with no backing circle in the SVG)
 tagged_circle_gates = set(
     int(m.group(1))
     for m in re.finditer(r'class="st128 gate-circle" data-gate="(\d+)"', svg)
 )
-synthetic_circles = []
-for g, pos in gate_positions.items():
-    if g not in tagged_circle_gates:
-        cx, cy = pos["cx"], pos["cy"]
-        synthetic_circles.append(
-            f'<circle class="st128 gate-circle" data-gate="{g}" '
-            f'cx="{cx}" cy="{cy}" r="6.9"/>'
-        )
-        print(f"[info] synthetic circle for gate {g} at ({cx},{cy})")
-
-if synthetic_circles:
-    svg = svg.replace(
-        "</svg>",
-        f"<g id='synthetic-circles'>{''.join(synthetic_circles)}</g>\n</svg>"
-    )
 
 # ── 3. Tag center shapes (st124) ─────────────────────────────
 def _center_name(sx, sy):
@@ -204,6 +188,18 @@ def _tag_center(m):
                   f'class="st127 chakra" data-center="{name}"', tag, count=1)
 
 svg = re.sub(r'<path\b[^>]+class="st127"[^>]*/>', _tag_center, svg)
+
+# Gate 25 (Initiation) sits on the G-center diamond — no separate backing circle.
+# Tag the G-center chakra shape ALSO as gate-25's gate-circle indicator.
+# When gate 25 is activated: the G-center diamond darkens and text turns white.
+svg = svg.replace(
+    'class="st127 chakra" data-center="G"',
+    'class="st127 chakra gate-circle" data-center="G" data-gate="25"',
+)
+if 'class="st127 chakra gate-circle" data-center="G" data-gate="25"' in svg:
+    print("[info] gate 25: G-center diamond tagged as gate-circle ✓")
+else:
+    print("[warn] gate 25: G-center tagging failed")
 
 # ── 4. Integration anchor ─────────────────────────────────────
 # Cell size matches the details.svg viewBox exactly
@@ -339,12 +335,27 @@ for gate, rule in GATE_RULES.items():
         f"{{fill:{DESIGN_PURPLE}!important;}}")
 
 # Gate circles & texts — darken when activated
+# Gate 25 is special: its "circle" is the G-center diamond (st127)
+# Color it with personality blue / design purple instead of near-black
 all_gates = list(GATE_RULES.keys()) + [10, 20, 34, 57]
 for gate in all_gates:
-    for pfx in ("active-p-", "active-d-", "active-b-"):
+    if gate == 25:
+        # G-center diamond: personality=blue, design=purple, both=mix
         css_lines.append(
-            f"svg.{pfx}{gate} .gate-circle[data-gate='{gate}']"
-            f"{{fill:#1a1a2e!important;}}")
+            f"svg.active-p-25 .gate-circle[data-gate='25']"
+            f"{{fill:{PERSONALITY_BLUE}!important;}}")
+        css_lines.append(
+            f"svg.active-d-25 .gate-circle[data-gate='25']"
+            f"{{fill:{DESIGN_PURPLE}!important;}}")
+        css_lines.append(
+            f"svg.active-b-25 .gate-circle[data-gate='25']"
+            f"{{fill:{PERSONALITY_BLUE}!important;}}")
+    else:
+        for pfx in ("active-p-", "active-d-", "active-b-"):
+            css_lines.append(
+                f"svg.{pfx}{gate} .gate-circle[data-gate='{gate}']"
+                f"{{fill:#1a1a2e!important;}}")
+    for pfx in ("active-p-", "active-d-", "active-b-"):
         css_lines.append(
             f"svg.{pfx}{gate} .gate-text[data-gate='{gate}']"
             f"{{fill:#FFFFFF!important;}}")
