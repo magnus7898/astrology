@@ -250,6 +250,7 @@ for m in re.finditer(r'<path class="([^"]+)" d="([^"]+)"/>', details_svg):
 
 detail_groups = []
 det_pos_data  = {}
+all_clip_defs = []   # collect all clipPaths — will go into root <defs>
 
 for n in range(1, 257):
     idx  = n - 1
@@ -257,11 +258,9 @@ for n in range(1, 257):
     col  = idx % 16
     ax   = DX_MIN + col * CELL_W
     ay   = DY_MIN + row * CELL_H
-    # translate: moves cell origin (ax,ay) to TARGET
     tx   = TARGET_X - ax
     ty   = TARGET_Y - ay
 
-    # Collect paths belonging to this cell (with ±5 tolerance)
     cell_paths = [
         f'<path {cls_str} d="{d}"/>'
         for (px, py, cls_str, d) in det_all_paths
@@ -269,13 +268,18 @@ for n in range(1, 257):
         and ay - 5 <= py <= ay + CELL_H + 5
     ]
 
-    path_block = "\n".join(cell_paths)
-    g = (
-        f'<g class="detail-part" data-detail="{n}" style="visibility:hidden">'
+    # clipPath in root <defs> — NOT inside the hidden group
+    # (browsers may not register clipPaths inside visibility:hidden elements)
+    all_clip_defs.append(
         f'<clipPath id="cdp{n}">'
         f'<rect x="{TARGET_X:.2f}" y="{TARGET_Y:.2f}" '
         f'width="{CELL_W:.2f}" height="{CELL_H:.2f}"/>'
         f'</clipPath>'
+    )
+
+    path_block = "\n".join(cell_paths)
+    g = (
+        f'<g class="detail-part" data-detail="{n}" style="visibility:hidden">'
         f'<g transform="translate({tx:.2f},{ty:.2f})" clip-path="url(#cdp{n})">'
         f'{path_block}'
         f'</g>'
@@ -335,30 +339,24 @@ for gate, rule in GATE_RULES.items():
         f"{{fill:{DESIGN_PURPLE}!important;}}")
 
 # Gate circles & texts — darken when activated
-# Gate 25 is special: its "circle" is the G-center diamond (st127)
-# Color it with personality blue / design purple instead of near-black
+# Gate 25 is handled separately after center rules (it uses the G-center diamond)
 all_gates = list(GATE_RULES.keys()) + [10, 20, 34, 57]
 for gate in all_gates:
     if gate == 25:
-        # G-center diamond: personality=blue, design=purple, both=mix
+        continue  # handled after center rules to ensure CSS priority
+    for pfx in ("active-p-", "active-d-", "active-b-"):
         css_lines.append(
-            f"svg.active-p-25 .gate-circle[data-gate='25']"
-            f"{{fill:{PERSONALITY_BLUE}!important;}}")
-        css_lines.append(
-            f"svg.active-d-25 .gate-circle[data-gate='25']"
-            f"{{fill:{DESIGN_PURPLE}!important;}}")
-        css_lines.append(
-            f"svg.active-b-25 .gate-circle[data-gate='25']"
-            f"{{fill:{PERSONALITY_BLUE}!important;}}")
-    else:
-        for pfx in ("active-p-", "active-d-", "active-b-"):
-            css_lines.append(
-                f"svg.{pfx}{gate} .gate-circle[data-gate='{gate}']"
-                f"{{fill:#1a1a2e!important;}}")
+            f"svg.{pfx}{gate} .gate-circle[data-gate='{gate}']"
+            f"{{fill:#1a1a2e!important;}}")
     for pfx in ("active-p-", "active-d-", "active-b-"):
         css_lines.append(
             f"svg.{pfx}{gate} .gate-text[data-gate='{gate}']"
             f"{{fill:#FFFFFF!important;}}")
+# Gate 25 text (the number "25" in the G-center area)
+for pfx in ("active-p-", "active-d-", "active-b-"):
+    css_lines.append(
+        f"svg.{pfx}25 .gate-text[data-gate='25']"
+        f"{{fill:#FFFFFF!important;}}")
 
 # Centers
 for name, color in CENTER_ACTIVE_COLORS.items():
@@ -366,6 +364,12 @@ for name, color in CENTER_ACTIVE_COLORS.items():
     css_lines.append(
         f"svg.center-active-{safe} .chakra[data-center='{name}']"
         f"{{fill:{color}!important;}}")
+
+# Gate 25 override — must come AFTER center rules so it wins when gate 25 is active
+# (G-center diamond is both a chakra AND gate-25's circle indicator)
+css_lines.append(f"svg.active-p-25 .gate-circle[data-gate='25']{{fill:{PERSONALITY_BLUE}!important;}}")
+css_lines.append(f"svg.active-d-25 .gate-circle[data-gate='25']{{fill:{DESIGN_PURPLE}!important;}}")
+css_lines.append(f"svg.active-b-25 .gate-circle[data-gate='25']{{fill:{PERSONALITY_BLUE}!important;}}")
 
 # Detail artboard visibility
 css_lines.append(".detail-part{visibility:hidden!important;}")
@@ -384,6 +388,11 @@ if det_style:
                  f'\\1\n/* === details.svg styles === */\n{det_style}\n',
                  svg, count=1)
 
+# Inject all 256 clipPaths into the SVG's root <defs> block.
+# They MUST be in <defs> (not inside hidden groups) so browsers always register them.
+clip_defs_block = "<defs id='detail-clips'>\n" + "\n".join(all_clip_defs) + "\n</defs>"
+svg = re.sub(r'(<svg\b[^>]*>)', f'\\1\n{clip_defs_block}', svg, count=1)
+
 # Inject detail artboards + activation CSS before </svg>
 details_layer = "\n".join(detail_groups)
 svg = svg.replace(
@@ -400,5 +409,5 @@ print(f"\nSummary:")
 print(f"  Gate lines tagged : {tagged}/120")
 print(f"  Centers tagged    : 9")
 print(f"  Gate circles      : {len(gate_positions)}")
-print(f"  Detail artboards  : 256 (direct path embedding)")
+print(f"  Detail artboards  : 256 (clipPaths in root <defs>)")
 print(f"  Output file size  : {mb:.1f} MB")
