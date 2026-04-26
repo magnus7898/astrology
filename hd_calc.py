@@ -123,10 +123,11 @@ INTEGRATION_STATE_VAL = {"None": 0, "A": 1, "B": 2, "Both": 3}
 
 
 def _load_integration_csv() -> List[Dict]:
-    """Load the 256-row CSV that enumerates every combination."""
+    """Load the 256-row CSV. Each row index (1-256) = the detail artboard number.
+    Columns: 10, 57, 34, 20 — each cell is 'None', 'A', 'B', or 'Both'.
+    """
     path = Path(__file__).parent / "static" / "integration_conditions.csv"
     if not path.exists():
-        # Fall back to the original upload if available
         alt = Path("/mnt/user-data/uploads/Book_Sheet1___1_.csv")
         if alt.exists():
             path = alt
@@ -135,57 +136,61 @@ def _load_integration_csv() -> List[Dict]:
     rows = []
     with path.open(encoding="utf-8-sig", newline="") as f:
         reader = csv.reader(f)
-        header = next(reader, None)          # ["10","57","34","20", ...]
+        next(reader, None)          # skip header ["10","57","34","20", ...]
         for r_idx, row in enumerate(reader, start=1):
             if len(row) < 4:
                 continue
-            g10, g57, g34, g20 = row[0], row[1], row[2], row[3]
-            # Optional 5th column = title (if user adds one later)
-            title = row[4].strip() if len(row) > 4 and row[4].strip() else ""
             rows.append({
                 "n": r_idx,
-                "states": {"10": g10, "57": g57, "34": g34, "20": g20},
-                "title": title,
+                "states": {
+                    "10": row[0].strip(),
+                    "57": row[1].strip(),
+                    "34": row[2].strip(),
+                    "20": row[3].strip(),
+                },
             })
     return rows
 
 
 INTEGRATION_CONDITIONS = _load_integration_csv()
 
+# Build reverse lookup: (state10, state57, state34, state20) → detail_n
+_INTEGRATION_LOOKUP: Dict[tuple, int] = {}
+for _row in INTEGRATION_CONDITIONS:
+    s = _row["states"]
+    _INTEGRATION_LOOKUP[(s["10"], s["57"], s["34"], s["20"])] = _row["n"]
+
+
+def gate_state_label(gate: int, p_gates: set, d_gates: set) -> str:
+    """Return 'None', 'A' (personality), 'B' (design), or 'Both'."""
+    in_p = gate in p_gates
+    in_d = gate in d_gates
+    if in_p and in_d:  return "Both"
+    if in_p:           return "A"
+    if in_d:           return "B"
+    return "None"
+
 
 def gate_state(gate: int, p_gates: set, d_gates: set) -> int:
     """Return 0 (None), 1 (A=P-only), 2 (B=D-only), 3 (Both)."""
     in_p = gate in p_gates
     in_d = gate in d_gates
-    if in_p and in_d:
-        return 3
-    if in_p:
-        return 1
-    if in_d:
-        return 2
+    if in_p and in_d: return 3
+    if in_p:          return 1
+    if in_d:          return 2
     return 0
 
 
 def integration_condition(p_gates: set, d_gates: set) -> Dict:
-    """Compute the 1..256 condition number for the 10-57-34-20 integration
-    cluster from the personality/design gate sets.
-    """
-    s10 = gate_state(10, p_gates, d_gates)
-    s57 = gate_state(57, p_gates, d_gates)
-    s34 = gate_state(34, p_gates, d_gates)
-    s20 = gate_state(20, p_gates, d_gates)
-    n = s10 * 64 + s57 * 16 + s34 * 4 + s20 + 1
-    label = {0: "None", 1: "A", 2: "B", 3: "Both"}
-    row = INTEGRATION_CONDITIONS[n - 1] if (1 <= n <= len(INTEGRATION_CONDITIONS)) else None
+    """Look up the 1..256 detail number from the CSV for gates 10, 57, 34, 20."""
+    s10 = gate_state_label(10, p_gates, d_gates)
+    s57 = gate_state_label(57, p_gates, d_gates)
+    s34 = gate_state_label(34, p_gates, d_gates)
+    s20 = gate_state_label(20, p_gates, d_gates)
+    n = _INTEGRATION_LOOKUP.get((s10, s57, s34, s20), 1)
     return {
         "n": n,
-        "states": {
-            "10": label[s10],
-            "57": label[s57],
-            "34": label[s34],
-            "20": label[s20],
-        },
-        "title": row.get("title", "") if row else "",
+        "states": {"10": s10, "57": s57, "34": s34, "20": s20},
     }
 
 
@@ -296,12 +301,13 @@ def analyze(personality: List[Activation], design: List[Activation]) -> Dict:
                 channel_type = "mixed"
             defined_channels.append({"gate_a": a, "gate_b": b, "name": name, "type": channel_type})
 
-    # Defined centers = any center that has BOTH ends of a defined channel touching it
-    # (a center is defined if at least one of its gates is on an activated channel)
+    # Defined centers = any center touched by a defined channel
     defined_centers = set()
     for ch in defined_channels:
-        defined_centers.add(GATE_TO_CENTER[ch["gate_a"]])
-        defined_centers.add(GATE_TO_CENTER[ch["gate_b"]])
+        ca = GATE_TO_CENTER.get(ch["gate_a"])
+        cb = GATE_TO_CENTER.get(ch["gate_b"])
+        if ca: defined_centers.add(ca)
+        if cb: defined_centers.add(cb)
 
     # ---------- Type ----------
     sacral_def = "Sacral" in defined_centers
