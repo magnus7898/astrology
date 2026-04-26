@@ -149,6 +149,28 @@ for g, (tx, ty) in text_pos.items():
 POS_JSON.write_text(json.dumps(gate_positions, indent=2))
 print(f"wrote {POS_JSON}  ({len(gate_positions)} gates)")
 
+# Add synthetic circles for gates that have no real st128 circle
+# (gate 25 is a side gate with no backing circle in the SVG)
+tagged_circle_gates = set(
+    int(m.group(1))
+    for m in re.finditer(r'class="st128 gate-circle" data-gate="(\d+)"', svg)
+)
+synthetic_circles = []
+for g, pos in gate_positions.items():
+    if g not in tagged_circle_gates:
+        cx, cy = pos["cx"], pos["cy"]
+        synthetic_circles.append(
+            f'<circle class="st128 gate-circle" data-gate="{g}" '
+            f'cx="{cx}" cy="{cy}" r="6.9"/>'
+        )
+        print(f"[info] synthetic circle for gate {g} at ({cx},{cy})")
+
+if synthetic_circles:
+    svg = svg.replace(
+        "</svg>",
+        f"<g id='synthetic-circles'>{''.join(synthetic_circles)}</g>\n</svg>"
+    )
+
 # ── 3. Tag center shapes (st124) ─────────────────────────────
 def _center_name(sx, sy):
     if sy < 220:    return "Head"
@@ -190,40 +212,22 @@ else:
     TARGET_X, TARGET_Y = 550.0, 313.0
 print(f"[info] integration anchor: ({TARGET_X:.1f}, {TARGET_Y:.1f})")
 
-# ── 5. Load details.svg, put body in <defs>, use <use> per artboard ───
+# ── 5. Load details.svg, embed paths directly per artboard ──────
+# Direct embedding (not <use>) for maximum browser compatibility.
+# Each artboard gets only its own paths → ~1.5 MB total (same as <use> approach).
 details_svg = DETAILS_SRC.read_text(encoding="utf-8")
 print(f"[info] loaded details.svg ({len(details_svg):,} chars)")
 
-# Extract style from details.svg (for color classes)
-# PREFIX all details classes with "det-" to avoid colliding with human.svg classes
-# (e.g. both use .st0, .st1 etc. but with different colors — details.st0=#FFFFFF
-#  would override human.st0=#D9FFFC and wipe out the silhouette)
+# Extract and prefix style from details.svg
 det_style = ""
 ds = re.search(r'<style[^>]*>(.*?)</style>', details_svg, re.DOTALL)
 if ds:
-    raw_style = ds.group(1).strip()
-    # Prefix every .stN class with .det-stN
-    det_style = re.sub(r'\.(st\d+)\b', r'.det-\1', raw_style)
+    det_style = re.sub(r'\.(st\d+)\b', r'.det-\1', ds.group(1).strip())
 
-# Strip to just the graphic content (no xml decl, svg tag, style, defs)
-det_body = details_svg
-for pat in [r'<\?xml[^?]*\?>', r'<!DOCTYPE[^>]*>', r'<svg[^>]*>', r'</svg>',
-            r'<style[^>]*>.*?</style>', r'<defs[^>]*>.*?</defs>']:
-    det_body = re.sub(pat, '', det_body, flags=re.DOTALL)
-
-# Prefix all class="stN" in the details body with "det-stN"
-det_body = re.sub(r'\bclass="(st\d+)"', lambda m: f'class="det-{m.group(1)}"',
-                  det_body.strip())
-
-# Find grid bounds of the details artboards
+# Find grid bounds
 all_x, all_y = [], []
-for v in re.findall(r'\bx="([\d.]+)"', details_svg):
-    all_x.append(float(v))
-for v in re.findall(r'\by="([\d.]+)"', details_svg):
-    all_y.append(float(v))
 for a, b in re.findall(r'M\s*([\d.]+),([\d.]+)', details_svg):
     all_x.append(float(a)); all_y.append(float(b))
-
 DX_MIN = min(all_x); DX_MAX = max(all_x)
 DY_MIN = min(all_y); DY_MAX = max(all_y)
 CELL_W = (DX_MAX - DX_MIN) / 16
@@ -231,36 +235,47 @@ CELL_H = (DY_MAX - DY_MIN) / 16
 print(f"[info] details grid ({DX_MIN:.0f},{DY_MIN:.0f})→({DX_MAX:.0f},{DY_MAX:.0f}), "
       f"cell {CELL_W:.1f}×{CELL_H:.1f}")
 
-# Build 256 artboard groups using <use> referencing a single shared <defs> group.
-# This keeps the output file small (~3-5 MB instead of 355 MB).
-defs_insert = (
-    f'<defs id="det-defs">'
-    f'<g id="det-content">{det_body}</g>'
-    f'</defs>'
-)
+# Extract all paths from details.svg with their M start coordinates
+det_all_paths = []
+for m in re.finditer(r'<path class="([^"]+)" d="([^"]+)"/>', details_svg):
+    cls = m.group(1)
+    d   = m.group(2)
+    pm  = re.search(r'M\s*([\d.]+),([\d.]+)', d)
+    if pm:
+        det_all_paths.append((float(pm.group(1)), float(pm.group(2)),
+                              f'class="det-{cls}"', d))
 
 detail_groups = []
 det_pos_data  = {}
 
 for n in range(1, 257):
-    idx = n - 1
-    row = idx // 16
-    col = idx % 16
-    ax  = DX_MIN + col * CELL_W
-    ay  = DY_MIN + row * CELL_H
-    # Translate so that cell top-left (ax,ay) maps to TARGET position
-    tx  = TARGET_X - ax
-    ty  = TARGET_Y - ay
+    idx  = n - 1
+    row  = idx // 16
+    col  = idx % 16
+    ax   = DX_MIN + col * CELL_W
+    ay   = DY_MIN + row * CELL_H
+    # translate: moves cell origin (ax,ay) to TARGET
+    tx   = TARGET_X - ax
+    ty   = TARGET_Y - ay
 
-    # clipPath clips to the TARGET area after transform
+    # Collect paths belonging to this cell (with ±5 tolerance)
+    cell_paths = [
+        f'<path {cls_str} d="{d}"/>'
+        for (px, py, cls_str, d) in det_all_paths
+        if ax - 5 <= px <= ax + CELL_W + 5
+        and ay - 5 <= py <= ay + CELL_H + 5
+    ]
+
+    path_block = "\n".join(cell_paths)
     g = (
         f'<g class="detail-part" data-detail="{n}" style="visibility:hidden">'
         f'<clipPath id="cdp{n}">'
         f'<rect x="{TARGET_X:.2f}" y="{TARGET_Y:.2f}" '
         f'width="{CELL_W:.2f}" height="{CELL_H:.2f}"/>'
         f'</clipPath>'
-        f'<use href="#det-content" transform="translate({tx:.2f},{ty:.2f})" '
-        f'clip-path="url(#cdp{n})"/>'
+        f'<g transform="translate({tx:.2f},{ty:.2f})" clip-path="url(#cdp{n})">'
+        f'{path_block}'
+        f'</g>'
         f'</g>'
     )
     detail_groups.append(g)
@@ -351,9 +366,6 @@ if det_style:
                  f'\\1\n/* === details.svg styles === */\n{det_style}\n',
                  svg, count=1)
 
-# Inject defs for the shared details content (right after <svg ...>)
-svg = re.sub(r'(<svg\b[^>]*>)', f'\\1\n{defs_insert}\n', svg, count=1)
-
 # Inject detail artboards + activation CSS before </svg>
 details_layer = "\n".join(detail_groups)
 svg = svg.replace(
@@ -367,8 +379,8 @@ DST.write_text(svg, encoding="utf-8")
 mb = len(svg) / 1_000_000
 print(f"wrote {DST}  ({mb:.1f} MB)")
 print(f"\nSummary:")
-print(f"  Gate lines tagged : {tagged} / {len(GATE_RULES)*2} (120 expected, 2 missing = gates 9,47,48,60 each lack one color in SVG)")
+print(f"  Gate lines tagged : {tagged}/120")
 print(f"  Centers tagged    : 9")
 print(f"  Gate circles      : {len(gate_positions)}")
-print(f"  Detail artboards  : 256 (via <use> — compact)")
+print(f"  Detail artboards  : 256 (direct path embedding)")
 print(f"  Output file size  : {mb:.1f} MB")
