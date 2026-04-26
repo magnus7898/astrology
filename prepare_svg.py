@@ -123,6 +123,12 @@ def _tag_circle(m):
     gate = _nearest(cx, cy)
     if gate is None:
         return tag
+    # Only assign if the circle is genuinely close to the gate text (< 15px)
+    # Prevents mis-assigning distant circles to side gates like gate 25
+    tx, ty = text_pos[gate]
+    dist = ((cx - tx)**2 + (cy - ty)**2) ** 0.5
+    if dist > 15:
+        return tag  # skip — no real circle for this gate position
     gate_positions[gate] = {"cx": round(cx,1), "cy": round(cy,1)}
     return re.sub(r'class="(st128)"',
                   f'class="\\1 gate-circle" data-gate="{gate}"', tag, count=1)
@@ -200,17 +206,23 @@ def _tag_center(m):
 svg = re.sub(r'<path\b[^>]+class="st127"[^>]*/>', _tag_center, svg)
 
 # ── 4. Integration anchor ─────────────────────────────────────
-# Use bounding box of integration gate positions, aligned top-left
-int_gates = [g for g in [10, 20, 34, 57] if g in gate_positions]
-if int_gates:
-    xs = [gate_positions[g]["cx"] for g in int_gates]
-    ys = [gate_positions[g]["cy"] for g in int_gates]
-    # Anchor = top-left of the integration cluster with small padding
-    TARGET_X = min(xs) - 5
-    TARGET_Y = min(ys) - 5
+# Cell size matches the details.svg viewBox exactly
+CELL_W = 152.6
+CELL_H = 279.0
+
+# Anchor: right edge = rightmost gate (20), bottom edge = lowest gate (34)
+# This guarantees all 4 integration gates are inside the artboard cell.
+int_gates_pos = {g: gate_positions[g] for g in [10, 20, 34, 57] if g in gate_positions}
+if len(int_gates_pos) == 4:
+    xs = [p["cx"] for p in int_gates_pos.values()]
+    ys = [p["cy"] for p in int_gates_pos.values()]
+    TARGET_X = round(max(xs) - CELL_W, 2)   # right edge lands on rightmost gate
+    TARGET_Y = round(max(ys) - CELL_H, 2)   # bottom edge lands on lowest gate
 else:
-    TARGET_X, TARGET_Y = 550.0, 313.0
+    TARGET_X, TARGET_Y = 554.7, 307.4
 print(f"[info] integration anchor: ({TARGET_X:.1f}, {TARGET_Y:.1f})")
+print(f"[info] cell size: {CELL_W} × {CELL_H}")
+print(f"[info] cell covers: x={TARGET_X:.1f}–{TARGET_X+CELL_W:.1f}, y={TARGET_Y:.1f}–{TARGET_Y+CELL_H:.1f}")
 
 # ── 5. Load details.svg, embed paths directly per artboard ──────
 # Direct embedding (not <use>) for maximum browser compatibility.
@@ -224,16 +236,11 @@ ds = re.search(r'<style[^>]*>(.*?)</style>', details_svg, re.DOTALL)
 if ds:
     det_style = re.sub(r'\.(st\d+)\b', r'.det-\1', ds.group(1).strip())
 
-# Find grid bounds
-all_x, all_y = [], []
-for a, b in re.findall(r'M\s*([\d.]+),([\d.]+)', details_svg):
-    all_x.append(float(a)); all_y.append(float(b))
-DX_MIN = min(all_x); DX_MAX = max(all_x)
-DY_MIN = min(all_y); DY_MAX = max(all_y)
-CELL_W = (DX_MAX - DX_MIN) / 16
-CELL_H = (DY_MAX - DY_MIN) / 16
-print(f"[info] details grid ({DX_MIN:.0f},{DY_MIN:.0f})→({DX_MAX:.0f},{DY_MAX:.0f}), "
-      f"cell {CELL_W:.1f}×{CELL_H:.1f}")
+# Find grid bounds — artboard origins are at (col*CELL_W, row*CELL_H)
+# (no need to recalculate from path ranges — we know the cell size from viewBox)
+DX_MIN = 0.0
+DY_MIN = 0.0
+print(f"[info] details grid: 16×16 artboards, each {CELL_W}×{CELL_H}, origin (0,0)")
 
 # Extract all paths from details.svg with their M start coordinates
 det_all_paths = []
