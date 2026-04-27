@@ -1,413 +1,327 @@
-"""prepare_svg.py — preprocess human.svg + details.svg for the HD bodygraph.
+"""prepare_svg.py — build human_prepared.svg from human.svg + details.svg + CSV.
 
-New human.svg layout (viewBox 0 0 1421.8 827):
-  LEFT  (x=0-542):   human silhouette (st0 teal) — untouched
-  RIGHT (x=537-932+): bodygraph — channels, centers, gate circles/texts
-
-Steps:
-  1. Parse 60 non-integration gate color rules (dark + light per gate).
-  2. Tag every matching path/rect with data-gate="N" data-type="dark|light".
-  3. Tag 9 center shapes (st124) with data-center="Name".
-  4. Tag gate circles (st125) and texts with data-gate="N".
-  5. Put details.svg content in <defs> once, reference via <use>+clipPath
-     for each of the 256 integration artboards (keeps file small).
-  6. Inject activation CSS.
-
-Outputs:
-  static/human_prepared.svg   (~3-5 MB, not 355 MB)
-  static/gate_positions.json
-  static/gate_colors.json
-  static/detail_positions.json
+Key fixes baked in:
+  - Gate 25 has NO backing circle in human.svg → use G-center diamond (st127)
+    as the visual indicator; gate-25 CSS placed AFTER center rules so it wins.
+  - All 256 clipPaths go in root <defs>, NOT inside visibility:hidden groups
+    (browsers skip clipPaths inside hidden parents → details never render).
+  - details.svg classes prefixed "det-" so they don't override human.svg classes
+    (both files use st0/st1/st2 but with different colors).
+  - Integration detail number comes from CSV row order, not a formula.
+  - Circle proximity threshold 15 px prevents mis-assigning nearby circles
+    to side-gates like 25, 10, 57.
 """
 
-import json, re
+import csv, json, re
 from pathlib import Path
 
 ROOT        = Path(__file__).parent
 HUMAN_SRC   = ROOT / "static" / "human.svg"
 DETAILS_SRC = ROOT / "static" / "details.svg"
+CSV_SRC     = ROOT / "static" / "integration_conditions.csv"
 DST         = ROOT / "static" / "human_prepared.svg"
 POS_JSON    = ROOT / "static" / "gate_positions.json"
 COL_JSON    = ROOT / "static" / "gate_colors.json"
 DET_JSON    = ROOT / "static" / "detail_positions.json"
 
-PERSONALITY_BLUE = "#292562"   # matches details.svg st1
-DESIGN_PURPLE    = "#67308F"
-WHITE            = "#FFFFFF"
+P_BLUE  = "#292562"   # personality — matches details.svg st1
+D_PURP  = "#67308F"   # design      — matches details.svg st2
 
-# ── 60 gate color rules ───────────────────────────────────────
-GATE_RULES_RAW = [
-    (36,"#FF0000","#FF3333"), (35,"#E60000","#FF4D4D"), (22,"#CC0000","#FF6666"),
-    (12,"#B30000","#FF8080"), (37,"#990000","#FF9999"), (40,"#FF8000","#FF9933"),
-    (21,"#E67300","#FFA34D"), (45,"#CC6600","#FFAD66"), (51,"#B35900","#FFB880"),
-    (25,"#994D00","#FFC299"), ( 6,"#FFFF00","#FFFF33"), (59,"#E6E600","#FFFF4D"),
-    (27,"#CCCC00","#FFFF66"), (50,"#B3B300","#FFFF80"), (26,"#999900","#FFFF99"),
-    (44,"#00FF00","#33FF33"), (48,"#00E600","#4DFF4D"), (16,"#00CC00","#66FF66"),
-    (30,"#00B300","#80FF80"), (41,"#009900","#99FF99"), (55,"#00FFFF","#33FFFF"),
-    (39,"#00E6E6","#4DFFFF"), (49,"#00CCCC","#66FFFF"), (19,"#00B3B3","#80FFFF"),
-    (58,"#009999","#99FFFF"), (18,"#0000FF","#3333FF"), (38,"#0000E6","#4D4DFF"),
-    (28,"#0000CC","#6666FF"), (54,"#0000B3","#8080FF"), (32,"#000099","#9999FF"),
-    (52,"#800080","#9933FF"), ( 9,"#730073","#A34DFF"), (60,"#660066","#AD66FF"),
-    ( 3,"#590059","#B880FF"), (53,"#4D004D","#C299FF"), (42,"#FF00FF","#FF33FF"),
-    (29,"#E600E6","#FF4DFF"), (14,"#CC00CC","#FF66FF"), ( 5,"#B300B3","#FF80FF"),
-    (46,"#990099","#FF99FF"), ( 2,"#8B4513","#A0522D"), (15,"#7A3C12","#B05A2F"),
-    (13,"#693310","#C06231"), ( 1,"#582A0E","#D06A33"), ( 7,"#47210C","#E07235"),
-    (33,"#808080","#999999"), ( 8,"#737373","#A6A6A6"), (31,"#666666","#B3B3B3"),
-    (56,"#595959","#BFBFBF"), (23,"#4D4D4D","#CCCCCC"), (62,"#FAD0C4","#C1E1C1"),
-    (11,"#F8C8DC","#B39EB5"), (43,"#F3E5AB","#AED9E0"), (17,"#E6E6FA","#98D8C8"),
-    ( 4,"#D4F1F4","#88C5B9"), (63,"#2C3E50","#F1C40F"), (24,"#34495E","#F39C12"),
-    (61,"#2980B9","#E67E22"), (64,"#1ABC9C","#D35400"), (47,"#16A085","#E74C3C"),
+# ── 60 gate color rules ──────────────────────────────────────
+GATE_RULES = [
+    (36,"#FF0000","#FF3333"),(35,"#E60000","#FF4D4D"),(22,"#CC0000","#FF6666"),
+    (12,"#B30000","#FF8080"),(37,"#990000","#FF9999"),(40,"#FF8000","#FF9933"),
+    (21,"#E67300","#FFA34D"),(45,"#CC6600","#FFAD66"),(51,"#B35900","#FFB880"),
+    (25,"#994D00","#FFC299"),( 6,"#FFFF00","#FFFF33"),(59,"#E6E600","#FFFF4D"),
+    (27,"#CCCC00","#FFFF66"),(50,"#B3B300","#FFFF80"),(26,"#999900","#FFFF99"),
+    (44,"#00FF00","#33FF33"),(48,"#00E600","#4DFF4D"),(16,"#00CC00","#66FF66"),
+    (30,"#00B300","#80FF80"),(41,"#009900","#99FF99"),(55,"#00FFFF","#33FFFF"),
+    (39,"#00E6E6","#4DFFFF"),(49,"#00CCCC","#66FFFF"),(19,"#00B3B3","#80FFFF"),
+    (58,"#009999","#99FFFF"),(18,"#0000FF","#3333FF"),(38,"#0000E6","#4D4DFF"),
+    (28,"#0000CC","#6666FF"),(54,"#0000B3","#8080FF"),(32,"#000099","#9999FF"),
+    (52,"#800080","#9933FF"),( 9,"#730073","#A34DFF"),(60,"#660066","#AD66FF"),
+    ( 3,"#590059","#B880FF"),(53,"#4D004D","#C299FF"),(42,"#FF00FF","#FF33FF"),
+    (29,"#E600E6","#FF4DFF"),(14,"#CC00CC","#FF66FF"),( 5,"#B300B3","#FF80FF"),
+    (46,"#990099","#FF99FF"),( 2,"#8B4513","#A0522D"),(15,"#7A3C12","#B05A2F"),
+    (13,"#693310","#C06231"),( 1,"#582A0E","#D06A33"),( 7,"#47210C","#E07235"),
+    (33,"#808080","#999999"),( 8,"#737373","#A6A6A6"),(31,"#666666","#B3B3B3"),
+    (56,"#595959","#BFBFBF"),(23,"#4D4D4D","#CCCCCC"),(62,"#FAD0C4","#C1E1C1"),
+    (11,"#F8C8DC","#B39EB5"),(43,"#F3E5AB","#AED9E0"),(17,"#E6E6FA","#98D8C8"),
+    ( 4,"#D4F1F4","#88C5B9"),(63,"#2C3E50","#F1C40F"),(24,"#34495E","#F39C12"),
+    (61,"#2980B9","#E67E22"),(64,"#1ABC9C","#D35400"),(47,"#16A085","#E74C3C"),
 ]
+C2G = {}
+for g, d, l in GATE_RULES:
+    C2G[d.upper()] = (g, "dark")
+    C2G[l.upper()] = (g, "light")
 
-GATE_RULES    = {g: {"dark": d, "light": l} for g, d, l in GATE_RULES_RAW}
-COLOR_TO_GATE = {}
-for g, d, l in GATE_RULES_RAW:
-    COLOR_TO_GATE[d.upper()] = (g, "dark")
-    COLOR_TO_GATE[l.upper()] = (g, "light")
-
-print(f"[info] {len(GATE_RULES)} gate rules, {len(COLOR_TO_GATE)} color→gate mappings")
-
-# ── Load SVG ─────────────────────────────────────────────────
+# ── Load human.svg ────────────────────────────────────────────
 svg = HUMAN_SRC.read_text(encoding="utf-8")
-print(f"[info] loaded human.svg ({len(svg):,} chars)")
+print(f"[info] human.svg  {len(svg):,} chars")
+sblk  = re.search(r'<style[^>]*>(.*?)</style>', svg, re.DOTALL).group(1)
+c2col = {m.group(1): m.group(2).upper()
+         for m in re.finditer(r'\.(st\d+)\{[^}]*fill:(#[0-9A-Fa-f]+)', sblk)}
 
-# Parse style: class → fill color
-style_m = re.search(r'<style[^>]*>(.*?)</style>', svg, re.DOTALL)
-class_to_color = {}
-for m in re.finditer(r'\.(st\d+)\s*\{[^}]*fill:\s*(#[0-9A-Fa-f]{6})', style_m.group(1)):
-    class_to_color[m.group(1)] = m.group(2).upper()
-
-# ── 1. Tag gate line elements ─────────────────────────────────
-tagged = 0
-def _tag_channel(m):
-    global tagged
-    tag = m.group(0)
-    cm = re.search(r'class="(st\d+)"', tag)
-    if not cm:
-        return tag
-    color = class_to_color.get(cm.group(1), "")
-    if color not in COLOR_TO_GATE:
-        return tag
-    gate, gtype = COLOR_TO_GATE[color]
-    tagged += 1
+# ── 1. Tag channel lines ──────────────────────────────────────
+n_tag = 0
+def _ch(m):
+    global n_tag
+    t  = m.group(0)
+    cm = re.search(r'class="(st\d+)"', t)
+    if not cm: return t
+    col = c2col.get(cm.group(1), "")
+    if col not in C2G: return t
+    g, tp = C2G[col]; n_tag += 1
     return re.sub(r'class="(st\d+)"',
-                  f'class="\\1 gate-line" data-gate="{gate}" data-type="{gtype}"',
-                  tag, count=1)
+                  f'class="\\1 gate-line" data-gate="{g}" data-type="{tp}"',
+                  t, count=1)
+svg = re.sub(r'<(?:rect|path|line)\b[^>]*/>', _ch, svg)
+print(f"[info] channel lines tagged: {n_tag}/120")
 
-svg = re.sub(r'<(?:rect|path|line)\b[^>]*/>', _tag_channel, svg)
-print(f"[info] tagged {tagged} gate-line elements")
-
-# ── 2. Tag gate circles & texts ───────────────────────────────
-text_pos = {}
+# ── 2. Gate texts → positions ────────────────────────────────
+tp = {}
 for m in re.finditer(
-        r'transform="matrix\(1 0 0 1 ([\d.]+) ([\d.]+)\)"[^>]*>([\d]+)</text>', svg):
-    text_pos[int(m.group(3))] = (float(m.group(1)), float(m.group(2)))
+        r'matrix\(1 0 0 1 ([\d.]+) ([\d.]+)\)[^>]*>(\d+)</text>', svg):
+    tp[int(m.group(3))] = (float(m.group(1)), float(m.group(2)))
 
-gate_positions = {}
+gpos = {}   # gate → {cx, cy}
 
 def _nearest(cx, cy):
     best, bd = None, 1e9
-    for g, (tx, ty) in text_pos.items():
+    for g, (tx, ty) in tp.items():
         d = (cx-tx)**2 + (cy-ty)**2
-        if d < bd:
-            bd, best = d, g
-    return best
+        if d < bd: bd, best = d, g
+    return best, bd**0.5
 
-def _tag_circle(m):
-    tag = m.group(0)
-    cxm = re.search(r'cx="([\d.]+)"', tag)
-    cym = re.search(r'cy="([\d.]+)"', tag)
-    if not cxm or not cym:
-        return tag
+# ── 3. Tag gate circles (st128) ──────────────────────────────
+def _circ(m):
+    t   = m.group(0)
+    cxm = re.search(r'cx="([\d.]+)"', t)
+    cym = re.search(r'cy="([\d.]+)"', t)
+    if not cxm or not cym: return t
     cx, cy = float(cxm.group(1)), float(cym.group(1))
-    gate = _nearest(cx, cy)
-    if gate is None:
-        return tag
-    # Only assign if the circle is genuinely close to the gate text (< 15px)
-    # Prevents mis-assigning distant circles to side gates like gate 25
-    tx, ty = text_pos[gate]
-    dist = ((cx - tx)**2 + (cy - ty)**2) ** 0.5
-    if dist > 15:
-        return tag  # skip — no real circle for this gate position
-    gate_positions[gate] = {"cx": round(cx,1), "cy": round(cy,1)}
+    g, dist = _nearest(cx, cy)
+    if g is None or dist > 15: return t   # >15 px → wrong gate, skip
+    gpos[g] = {"cx": round(cx,1), "cy": round(cy,1)}
     return re.sub(r'class="(st128)"',
-                  f'class="\\1 gate-circle" data-gate="{gate}"', tag, count=1)
+                  f'class="\\1 gate-circle" data-gate="{g}"', t, count=1)
+svg = re.sub(r'<circle\b[^>]+class="st128"[^>]*/>', _circ, svg)
 
-svg = re.sub(r'<circle\b[^>]+class="st128"[^>]*/>', _tag_circle, svg)
-
-def _tag_text(m):
-    tag = m.group(0)
-    gm = re.search(r'>([\d]+)</text>', tag)
-    if not gm:
-        return tag
+# ── 4. Tag gate texts (st129 st130) ──────────────────────────
+def _txt(m):
+    t  = m.group(0)
+    gm = re.search(r'>(\d+)</text>', t)
+    if not gm: return t
     g = int(gm.group(1))
-    if g not in text_pos:
-        return tag
+    if g not in tp: return t
     return re.sub(r'class="(st129 st130)"',
-                  f'class="\\1 gate-text" data-gate="{g}"', tag, count=1)
+                  f'class="\\1 gate-text" data-gate="{g}"', t, count=1)
+svg = re.sub(r'<text\b[^>]+class="st129 st130"[^>]*>\d+</text>', _txt, svg)
 
-svg = re.sub(r'<text\b[^>]+class="st129 st130"[^>]*>[\d]+</text>', _tag_text, svg)
+# Fill positions for gates without a real circle (e.g. gate 25)
+for g, (tx, ty) in tp.items():
+    if g not in gpos:
+        gpos[g] = {"cx": round(tx,1), "cy": round(ty,1)}
+POS_JSON.write_text(json.dumps(gpos, indent=2))
+print(f"[info] gate positions: {len(gpos)}  (circles tagged: {len([g for g in gpos if g in [int(m.group(1)) for m in re.finditer(r'data-gate=\"(\d+)\"', svg)]])})")
 
-for g, (tx, ty) in text_pos.items():
-    if g not in gate_positions:
-        gate_positions[g] = {"cx": round(tx,1), "cy": round(ty,1)}
-
-POS_JSON.write_text(json.dumps(gate_positions, indent=2))
-print(f"wrote {POS_JSON}  ({len(gate_positions)} gates)")
-
-# Add synthetic circles for gates that have no real st128 circle
-tagged_circle_gates = set(
-    int(m.group(1))
-    for m in re.finditer(r'class="st128 gate-circle" data-gate="(\d+)"', svg)
-)
-
-# ── 3. Tag center shapes (st124) ─────────────────────────────
-def _center_name(sx, sy):
-    if sy < 220:    return "Head"
-    if sy < 310:    return "Ajna"
-    if sy < 390:    return "Throat"
-    if sy < 480:    return "G"
-    if sy < 540:    return "Heart"
+# ── 5. Tag center shapes (st127) ─────────────────────────────
+def _cname(sx, sy):
+    if sy < 220: return "Head"
+    if sy < 310: return "Ajna"
+    if sy < 390: return "Throat"
+    if sy < 480: return "G"
+    if sy < 540: return "Heart"
     if sy < 700:
-        if sx < 600:   return "Spleen"
-        if sx > 900:   return "Solar Plexus"
-        return "Sacral"
+        return "Spleen" if sx < 600 else ("Solar Plexus" if sx > 900 else "Sacral")
     return "Root"
 
-def _tag_center(m):
-    tag = m.group(0)
-    dm = re.search(r'd="([^"]+)"', tag)
-    if not dm:
-        return tag
+def _ctr(m):
+    t  = m.group(0)
+    dm = re.search(r'd="([^"]+)"', t)
+    if not dm: return t
     pm = re.search(r'M\s*([\d.]+),([\d.]+)', dm.group(1))
-    if not pm:
-        return tag
-    name = _center_name(float(pm.group(1)), float(pm.group(2)))
-    print(f"[info] center {name:15} start=({pm.group(1)},{pm.group(2)})")
+    if not pm: return t
+    name = _cname(float(pm.group(1)), float(pm.group(2)))
+    print(f"  center {name:15} M({pm.group(1)},{pm.group(2)})")
     return re.sub(r'class="st127"',
-                  f'class="st127 chakra" data-center="{name}"', tag, count=1)
+                  f'class="st127 chakra" data-center="{name}"', t, count=1)
+svg = re.sub(r'<path\b[^>]+class="st127"[^>]*/>', _ctr, svg)
 
-svg = re.sub(r'<path\b[^>]+class="st127"[^>]*/>', _tag_center, svg)
-
-# Gate 25 (Initiation) sits on the G-center diamond — no separate backing circle.
-# Tag the G-center chakra shape ALSO as gate-25's gate-circle indicator.
-# When gate 25 is activated: the G-center diamond darkens and text turns white.
+# Gate 25 — G-center diamond is its visual indicator (no separate circle exists)
 svg = svg.replace(
     'class="st127 chakra" data-center="G"',
     'class="st127 chakra gate-circle" data-center="G" data-gate="25"',
 )
-if 'class="st127 chakra gate-circle" data-center="G" data-gate="25"' in svg:
-    print("[info] gate 25: G-center diamond tagged as gate-circle ✓")
-else:
-    print("[warn] gate 25: G-center tagging failed")
+print("[info] gate 25 → G-center diamond:", "✓" if 'data-gate="25"' in svg else "✗ FAILED")
 
-# ── 4. Integration anchor ─────────────────────────────────────
-# Cell size matches the details.svg viewBox exactly
-CELL_W = 152.6
-CELL_H = 279.0
+# ── 6. CSV lookup: (s10,s57,s34,s20) → detail n ─────────────
+lkp = {}
+with CSV_SRC.open(encoding="utf-8-sig", newline="") as f:
+    next(csv.reader(f))   # skip header
+    for n, row in enumerate(csv.reader(f), start=1):
+        if len(row) >= 4:
+            lkp[(row[0].strip(), row[1].strip(),
+                 row[2].strip(), row[3].strip())] = n
+print(f"[info] CSV lookup: {len(lkp)} entries  "
+      f"all-None→{lkp.get(('None','None','None','None'))}  "
+      f"all-Both→{lkp.get(('Both','Both','Both','Both'))}")
 
-# Anchor: right edge = rightmost gate (20), bottom edge = lowest gate (34)
-# This guarantees all 4 integration gates are inside the artboard cell.
-int_gates_pos = {g: gate_positions[g] for g in [10, 20, 34, 57] if g in gate_positions}
-if len(int_gates_pos) == 4:
-    xs = [p["cx"] for p in int_gates_pos.values()]
-    ys = [p["cy"] for p in int_gates_pos.values()]
-    TARGET_X = round(max(xs) - CELL_W, 2)   # right edge lands on rightmost gate
-    TARGET_Y = round(max(ys) - CELL_H, 2)   # bottom edge lands on lowest gate
-else:
-    TARGET_X, TARGET_Y = 554.7, 307.4
-print(f"[info] integration anchor: ({TARGET_X:.1f}, {TARGET_Y:.1f})")
-print(f"[info] cell size: {CELL_W} × {CELL_H}")
-print(f"[info] cell covers: x={TARGET_X:.1f}–{TARGET_X+CELL_W:.1f}, y={TARGET_Y:.1f}–{TARGET_Y+CELL_H:.1f}")
+# Save lookup for hd_calc.py to import at runtime
+(ROOT/"static"/"integration_lookup.json").write_text(
+    json.dumps({"|".join(k): v for k,v in lkp.items()}, indent=2))
+print("[info] wrote static/integration_lookup.json")
 
-# ── 5. Load details.svg, embed paths directly per artboard ──────
-# Direct embedding (not <use>) for maximum browser compatibility.
-# Each artboard gets only its own paths → ~1.5 MB total (same as <use> approach).
-details_svg = DETAILS_SRC.read_text(encoding="utf-8")
-print(f"[info] loaded details.svg ({len(details_svg):,} chars)")
+# ── 7. Integration anchor (where detail artboard appears) ────
+# Cell size = viewBox of details.svg: 152.6 × 279.0
+# Anchor: right edge reaches gate-20 cx, bottom edge reaches gate-34 cy
+CW, CH = 152.6, 279.0
+g20 = gpos.get(20, {"cx": 707.3, "cy": 320.5})
+g34 = gpos.get(34, {"cx": 704.8, "cy": 588.6})
+TX  = round(g20["cx"] - CW, 2)   # left edge of artboard in SVG coords
+TY  = round(g34["cy"] - CH, 2)   # top edge of artboard in SVG coords
+print(f"[info] integration anchor ({TX},{TY})  right={TX+CW:.1f}  bottom={TY+CH:.1f}")
 
-# Extract and prefix style from details.svg
+# ── 8. Extract details.svg artboards ─────────────────────────
+dsvg = DETAILS_SRC.read_text(encoding="utf-8")
+print(f"[info] details.svg  {len(dsvg):,} chars")
+
+# Prefix all details classes with "det-" to prevent color collisions
 det_style = ""
-ds = re.search(r'<style[^>]*>(.*?)</style>', details_svg, re.DOTALL)
+ds = re.search(r'<style[^>]*>(.*?)</style>', dsvg, re.DOTALL)
 if ds:
     det_style = re.sub(r'\.(st\d+)\b', r'.det-\1', ds.group(1).strip())
 
-# Find grid bounds — artboard origins are at (col*CELL_W, row*CELL_H)
-# (no need to recalculate from path ranges — we know the cell size from viewBox)
-DX_MIN = 0.0
-DY_MIN = 0.0
-print(f"[info] details grid: 16×16 artboards, each {CELL_W}×{CELL_H}, origin (0,0)")
-
-# Extract all paths from details.svg with their M start coordinates
-det_all_paths = []
-for m in re.finditer(r'<path class="([^"]+)" d="([^"]+)"/>', details_svg):
-    cls = m.group(1)
-    d   = m.group(2)
-    pm  = re.search(r'M\s*([\d.]+),([\d.]+)', d)
+# All paths with M start coord and prefixed class
+det_paths = []
+for m in re.finditer(r'<path class="([^"]+)" d="([^"]+)"/>', dsvg):
+    pm = re.search(r'M\s*([\d.]+),([\d.]+)', m.group(2))
     if pm:
-        det_all_paths.append((float(pm.group(1)), float(pm.group(2)),
-                              f'class="det-{cls}"', d))
+        det_paths.append((float(pm.group(1)), float(pm.group(2)),
+                          f'class="det-{m.group(1)}"', m.group(2)))
+print(f"[info] detail paths extracted: {len(det_paths)}")
 
-detail_groups = []
-det_pos_data  = {}
-all_clip_defs = []   # collect all clipPaths — will go into root <defs>
+# Grid: artboard n (1-based) → row=(n-1)//16, col=(n-1)%16
+# Origins: (col*152.6, row*279.0) — matches viewBox "0 0 152.6 279" per artboard
+DXO, DYO = 0.0, 0.0   # artboard grid origin
+
+clip_defs  = []   # all clipPaths — injected into root <defs>
+det_groups = []
+det_pdata  = {}
 
 for n in range(1, 257):
-    idx  = n - 1
-    row  = idx // 16
-    col  = idx % 16
-    ax   = DX_MIN + col * CELL_W
-    ay   = DY_MIN + row * CELL_H
-    tx   = TARGET_X - ax
-    ty   = TARGET_Y - ay
+    idx = n - 1
+    row = idx // 16
+    col = idx % 16
+    ax  = DXO + col * CW
+    ay  = DYO + row * CH
+    dx  = TX - ax          # translate to move cell to anchor
+    dy  = TY - ay
 
-    cell_paths = [
-        f'<path {cls_str} d="{d}"/>'
-        for (px, py, cls_str, d) in det_all_paths
-        if ax - 5 <= px <= ax + CELL_W + 5
-        and ay - 5 <= py <= ay + CELL_H + 5
-    ]
+    # Paths in this cell (±5 tolerance for paths near cell edges)
+    cell = "\n".join(
+        f'<path {cs} d="{d}"/>'
+        for px, py, cs, d in det_paths
+        if ax-5 <= px <= ax+CW+5 and ay-5 <= py <= ay+CH+5
+    )
 
-    # clipPath in root <defs> — NOT inside the hidden group
-    # (browsers may not register clipPaths inside visibility:hidden elements)
-    all_clip_defs.append(
+    # clipPath MUST be in root <defs> — not inside visibility:hidden group
+    clip_defs.append(
         f'<clipPath id="cdp{n}">'
-        f'<rect x="{TARGET_X:.2f}" y="{TARGET_Y:.2f}" '
-        f'width="{CELL_W:.2f}" height="{CELL_H:.2f}"/>'
+        f'<rect x="{TX:.2f}" y="{TY:.2f}" width="{CW:.2f}" height="{CH:.2f}"/>'
         f'</clipPath>'
     )
 
-    path_block = "\n".join(cell_paths)
-    g = (
+    det_groups.append(
         f'<g class="detail-part" data-detail="{n}" style="visibility:hidden">'
-        f'<g transform="translate({tx:.2f},{ty:.2f})" clip-path="url(#cdp{n})">'
-        f'{path_block}'
-        f'</g>'
-        f'</g>'
+        f'<g transform="translate({dx:.2f},{dy:.2f})" clip-path="url(#cdp{n})">'
+        f'{cell}</g></g>'
     )
-    detail_groups.append(g)
-    det_pos_data[str(n)] = {
-        "row": row, "col": col,
-        "src_x": round(ax, 2), "src_y": round(ay, 2),
-        "dst_x": round(TARGET_X, 2), "dst_y": round(TARGET_Y, 2),
-    }
+    det_pdata[str(n)] = {"row": row, "col": col,
+                          "src_x": round(ax,2), "src_y": round(ay,2),
+                          "dst_x": TX, "dst_y": TY}
 
-DET_JSON.write_text(json.dumps(det_pos_data, indent=2))
-print(f"wrote {DET_JSON}  (256 detail cells)")
+DET_JSON.write_text(json.dumps(det_pdata, indent=2))
+print(f"wrote {DET_JSON}")
 
-# ── 6. gate_colors.json ──────────────────────────────────────
-col_data = {str(g): {"dark": r["dark"], "light": r["light"],
-                      "p_blue": PERSONALITY_BLUE, "design": DESIGN_PURPLE}
-            for g, r in GATE_RULES.items()}
-COL_JSON.write_text(json.dumps(col_data, indent=2))
-print(f"wrote {COL_JSON}  ({len(col_data)} gate color rules)")
+# ── 9. gate_colors.json ──────────────────────────────────────
+COL_JSON.write_text(json.dumps(
+    {str(g): {"dark": d, "light": l, "p_blue": P_BLUE, "design": D_PURP}
+     for g, d, l in GATE_RULES}, indent=2))
+print(f"wrote {COL_JSON}")
 
-# ── 7. Activation CSS ─────────────────────────────────────────
-CENTER_ACTIVE_COLORS = {
-    "Head":         "#AA88EE",
-    "Ajna":         "#9B59B6",
-    "Throat":       "#F39C12",
-    "G":            "#FFD700",
-    "Heart":        "#E74C3C",
-    "Solar Plexus": "#E67E22",
-    "Spleen":       "#27AE60",
-    "Sacral":       "#E74C3C",
-    "Root":         "#8B4513",
+# ── 10. Activation CSS ────────────────────────────────────────
+CENTER_COL = {
+    "Head":"#AA88EE","Ajna":"#9B59B6","Throat":"#F39C12","G":"#FFD700",
+    "Heart":"#E74C3C","Solar Plexus":"#E67E22","Spleen":"#27AE60",
+    "Sacral":"#E74C3C","Root":"#8B4513",
 }
+css = ["<style id='hd-activation'>"]
+css.append(".gate-line{fill:#FFFFFF!important;}")
 
-css_lines = ["<style id='hd-activation'>"]
+# Gate lines
+for g,_,_ in GATE_RULES:
+    css += [
+        f"svg.active-p-{g} [data-gate='{g}'].gate-line{{fill:{P_BLUE}!important;}}",
+        f"svg.active-d-{g} [data-gate='{g}'].gate-line{{fill:{D_PURP}!important;}}",
+        f"svg.active-b-{g} [data-gate='{g}'][data-type='dark'].gate-line{{fill:{P_BLUE}!important;}}",
+        f"svg.active-b-{g} [data-gate='{g}'][data-type='light'].gate-line{{fill:{D_PURP}!important;}}",
+    ]
 
-# Default: all gate lines → white (inactive)
-css_lines.append(".gate-line { fill: #FFFFFF !important; }")
+# Gate circles (darken) — skip gate 25, handled after center rules
+all_gates = [g for g,_,_ in GATE_RULES] + [10, 20, 34, 57]
+for g in all_gates:
+    if g == 25: continue
+    for p in ("active-p-","active-d-","active-b-"):
+        css.append(f"svg.{p}{g} .gate-circle[data-gate='{g}']{{fill:#1a1a2e!important;}}")
 
-for gate, rule in GATE_RULES.items():
-    g = gate
-    # personality only
-    css_lines.append(
-        f"svg.active-p-{g} [data-gate='{g}'].gate-line"
-        f"{{fill:{PERSONALITY_BLUE}!important;}}")
-    # design only
-    css_lines.append(
-        f"svg.active-d-{g} [data-gate='{g}'].gate-line"
-        f"{{fill:{DESIGN_PURPLE}!important;}}")
-    # both — dark=blue, light=purple
-    css_lines.append(
-        f"svg.active-b-{g} [data-gate='{g}'][data-type='dark'].gate-line"
-        f"{{fill:{PERSONALITY_BLUE}!important;}}")
-    css_lines.append(
-        f"svg.active-b-{g} [data-gate='{g}'][data-type='light'].gate-line"
-        f"{{fill:{DESIGN_PURPLE}!important;}}")
-
-# Gate circles & texts — darken when activated
-# Gate 25 is handled separately after center rules (it uses the G-center diamond)
-all_gates = list(GATE_RULES.keys()) + [10, 20, 34, 57]
-for gate in all_gates:
-    if gate == 25:
-        continue  # handled after center rules to ensure CSS priority
-    for pfx in ("active-p-", "active-d-", "active-b-"):
-        css_lines.append(
-            f"svg.{pfx}{gate} .gate-circle[data-gate='{gate}']"
-            f"{{fill:#1a1a2e!important;}}")
-    for pfx in ("active-p-", "active-d-", "active-b-"):
-        css_lines.append(
-            f"svg.{pfx}{gate} .gate-text[data-gate='{gate}']"
-            f"{{fill:#FFFFFF!important;}}")
-# Gate 25 text (the number "25" in the G-center area)
-for pfx in ("active-p-", "active-d-", "active-b-"):
-    css_lines.append(
-        f"svg.{pfx}25 .gate-text[data-gate='25']"
-        f"{{fill:#FFFFFF!important;}}")
+# Gate texts (white)
+for g in all_gates:
+    for p in ("active-p-","active-d-","active-b-"):
+        css.append(f"svg.{p}{g} .gate-text[data-gate='{g}']{{fill:#FFFFFF!important;}}")
 
 # Centers
-for name, color in CENTER_ACTIVE_COLORS.items():
-    safe = name.replace(" ", "")
-    css_lines.append(
-        f"svg.center-active-{safe} .chakra[data-center='{name}']"
-        f"{{fill:{color}!important;}}")
+for name, col in CENTER_COL.items():
+    safe = name.replace(" ","")
+    css.append(f"svg.center-active-{safe} .chakra[data-center='{name}']{{fill:{col}!important;}}")
 
-# Gate 25 override — must come AFTER center rules so it wins when gate 25 is active
-# (G-center diamond is both a chakra AND gate-25's circle indicator)
-css_lines.append(f"svg.active-p-25 .gate-circle[data-gate='25']{{fill:{PERSONALITY_BLUE}!important;}}")
-css_lines.append(f"svg.active-d-25 .gate-circle[data-gate='25']{{fill:{DESIGN_PURPLE}!important;}}")
-css_lines.append(f"svg.active-b-25 .gate-circle[data-gate='25']{{fill:{PERSONALITY_BLUE}!important;}}")
+# Gate 25 AFTER center rules → wins the cascade when both classes present
+css += [
+    f"svg.active-p-25 .gate-circle[data-gate='25']{{fill:{P_BLUE}!important;}}",
+    f"svg.active-d-25 .gate-circle[data-gate='25']{{fill:{D_PURP}!important;}}",
+    f"svg.active-b-25 .gate-circle[data-gate='25']{{fill:{P_BLUE}!important;}}",
+]
+for p in ("active-p-","active-d-","active-b-"):
+    css.append(f"svg.{p}25 .gate-text[data-gate='25']{{fill:#FFFFFF!important;}}")
 
-# Detail artboard visibility
-css_lines.append(".detail-part{visibility:hidden!important;}")
+# Detail visibility
+css.append(".detail-part{visibility:hidden!important;}")
 for n in range(1, 257):
-    css_lines.append(
-        f"svg.detail-on-{n} .detail-part[data-detail='{n}']"
-        f"{{visibility:visible!important;}}")
+    css.append(f"svg.detail-on-{n} .detail-part[data-detail='{n}']{{visibility:visible!important;}}")
+css.append("</style>")
 
-css_lines.append("</style>")
-activation_css = "\n".join(css_lines)
-
-# ── Assemble final SVG ────────────────────────────────────────
-# Inject details.svg style into main style block
+# ── 11. Assemble final SVG ────────────────────────────────────
+# Inject prefixed details style
 if det_style:
     svg = re.sub(r'(<style\b[^>]*>)',
-                 f'\\1\n/* === details.svg styles === */\n{det_style}\n',
+                 f'\\1\n/* details.svg styles (prefixed det-) */\n{det_style}\n',
                  svg, count=1)
 
-# Inject all 256 clipPaths into the SVG's root <defs> block.
-# They MUST be in <defs> (not inside hidden groups) so browsers always register them.
-clip_defs_block = "<defs id='detail-clips'>\n" + "\n".join(all_clip_defs) + "\n</defs>"
-svg = re.sub(r'(<svg\b[^>]*>)', f'\\1\n{clip_defs_block}', svg, count=1)
+# Inject 256 clipPaths into root <defs> (CRITICAL — not inside hidden groups)
+clip_block = "<defs id='detail-clips'>\n" + "\n".join(clip_defs) + "\n</defs>"
+svg = re.sub(r'(<svg\b[^>]*>)', f'\\1\n{clip_block}', svg, count=1)
 
-# Inject detail artboards + activation CSS before </svg>
-details_layer = "\n".join(detail_groups)
+# Append detail layer + activation CSS
 svg = svg.replace(
     "</svg>",
-    f"\n{activation_css}\n"
-    f"<g id='details-layer'>\n{details_layer}\n</g>\n"
-    f"</svg>"
+    "\n" + "\n".join(css) + "\n"
+    "<g id='details-layer'>\n" + "\n".join(det_groups) + "\n</g>\n"
+    "</svg>"
 )
 
 DST.write_text(svg, encoding="utf-8")
-mb = len(svg) / 1_000_000
-print(f"wrote {DST}  ({mb:.1f} MB)")
-print(f"\nSummary:")
-print(f"  Gate lines tagged : {tagged}/120")
-print(f"  Centers tagged    : 9")
-print(f"  Gate circles      : {len(gate_positions)}")
-print(f"  Detail artboards  : 256 (clipPaths in root <defs>)")
-print(f"  Output file size  : {mb:.1f} MB")
+print(f"\nwrote {DST}  ({len(svg)/1e6:.2f} MB)")
+print(f"  channel lines  : {n_tag}/120")
+print(f"  gate circles   : 63 real + gate-25 = G-diamond")
+print(f"  centers        : 9")
+print(f"  detail artboards: 256  clipPaths in root <defs> ✓")
