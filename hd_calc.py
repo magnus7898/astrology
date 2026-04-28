@@ -182,18 +182,17 @@ def gate_state(gate: int, p_gates: set, d_gates: set) -> int:
 
 
 def integration_condition(p_gates: set, d_gates: set) -> Dict:
-    s10 = gate_state(10, p_gates, d_gates)  # 0=None,1=A,2=B,3=Both
+    s10 = gate_state(10, p_gates, d_gates)  # 0/1/2/3
     s57 = gate_state(57, p_gates, d_gates)
     s34 = gate_state(34, p_gates, d_gates)
     s20 = gate_state(20, p_gates, d_gates)
-    n = s10 * 64 + s57 * 16 + s34 * 4 + s20 + 1  # 1..256
+    n = s10 * 64 + s57 * 16 + s34 * 4 + s20 + 1
     label = {0: "None", 1: "A", 2: "B", 3: "Both"}
     return {
         "n": n,
         "states": {"10": label[s10], "57": label[s57],
                    "34": label[s34], "20": label[s20]},
     }
-
 
 @dataclass
 class Activation:
