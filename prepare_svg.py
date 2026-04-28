@@ -233,7 +233,6 @@ for n in range(1, 257):
     det_groups.append(
         f'<g class="detail-part" data-detail="{n}" style="display:none">'
         f'<g clip-path="url(#cdp{n})">'
-        f'<rect x="{TX:.2f}" y="{TY:.2f}" width="{CW:.2f}" height="{CH:.2f}" fill="#454545"/>'
         f'<g transform="{transform}">'
         f'{cell}</g></g></g>'
     )
