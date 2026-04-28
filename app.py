@@ -51,19 +51,14 @@ from hd_calc import calculate_chart as hd_calculate_chart
 # is missing (merges human.svg + details.svg).
 # ────────────────────────────────────────────────────────────────
 ROOT = Path(__file__).parent
+
 def _ensure_hd_svg():
-    prepared  = ROOT / "static" / "human_prepared.svg"
-    positions = ROOT / "static" / "gate_positions.json"
-    if prepared.exists() and positions.exists():
-        return
-    human   = ROOT / "static" / "human.svg"
+    human  = ROOT / "static" / "human.svg"
     detail = ROOT / "static" / "detail.svg"
-    if prepared.exists() and positions.exists() and not (detail.exists() and detail.stat().st_mtime > prepared.stat().st_mtime):
+    if not human.exists() or not detail.exists():
+        print("[hd] skipping SVG prep — human.svg or detail.svg missing", file=sys.stderr)
         return
-        print("[hd] skipping SVG prep — human.svg or detail.svg missing",
-              file=sys.stderr)
-        return
-    print(f"[hd] preparing merged SVG from {human.name} + {details.name} ...")
+    print(f"[hd] building human_prepared.svg ...")
     try:
         subprocess.check_call(
             [sys.executable, str(ROOT / "prepare_svg.py")],
