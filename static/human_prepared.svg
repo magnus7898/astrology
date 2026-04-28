@@ -688,7 +688,7 @@
 <circle class="st127 gate-circle" data-gate="52" cx="751.7" cy="682" r="6.9"/>
 <circle class="st127 gate-circle" data-gate="15" cx="718.4" cy="456.7" r="6.9"/>
 <circle class="st127 gate-circle" data-gate="2" cx="735.1" cy="470.4" r="6.9"/>
-<circle class="st127 gate-circle" data-gate="25" cx="781.7" cy="427.8" r="6.9"/>
+<circle style="display:none" class="st127" cx="781.7" cy="427.8" r="6.9"/>
 <circle class="st127 gate-circle" data-gate="46" cx="751.7" cy="456.7" r="6.9"/>
 <circle class="st127 gate-circle" data-gate="7" cx="719.5" cy="399.7" r="6.9"/>
 <circle class="st127 gate-circle" data-gate="1" cx="736.1" cy="382" r="6.9"/>
