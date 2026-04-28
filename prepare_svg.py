@@ -63,14 +63,9 @@ c2col= {m.group(1): m.group(2).upper()
         for m in re.finditer(r'\.(st\d+)\s*\{[^}]*fill:\s*(#[0-9A-Fa-f]+)', sblk)}
 print(f"[info] human.svg  {len(svg):,} chars  classes:{len(c2col)}")
 
-# ── Hide the #454545 integration silhouette (st19) ───────────
-# Replace it with display:none so it vanishes but the element stays valid.
-svg = re.sub(
-    r'(<path\s[^>]*class="st19")',
-    r'\1 style="display:none"',
-    svg
-)
-print("[info] st19 (#454545 integration silhouette) → hidden")
+# st19 (#454545) is the integration e-shape silhouette.
+# Keep it visible as the dark background for detail artboard overlays.
+print("[info] st19 (#454545) kept as dark background for details")
 
 # ── 1. Tag channel lines ─────────────────────────────────────
 n_tag = 0
@@ -221,9 +216,11 @@ for n in range(1, 257):
         f'</clipPath>'
     )
     det_groups.append(
-        f'<g class="detail-part" data-detail="{n}" style="visibility:hidden">'
-        f'<g clip-path="url(#cdp{n})">'        # clip in SVG coordinate space
-        f'<g transform="translate({dx:.2f},{dy:.2f})">'  # then transform content
+        f'<g class="detail-part" data-detail="{n}" style="display:none">'
+        f'<g clip-path="url(#cdp{n})">'
+        # Dark background so white (st0) paths in artboard are visible
+        f'<rect x="{TX:.2f}" y="{TY:.2f}" width="{CW:.2f}" height="{CH:.2f}" fill="#454545"/>'
+        f'<g transform="translate({dx:.2f},{dy:.2f})">'
         f'{cell}</g></g></g>'
     )
     det_pdata[str(n)] = {"row":row,"col":col,
@@ -269,9 +266,9 @@ for name,col in CCOL.items():
     css.append(f"svg.center-active-{safe} .chakra[data-center='{name}']{{fill:{col}!important;}}")
 
 # Detail visibility
-css.append(".detail-part{visibility:hidden!important;}")
+css.append(".detail-part{display:none!important;}")
 for n in range(1,257):
-    css.append(f"svg.detail-on-{n} .detail-part[data-detail='{n}']{{visibility:visible!important;}}")
+    css.append(f"svg.detail-on-{n} .detail-part[data-detail='{n}']{{display:block!important;}}")
 css.append("</style>")
 
 # ── 10. Assemble ──────────────────────────────────────────────
