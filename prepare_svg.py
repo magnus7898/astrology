@@ -112,8 +112,6 @@ def _circ(m):
     cx, cy = float(cxm.group(1)), float(cym.group(1))
     g, dist = _nearest(cx, cy)
     if g is None or dist > 15: return t
-    # Gate 25 uses the G-centre diamond — never assign a real circle to it
-    if g == 25: return re.sub(r'<circle', '<circle style="display:none"', t, count=1)
     gpos[g] = {"cx": round(cx,1), "cy": round(cy,1)}
     return re.sub(r'class="(st127)"',
                   f'class="\\1 gate-circle" data-gate="{g}"', t, count=1)
@@ -159,12 +157,8 @@ def _ctr(m):
                   f'class="st126 chakra" data-center="{name}"', t, count=1)
 svg = re.sub(r'<path\b[^>]+class="st126"[^>]*/>', _ctr, svg)
 
-# Gate 25 — G-centre diamond doubles as its visual indicator
-svg = svg.replace(
-    'class="st126 chakra" data-center="G"',
-    'class="st126 chakra gate-circle" data-center="G" data-gate="25"',
-)
-print("[info] gate 25 G-diamond:", "✓" if 'data-gate="25"' in svg else "✗")
+# Gate 25 has its own real st127 circle — no need to use the G-diamond
+print("[info] gate 25 circle: using real st127 circle (not G-diamond)")
 
 # ── 6. CSV lookup ─────────────────────────────────────────────
 lkp = {}
@@ -228,8 +222,9 @@ for n in range(1, 257):
     )
     det_groups.append(
         f'<g class="detail-part" data-detail="{n}" style="visibility:hidden">'
-        f'<g transform="translate({dx:.2f},{dy:.2f})" clip-path="url(#cdp{n})">'
-        f'{cell}</g></g>'
+        f'<g clip-path="url(#cdp{n})">'        # clip in SVG coordinate space
+        f'<g transform="translate({dx:.2f},{dy:.2f})">'  # then transform content
+        f'{cell}</g></g></g>'
     )
     det_pdata[str(n)] = {"row":row,"col":col,
                           "src_x":round(ax,2),"src_y":round(ay,2),
@@ -258,8 +253,8 @@ for g,_,_ in GATE_RULES:
         f"svg.active-b-{g} [data-gate='{g}'][data-type='light'].gate-line{{fill:{D_PURP}!important;}}",
     ]
 
-# Circles darken (skip 25 — handled after centres)
-for g in [g for g,_,_ in GATE_RULES if g!=25]+[10,20,34,57]:
+# Circles darken when activated
+for g in [g for g,_,_ in GATE_RULES]+[10,20,34,57]:
     for p in ("active-p-","active-d-","active-b-"):
         css.append(f"svg.{p}{g} .gate-circle[data-gate='{g}']{{fill:#1a1a2e!important;}}")
 
@@ -272,15 +267,6 @@ for g in [g for g,_,_ in GATE_RULES]+[10,20,34,57]:
 for name,col in CCOL.items():
     safe=name.replace(" ","")
     css.append(f"svg.center-active-{safe} .chakra[data-center='{name}']{{fill:{col}!important;}}")
-
-# Gate 25 AFTER centres — wins cascade
-css += [
-    f"svg.active-p-25 .gate-circle[data-gate='25']{{fill:{P_BLUE}!important;}}",
-    f"svg.active-d-25 .gate-circle[data-gate='25']{{fill:{D_PURP}!important;}}",
-    f"svg.active-b-25 .gate-circle[data-gate='25']{{fill:{P_BLUE}!important;}}",
-]
-for p in ("active-p-","active-d-","active-b-"):
-    css.append(f"svg.{p}25 .gate-text[data-gate='25']{{fill:#FFFFFF!important;}}")
 
 # Detail visibility
 css.append(".detail-part{visibility:hidden!important;}")
