@@ -3,10 +3,10 @@
 Key behaviours
 ──────────────
 • st19 (#454545) — the integration silhouette "e-shape" — is HIDDEN.
-  Its place is taken by the correct detail artboard from details.svg,
+  Its place is taken by the correct detail artboard from detail.svg,
   chosen by the CSV lookup (gates 10/57/34/20 states → row number).
 • 256 clipPaths are in root <defs> (not inside visibility:hidden groups).
-• details.svg classes prefixed "det-" to prevent colour collisions.
+• detail.svg classes prefixed "det-" to prevent colour collisions.
 • Gate 25 uses the G-centre diamond as its visual indicator.
   Gate-25 CSS comes AFTER centre rules to win the cascade.
 • Circle proximity threshold 15 px prevents mis-assigning circles to
@@ -18,15 +18,15 @@ from pathlib import Path
 
 ROOT        = Path(__file__).parent
 HUMAN_SRC   = ROOT / "static" / "human.svg"
-DETAILS_SRC = ROOT / "static" / "details.svg"
+DETAILS_SRC = ROOT / "static" / "detail.svg"          # ← updated filename
 CSV_SRC     = ROOT / "static" / "integration_conditions.csv"
 DST         = ROOT / "static" / "human_prepared.svg"
 POS_JSON    = ROOT / "static" / "gate_positions.json"
 COL_JSON    = ROOT / "static" / "gate_colors.json"
 DET_JSON    = ROOT / "static" / "detail_positions.json"
 
-P_BLUE = "#292562"   # personality  (= details.svg st1)
-D_PURP = "#67308F"   # design       (= details.svg st2)
+P_BLUE = "#292562"   # personality  (= detail.svg st1)
+D_PURP = "#67308F"   # design       (= detail.svg st2)
 
 # ── 60 gate colour rules ─────────────────────────────────────
 GATE_RULES = [
@@ -151,7 +151,6 @@ def _ctr(m):
                   f'class="st126 chakra" data-center="{name}"', t, count=1)
 svg = re.sub(r'<path\b[^>]+class="st126"[^>]*/>', _ctr, svg)
 
-# Gate 25 has its own real st127 circle — no need to use the G-diamond
 print("[info] gate 25 circle: using real st127 circle (not G-diamond)")
 
 # ── 6. CSV lookup ─────────────────────────────────────────────
@@ -168,47 +167,64 @@ print(f"[info] CSV: {len(lkp)} entries  "
       f"all-Both→{lkp.get(('Both','Both','Both','Both'))}")
 
 # ── 7. Integration artboard anchor ───────────────────────────
-# The detail cell (152.6×279) must cover all 4 integration gates.
-# Right edge  → gate-20 cx = 707.3   ⟹  TARGET_X = 707.3 − 152.6 = 554.7
-# Bottom edge → gate-34 cy = 586.4   ⟹  TARGET_Y = 586.4 − 279.0 = 307.4
-CW, CH = 152.6, 279.0
-g20 = gpos.get(20, {"cx": 707.3, "cy": 318.1})
-g34 = gpos.get(34, {"cx": 704.8, "cy": 586.4})
-TX  = 553.3  # exact left edge of st19 bounding box
-TY  = 311.0  # exact top edge of st19 bounding box
-print(f"[info] artboard anchor ({TX},{TY})  "
+# Target area = bounding box of the hidden st19 shape in the bodygraph
+CW, CH = 152.6, 279.0        # target width/height (bodygraph shape)
+TX     = 553.3               # exact left edge of st19
+TY     = 311.0               # exact top  edge of st19
+print(f"[info] artboard target ({TX},{TY})  "
       f"right={TX+CW:.1f}  bottom={TY+CH:.1f}")
 
-# ── 8. Load details.svg ───────────────────────────────────────
+# ── 8. Load detail.svg ────────────────────────────────────────
 dsvg = DETAILS_SRC.read_text(encoding="utf-8")
-print(f"[info] details.svg  {len(dsvg):,} chars")
+print(f"[info] detail.svg  {len(dsvg):,} chars")
 
 ds = re.search(r'<style[^>]*>(.*?)</style>', dsvg, re.DOTALL)
 det_style = re.sub(r'\.(st\d+)\b', r'.det-\1', ds.group(1).strip()) if ds else ""
 
-det_paths = []
-for m in re.finditer(r'<path class="([^"]+)" d="([^"]+)"/>', dsvg):
-    pm = re.search(r'M\s*([\d.]+),([\d.]+)', m.group(2))
-    if pm:
-        det_paths.append((float(pm.group(1)), float(pm.group(2)),
-                          f'class="det-{m.group(1)}"', m.group(2)))
-print(f"[info] detail paths: {len(det_paths)}")
+# Source grid dimensions (new detail.svg: 16×16 artboards over 2974.7×5121.9)
+CW_SRC = 2974.7 / 16   # 185.9187
+CH_SRC = 5121.9 / 16   # 320.1187
 
-# Grid: row=(n-1)//16, col=(n-1)%16, origin=(col*152.6, row*279)
+# Scale factors: stretch each artboard to fill the target area exactly
+SX = CW / CW_SRC        # ≈ 0.8208
+SY = CH / CH_SRC        # ≈ 0.8716
+
+# Extract all path + polygon elements, prefixing class names with "det-"
+det_elems = []
+for tag in re.findall(r'<path[^>]+/>|<polygon[^>]+/>', dsvg):
+    m = re.search(r'd="M\s*([\d.]+),([\d.]+)', tag) or \
+        re.search(r'points="([\d.]+),([\d.]+)', tag)
+    if not m:
+        continue
+    x, y = float(m.group(1)), float(m.group(2))
+    tag_prefixed = re.sub(r'class="(st\d+)"', r'class="det-\1"', tag)
+    det_elems.append((x, y, tag_prefixed))
+
+print(f"[info] detail elements: {len(det_elems)}  "
+      f"(src cell {CW_SRC:.2f}×{CH_SRC:.2f}  scale {SX:.4f}×{SY:.4f})")
+
 clip_defs  = []
 det_groups = []
 det_pdata  = {}
 
 for n in range(1, 257):
-    idx = n-1; row = idx//16; col = idx%16
-    ax  = col*CW;  ay = row*CH
-    dx  = TX-ax;   dy = TY-ay
+    idx = n - 1
+    row = idx // 16
+    col = idx % 16
+    ax  = col * CW_SRC
+    ay  = row * CH_SRC
 
+    # Collect elements that belong to this artboard cell
     cell = "\n".join(
-        f'<path {cs} d="{d}"/>'
-        for px,py,cs,d in det_paths
-        if ax-5 <= px <= ax+CW+5 and ay-5 <= py <= ay+CH+5
+        tag for px, py, tag in det_elems
+        if ax - 5 <= px <= ax + CW_SRC + 5 and ay - 5 <= py <= ay + CH_SRC + 5
     )
+
+    # Transform: shift artboard to origin → scale → place at target
+    transform = (f"translate({TX:.2f},{TY:.2f}) "
+                 f"scale({SX:.6f},{SY:.6f}) "
+                 f"translate({-ax:.2f},{-ay:.2f})")
+
     clip_defs.append(
         f'<clipPath id="cdp{n}">'
         f'<rect x="{TX:.2f}" y="{TY:.2f}" width="{CW:.2f}" height="{CH:.2f}"/>'
@@ -217,14 +233,16 @@ for n in range(1, 257):
     det_groups.append(
         f'<g class="detail-part" data-detail="{n}" style="display:none">'
         f'<g clip-path="url(#cdp{n})">'
-        # Dark background so white (st0) paths in artboard are visible
         f'<rect x="{TX:.2f}" y="{TY:.2f}" width="{CW:.2f}" height="{CH:.2f}" fill="#454545"/>'
-        f'<g transform="translate({dx:.2f},{dy:.2f})">'
+        f'<g transform="{transform}">'
         f'{cell}</g></g></g>'
     )
-    det_pdata[str(n)] = {"row":row,"col":col,
-                          "src_x":round(ax,2),"src_y":round(ay,2),
-                          "dst_x":TX,"dst_y":TY}
+    det_pdata[str(n)] = {
+        "row": row, "col": col,
+        "src_x": round(ax, 2), "src_y": round(ay, 2),
+        "dst_x": TX, "dst_y": TY,
+        "scale_x": round(SX, 6), "scale_y": round(SY, 6),
+    }
 
 DET_JSON.write_text(json.dumps(det_pdata, indent=2))
 
@@ -249,22 +267,18 @@ for g,_,_ in GATE_RULES:
         f"svg.active-b-{g} [data-gate='{g}'][data-type='light'].gate-line{{fill:{D_PURP}!important;}}",
     ]
 
-# Circles darken when activated
 for g in [g for g,_,_ in GATE_RULES]+[10,20,34,57]:
     for p in ("active-p-","active-d-","active-b-"):
         css.append(f"svg.{p}{g} .gate-circle[data-gate='{g}']{{fill:#1a1a2e!important;}}")
 
-# Texts white
 for g in [g for g,_,_ in GATE_RULES]+[10,20,34,57]:
     for p in ("active-p-","active-d-","active-b-"):
         css.append(f"svg.{p}{g} .gate-text[data-gate='{g}']{{fill:#FFFFFF!important;}}")
 
-# Centres
 for name,col in CCOL.items():
     safe=name.replace(" ","")
     css.append(f"svg.center-active-{safe} .chakra[data-center='{name}']{{fill:{col}!important;}}")
 
-# Detail visibility
 css.append(".detail-part{display:none!important;}")
 for n in range(1,257):
     css.append(f"svg.detail-on-{n} .detail-part[data-detail='{n}']{{display:block!important;}}")
@@ -273,10 +287,9 @@ css.append("</style>")
 # ── 10. Assemble ──────────────────────────────────────────────
 if det_style:
     svg = re.sub(r'(<style\b[^>]*>)',
-                 f'\\1\n/* details.svg styles (prefixed det-) */\n{det_style}\n',
+                 f'\\1\n/* detail.svg styles (prefixed det-) */\n{det_style}\n',
                  svg, count=1)
 
-# clipPaths in root <defs> (critical — browsers ignore clipPaths in hidden groups)
 clip_block = "<defs id='detail-clips'>\n"+"\n".join(clip_defs)+"\n</defs>"
 svg = re.sub(r'(<svg\b[^>]*>)', f'\\1\n{clip_block}', svg, count=1)
 
