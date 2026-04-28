@@ -63,8 +63,7 @@ c2col= {m.group(1): m.group(2).upper()
         for m in re.finditer(r'\.(st\d+)\s*\{[^}]*fill:\s*(#[0-9A-Fa-f]+)', sblk)}
 print(f"[info] human.svg  {len(svg):,} chars  classes:{len(c2col)}")
 
-svg = re.sub(r'(<path[^>]+class="st19")', r'\1 style="display:none"', svg)
-print('[info] st19 (#454545) hidden — replaced by detail artboard')
+print('[info] st19 (#454545) kept — detail artboard renders on top of it')
 
 # ── 1. Tag channel lines ─────────────────────────────────────
 n_tag = 0
