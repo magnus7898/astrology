@@ -59,7 +59,7 @@ def _ensure_hd_svg():
     human   = ROOT / "static" / "human.svg"
     details = ROOT / "static" / "detail.svg"
     if not human.exists() or not details.exists():
-        print("[hd] skipping SVG prep — human.svg or details.svg missing",
+        print("[hd] skipping SVG prep — human.svg or detail.svg missing",
               file=sys.stderr)
         return
     print(f"[hd] preparing merged SVG from {human.name} + {details.name} ...")
