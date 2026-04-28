@@ -63,9 +63,8 @@ c2col= {m.group(1): m.group(2).upper()
         for m in re.finditer(r'\.(st\d+)\s*\{[^}]*fill:\s*(#[0-9A-Fa-f]+)', sblk)}
 print(f"[info] human.svg  {len(svg):,} chars  classes:{len(c2col)}")
 
-# st19 (#454545) is the integration e-shape silhouette.
-# Keep it visible as the dark background for detail artboard overlays.
-print("[info] st19 (#454545) kept as dark background for details")
+svg = re.sub(r'(<path[^>]+class="st19")', r'\1 style="display:none"', svg)
+print('[info] st19 (#454545) hidden — replaced by detail artboard')
 
 # ── 1. Tag channel lines ─────────────────────────────────────
 n_tag = 0
@@ -175,8 +174,8 @@ print(f"[info] CSV: {len(lkp)} entries  "
 CW, CH = 152.6, 279.0
 g20 = gpos.get(20, {"cx": 707.3, "cy": 318.1})
 g34 = gpos.get(34, {"cx": 704.8, "cy": 586.4})
-TX  = round(g20["cx"] - CW, 2)
-TY  = round(g34["cy"] - CH, 2)
+TX  = 553.3  # exact left edge of st19 bounding box
+TY  = 311.0  # exact top edge of st19 bounding box
 print(f"[info] artboard anchor ({TX},{TY})  "
       f"right={TX+CW:.1f}  bottom={TY+CH:.1f}")
 
