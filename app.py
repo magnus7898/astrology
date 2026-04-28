@@ -57,8 +57,9 @@ def _ensure_hd_svg():
     if prepared.exists() and positions.exists():
         return
     human   = ROOT / "static" / "human.svg"
-    details = ROOT / "static" / "detail.svg"
-    if not human.exists() or not details.exists():
+    detail = ROOT / "static" / "detail.svg"
+    if prepared.exists() and positions.exists() and not (detail.exists() and detail.stat().st_mtime > prepared.stat().st_mtime):
+        return
         print("[hd] skipping SVG prep — human.svg or detail.svg missing",
               file=sys.stderr)
         return
