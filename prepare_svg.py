@@ -112,6 +112,8 @@ def _circ(m):
     cx, cy = float(cxm.group(1)), float(cym.group(1))
     g, dist = _nearest(cx, cy)
     if g is None or dist > 15: return t
+    # Gate 25 uses the G-centre diamond — never assign a real circle to it
+    if g == 25: return re.sub(r'<circle', '<circle style="display:none"', t, count=1)
     gpos[g] = {"cx": round(cx,1), "cy": round(cy,1)}
     return re.sub(r'class="(st127)"',
                   f'class="\\1 gate-circle" data-gate="{g}"', t, count=1)
