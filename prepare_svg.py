@@ -172,10 +172,16 @@ for n in range(1, 257):
                  f"scale({SX:.8f},{SY:.8f}) "
                  f"translate({-ax:.4f},{-ay:.4f})")
 
+    clip_defs.append(
+        f'<clipPath id="cdp{n}">'
+        f'<rect x="{TX:.2f}" y="{TY:.2f}" width="{CW:.2f}" height="{CH:.2f}"/>'
+        f'</clipPath>'
+    )
     det_groups.append(
         f'<g class="detail-part" data-detail="{n}" style="display:none">'
+        f'<g clip-path="url(#cdp{n})">'
         f'<g transform="{transform}">{cell}</g>'
-        f'</g>'
+        f'</g></g>'
     )
     det_pdata[str(n)] = {"row":row,"col":col,"src_x":round(ax,2),"src_y":round(ay,2),
                           "dst_x":TX,"dst_y":TY,"scale_x":round(SX,6),"scale_y":round(SY,6)}
@@ -214,7 +220,8 @@ css.append("</style>")
 if det_style:
     svg = re.sub(r'(<style\b[^>]*>)', f'\\1\n/* detail.svg styles */\n{det_style}\n', svg, count=1)
 
-svg = re.sub(r'(<svg\b[^>]*>)', f'\\1', svg, count=1)
+svg = re.sub(r'(<svg\b[^>]*>)',
+             f'\\1\n<defs id="detail-clips">\n{"".join(clip_defs)}\n</defs>', svg, count=1)
 
 svg = svg.replace("</svg>",
     "\n" + "\n".join(css) +
