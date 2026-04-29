@@ -166,10 +166,9 @@ print(f"[info] CSV: {len(lkp)} entries  "
       f"all-Both→{lkp.get(('Both','Both','Both','Both'))}")
 
 # ── 7. Integration artboard anchor ───────────────────────────
-# Target area = bounding box of the hidden st19 shape in the bodygraph
-CW, CH = 152.6, 279.0        # target width/height (bodygraph shape)
-TX     = 553.3               # exact left edge of st19
-TY     = 311.0               # exact top  edge of st19
+# Target area = TRUE bounding box of st19 shape (parsed from path data)
+TX, TY =  393.6, 311.4      # top-left of st19
+CW, CH =  312.5, 517.6      # width / height of st19
 print(f"[info] artboard target ({TX},{TY})  "
       f"right={TX+CW:.1f}  bottom={TY+CH:.1f}")
 
