@@ -182,17 +182,6 @@ def gate_state(gate: int, p_gates: set, d_gates: set) -> int:
 
 
 def integration_condition(p_gates: set, d_gates: set) -> Dict:
-    """
-    Compute 1..256 detail number from gates 10,57,34,20 states.
-    
-    State mapping:
-      0 = Not in p or d  → "Not Design Not personal planet"
-      1 = personality only → "Personal planet"  
-      2 = design only      → "Design"
-      3 = both             → "Both"
-    
-    N = s10*64 + s57*16 + s34*4 + s20 + 1
-    """
     s10 = gate_state(10, p_gates, d_gates)
     s57 = gate_state(57, p_gates, d_gates)
     s34 = gate_state(34, p_gates, d_gates)
@@ -204,12 +193,8 @@ def integration_condition(p_gates: set, d_gates: set) -> Dict:
              3: "Both"}
     return {
         "n": n,
-        "states": {
-            "10": label[s10],
-            "57": label[s57],
-            "34": label[s34],
-            "20": label[s20],
-        },
+        "states": {"10": label[s10], "57": label[s57],
+                   "34": label[s34], "20": label[s20]},
     }
  
 
