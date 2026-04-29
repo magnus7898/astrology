@@ -136,6 +136,23 @@ CH_SRC = H_DET / 16   # 320.1187
 # Inline fill colors — reliable in any HTML/SVG context
 DET_COLORS = {'st0':'#FFFFFF','st1':'#292561','st2':'#67328F','st3':'#C3996C','st4':'#020202'}
 
+def _get_coords(tag):
+    d = re.search(r'd="([^"]+)"', tag)
+    text = d.group(1) if d else ''
+    if not text:
+        pts = re.search(r'points="([^"]+)"', tag)
+        text = pts.group(1) if pts else ''
+    text = re.sub(r'([0-9.])(-)', r'\1 \2', text)
+    nums = re.findall(r'-?[\d]+\.?[\d]*', text)
+    coords = []
+    for i in range(0, len(nums)-1, 2):
+        try:
+            x, y = float(nums[i]), float(nums[i+1])
+            if 0 < x < 3500 and 0 < y < 6000:
+                coords.append((x, y))
+        except: pass
+    return coords
+
 det_elems = []
 for tag in re.findall(r'<path[^>]+/>|<polygon[^>]+/>', dsvg):
     m = re.search(r'd="M\s*([\d.]+),([\d.]+)', tag) or \
@@ -149,8 +166,6 @@ for tag in re.findall(r'<path[^>]+/>|<polygon[^>]+/>', dsvg):
 print(f"[info] detail elements: {len(det_elems)}")
 
 # ── 8. Build 256 detail groups using nested SVG ───────────────
-# Nested SVG with viewBox handles clipping + scaling automatically
-# Works correctly with both innerHTML and DOMParser
 det_groups = []
 det_pdata  = {}
 
@@ -158,17 +173,34 @@ for n in range(1, 257):
     idx = n - 1; row = idx // 16; col = idx % 16
     ax = col * CW_SRC; ay = row * CH_SRC
 
-    cell = "\n".join(
-        tag for px, py, tag in det_elems
-        if ax - 5 <= px <= ax + CW_SRC + 5 and ay - 5 <= py <= ay + CH_SRC + 5
-    )
+    cell_tags = [(px, py, tag) for px, py, tag in det_elems
+                 if ax - 5 <= px <= ax + CW_SRC + 5 and ay - 5 <= py <= ay + CH_SRC + 5]
 
-    # Nested SVG: viewBox selects the cell, x/y/width/height places it in bodygraph
+    if not cell_tags:
+        det_groups.append(f'<g class="detail-part" data-detail="{n}" style="display:none"></g>')
+        det_pdata[str(n)] = {"row": row, "col": col, "empty": True}
+        continue
+
+    # Find actual content bounds for accurate viewBox
+    all_x, all_y = [], []
+    for px, py, tag in cell_tags:
+        for cx, cy in _get_coords(tag):
+            if ax - 50 <= cx <= ax + CW_SRC + 50 and ay - 50 <= cy <= ay + CH_SRC + 50:
+                all_x.append(cx); all_y.append(cy)
+
+    if all_x:
+        vb_x, vb_y = min(all_x), min(all_y)
+        vb_w = max(all_x) - vb_x or CW_SRC
+        vb_h = max(all_y) - vb_y or CH_SRC
+    else:
+        vb_x, vb_y, vb_w, vb_h = ax, ay, CW_SRC, CH_SRC
+
+    inner = "\n".join(tag for _, _, tag in cell_tags)
     det_groups.append(
         f'<g class="detail-part" data-detail="{n}" style="display:none">'
         f'<svg x="{TX}" y="{TY}" width="{CW}" height="{CH}" '
-        f'viewBox="{ax} {ay} {CW_SRC} {CH_SRC}" overflow="hidden">'
-        f'{cell}'
+        f'viewBox="{vb_x:.4f} {vb_y:.4f} {vb_w:.4f} {vb_h:.4f}" overflow="hidden">'
+        f'{inner}'
         f'</svg></g>'
     )
     det_pdata[str(n)] = {"row": row, "col": col, "src_x": round(ax, 2), "src_y": round(ay, 2),
