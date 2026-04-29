@@ -140,14 +140,21 @@ SX = CW / CW_SRC
 SY = CH / CH_SRC
 print(f"[info] src cell {CW_SRC:.2f}x{CH_SRC:.2f}  scale {SX:.6f}x{SY:.6f}")
 
-# Extract all path+polygon elements
+# Extract all path+polygon elements — use inline fill styles (reliable in innerHTML context)
+DET_COLORS = {'st0':'#FFFFFF','st1':'#292561','st2':'#67328F','st3':'#C3996C','st4':'#020202'}
+
 det_elems = []
 for tag in re.findall(r'<path[^>]+/>|<polygon[^>]+/>', dsvg):
     m = re.search(r'd="M\s*([\d.]+),([\d.]+)', tag) or \
         re.search(r'points="([\d.]+),([\d.]+)', tag)
     if not m: continue
     x, y = float(m.group(1)), float(m.group(2))
-    det_elems.append((x, y, re.sub(r'class="(st\d+)"', r'class="det-\1"', tag)))
+    # Replace class with inline style fill
+    cls_m = re.search(r'class="(st\d+)"', tag)
+    if cls_m:
+        color = DET_COLORS.get(cls_m.group(1), '#000000')
+        tag = re.sub(r'class="st\d+"', f'style="fill:{color}"', tag)
+    det_elems.append((x, y, tag))
 print(f"[info] detail elements: {len(det_elems)}")
 
 # ── 8. Build 256 detail groups ────────────────────────────────
