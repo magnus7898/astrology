@@ -6,4 +6,4 @@ timezonefinder>=6.5
 pytz>=2024.1
 numpy>=1.26
 gunicorn>=21.0
-svgpathtools
+svgpathtools==1.7.2
