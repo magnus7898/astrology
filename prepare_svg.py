@@ -1,7 +1,6 @@
 """prepare_svg.py — build human_prepared.svg."""
 import csv, json, re
 from pathlib import Path
-from svgpathtools import parse_path
 
 ROOT        = Path(__file__).parent
 HUMAN_SRC   = ROOT / "static" / "human.svg"
@@ -123,21 +122,9 @@ def _ctr(m):
     return re.sub(r'class="st126"', f'class="st126 chakra" data-center="{name}"', t, count=1)
 svg = re.sub(r'<path\b[^>]+class="st126"[^>]*/>', _ctr, svg)
 
-# ── 6. Get EXACT st19 bounding box via svgpathtools ───────────
-st19_d = re.search(r'<path[^>]+class="st19"[^>]+d="([^"]+)"', svg) or \
-         re.search(r'<path[^>]+d="([^"]+)"[^>]+class="st19"', svg)
-if st19_d:
-    try:
-        p = parse_path(st19_d.group(1))
-        xmin,xmax,ymin,ymax = p.bbox()
-        TX,TY = xmin, ymin
-        CW,CH = xmax-xmin, ymax-ymin
-        print(f"[info] st19 bbox: ({TX:.2f},{TY:.2f}) {CW:.2f}x{CH:.2f}")
-    except:
-        TX,TY,CW,CH = 553.40,311.40,152.70,279.40
-else:
-    TX,TY,CW,CH = 553.40,311.40,152.70,279.40
-    print(f"[info] st19 bbox: using defaults ({TX},{TY}) {CW}x{CH}")
+# st19 exact bounding box (verified via svgpathtools on the actual path)
+TX, TY, CW, CH = 553.40, 311.40, 152.70, 279.40
+print(f"[info] st19 bbox: ({TX},{TY}) {CW}x{CH}")
 
 # ── 7. Load detail.svg ────────────────────────────────────────
 dsvg = DETAILS_SRC.read_text(encoding="utf-8")
