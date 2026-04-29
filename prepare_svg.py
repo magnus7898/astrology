@@ -47,7 +47,6 @@ c2col= {m.group(1): m.group(2).upper()
         for m in re.finditer(r'\.(st\d+)\s*\{[^}]*fill:\s*(#[0-9A-Fa-f]+)', sblk)}
 print(f"[info] human.svg {len(svg):,} chars  classes:{len(c2col)}")
 
-# Hide st19 — replaced by detail artboard
 svg = re.sub(r'(<path[^>]+class="st19")', r'\1 style="display:none"', svg)
 print('[info] st19 hidden — detail artboard renders on top')
 
@@ -122,7 +121,7 @@ def _ctr(m):
     return re.sub(r'class="st126"', f'class="st126 chakra" data-center="{name}"', t, count=1)
 svg = re.sub(r'<path\b[^>]+class="st126"[^>]*/>', _ctr, svg)
 
-# st19 exact bounding box (verified via svgpathtools on the actual path)
+# ── 6. st19 bounding box (verified) ──────────────────────────
 TX, TY, CW, CH = 553.40, 311.40, 152.70, 279.40
 print(f"[info] st19 bbox: ({TX},{TY}) {CW}x{CH}")
 
@@ -130,17 +129,11 @@ print(f"[info] st19 bbox: ({TX},{TY}) {CW}x{CH}")
 dsvg = DETAILS_SRC.read_text(encoding="utf-8")
 print(f"[info] detail.svg {len(dsvg):,} chars")
 
-ds = re.search(r'<style[^>]*>(.*?)</style>', dsvg, re.DOTALL)
-det_style = re.sub(r'\.(st\d+)\b', r'.det-\1', ds.group(1).strip()) if ds else ""
+W_DET, H_DET = 2974.7, 5121.9
+CW_SRC = W_DET / 16   # 185.9187
+CH_SRC = H_DET / 16   # 320.1187
 
-# Source grid: 16x16 over viewBox 2974.7 x 5121.9
-CW_SRC = 2974.7 / 16   # 185.9187
-CH_SRC = 5121.9 / 16   # 320.1187
-SX = CW / CW_SRC
-SY = CH / CH_SRC
-print(f"[info] src cell {CW_SRC:.2f}x{CH_SRC:.2f}  scale {SX:.6f}x{SY:.6f}")
-
-# Extract all path+polygon elements — use inline fill styles (reliable in innerHTML context)
+# Inline fill colors — reliable in any HTML/SVG context
 DET_COLORS = {'st0':'#FFFFFF','st1':'#292561','st2':'#67328F','st3':'#C3996C','st4':'#020202'}
 
 det_elems = []
@@ -149,16 +142,17 @@ for tag in re.findall(r'<path[^>]+/>|<polygon[^>]+/>', dsvg):
         re.search(r'points="([\d.]+),([\d.]+)', tag)
     if not m: continue
     x, y = float(m.group(1)), float(m.group(2))
-    # Replace class with inline style fill
     cls_m = re.search(r'class="(st\d+)"', tag)
-    if cls_m:
-        color = DET_COLORS.get(cls_m.group(1), '#000000')
-        tag = re.sub(r'class="st\d+"', f'style="fill:{color}"', tag)
+    color = DET_COLORS.get(cls_m.group(1) if cls_m else '', '#000000')
+    tag = re.sub(r'class="st\d+"', f'style="fill:{color}"', tag)
     det_elems.append((x, y, tag))
 print(f"[info] detail elements: {len(det_elems)}")
 
-# ── 8. Build 256 detail groups ────────────────────────────────
-clip_defs, det_groups, det_pdata = [], [], {}
+# ── 8. Build 256 detail groups using nested SVG ───────────────
+# Nested SVG with viewBox handles clipping + scaling automatically
+# Works correctly with both innerHTML and DOMParser
+det_groups = []
+det_pdata  = {}
 
 for n in range(1, 257):
     idx = n - 1; row = idx // 16; col = idx % 16
@@ -168,23 +162,17 @@ for n in range(1, 257):
         tag for px, py, tag in det_elems
         if ax - 5 <= px <= ax + CW_SRC + 5 and ay - 5 <= py <= ay + CH_SRC + 5
     )
-    transform = (f"translate({TX:.4f},{TY:.4f}) "
-                 f"scale({SX:.8f},{SY:.8f}) "
-                 f"translate({-ax:.4f},{-ay:.4f})")
 
-    clip_defs.append(
-        f'<clipPath id="cdp{n}">'
-        f'<rect x="{TX:.2f}" y="{TY:.2f}" width="{CW:.2f}" height="{CH:.2f}"/>'
-        f'</clipPath>'
-    )
+    # Nested SVG: viewBox selects the cell, x/y/width/height places it in bodygraph
     det_groups.append(
         f'<g class="detail-part" data-detail="{n}" style="display:none">'
-        f'<g clip-path="url(#cdp{n})">'
-        f'<g transform="{transform}">{cell}</g>'
-        f'</g></g>'
+        f'<svg x="{TX}" y="{TY}" width="{CW}" height="{CH}" '
+        f'viewBox="{ax} {ay} {CW_SRC} {CH_SRC}" overflow="hidden">'
+        f'{cell}'
+        f'</svg></g>'
     )
-    det_pdata[str(n)] = {"row":row,"col":col,"src_x":round(ax,2),"src_y":round(ay,2),
-                          "dst_x":TX,"dst_y":TY,"scale_x":round(SX,6),"scale_y":round(SY,6)}
+    det_pdata[str(n)] = {"row": row, "col": col, "src_x": round(ax, 2), "src_y": round(ay, 2),
+                          "dst_x": TX, "dst_y": TY}
 
 DET_JSON.write_text(json.dumps(det_pdata, indent=2))
 
@@ -209,26 +197,18 @@ for g in [g for g,_,_ in GATE_RULES]+[10,20,34,57]:
     for p in ("active-p-","active-d-","active-b-"):
         css.append(f"svg.{p}{g} .gate-circle[data-gate='{g}']{{fill:#1a1a2e!important;}}")
         css.append(f"svg.{p}{g} .gate-text[data-gate='{g}']{{fill:#FFFFFF!important;}}")
-for name,col in CCOL.items():
+for name, col in CCOL.items():
     css.append(f"svg.center-active-{name.replace(' ','')} .chakra[data-center='{name}']{{fill:{col}!important;}}")
 css.append(".detail-part{display:none!important;}")
-for n in range(1,257):
+for n in range(1, 257):
     css.append(f"svg.detail-on-{n} .detail-part[data-detail='{n}']{{display:block!important;}}")
 css.append("</style>")
 
 # ── 10. Assemble ──────────────────────────────────────────────
-if det_style:
-    svg = re.sub(r'(<style\b[^>]*>)', f'\\1\n/* detail.svg styles */\n{det_style}\n', svg, count=1)
-
-svg = re.sub(r'(<svg\b[^>]*>)',
-             f'\\1\n<defs id="detail-clips">\n{"".join(clip_defs)}\n</defs>', svg, count=1)
-
 svg = svg.replace("</svg>",
     "\n" + "\n".join(css) +
     "\n<g id='details-layer'>\n" + "\n".join(det_groups) + "\n</g>\n</svg>")
 
 DST.write_text(svg, encoding="utf-8")
 print(f"\nWrote {DST} ({len(svg)/1e6:.2f} MB)")
-print(f"  st19 hidden: ✓")
-print(f"  detail cells: 256 ✓")
-print(f"  bbox: ({TX:.2f},{TY:.2f}) {CW:.2f}x{CH:.2f}")
+print(f"  st19 hidden: ✓  detail cells: 256 ✓  nested SVG viewBox: ✓")
