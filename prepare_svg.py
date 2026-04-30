@@ -170,7 +170,7 @@ for n in range(1, 257):
     else:
         min_x, min_y = ax, ay
 
-    TX_ADJ = TX + 25
+    TX_ADJ = TX + 24.5
     TY_ADJ = TY + 9
     transform = f"translate({TX_ADJ},{TY_ADJ}) scale({sx:.6f},{sy:.6f}) translate({-min_x:.4f},{-min_y:.4f})"
 
