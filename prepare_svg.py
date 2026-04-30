@@ -237,9 +237,19 @@ for n in range(1, 257):
 css.append("</style>")
 
 # ── 10. Assemble ──────────────────────────────────────────────
-svg = svg.replace("</svg>",
-    "\n" + "\n".join(css) +
-    "\n<g id='details-layer'>\n" + "\n".join(det_groups) + "\n</g>\n</svg>")
+# Insert details layer right after the st19 path (same layer as st19)
+svg = svg.replace(
+    'style="display:none" class="st19"',
+    'style="display:none" class="st19"',  # keep st19 hidden
+)
+# Insert detail group right after st19
+st19_end = svg.find('style="display:none" class="st19"')
+st19_end = svg.find('/>', st19_end) + 2
+details_html = "\n<g id='details-layer'>\n" + "\n".join(det_groups) + "\n</g>\n"
+svg = svg[:st19_end] + details_html + svg[st19_end:]
+
+# CSS and closing
+svg = svg.replace("</svg>", "\n" + "\n".join(css) + "\n</svg>")
 
 DST.write_text(svg, encoding="utf-8")
 print(f"\nWrote {DST} ({len(svg)/1e6:.2f} MB)")
