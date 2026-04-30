@@ -168,12 +168,19 @@ for n in range(1, 257):
         if ax - 5 <= px <= ax + CW_SRC + 5 and ay - 5 <= py <= ay + CH_SRC + 5
     )
 
+    # Transform: scale cell coords to target size, then translate to target position
+    # Step 1: translate cell origin to (0,0): translate(-ax, -ay)
+    # Step 2: scale cell size to target size: scale(CW/CW_DISP, CH/CH_DISP)
+    # Step 3: translate to target position: translate(TX, TY)
+    sx = CW / CW_DISP
+    sy = CH / CH_DISP
+    transform = f"translate({TX},{TY}) scale({sx:.6f},{sy:.6f}) translate({-ax:.4f},{-ay:.4f})"
+
     det_groups.append(
         f'<g class="detail-part" data-detail="{n}" style="display:none">'
-        f'<svg x="{TX}" y="{TY}" width="{CW}" height="{CH}" '
-        f'viewBox="{ax:.4f} {ay:.4f} {CW_DISP} {CH_DISP}" overflow="hidden">'
-        f'{cell_paths}'
-        f'</svg></g>'
+        f'<clipPath id="dcp{n}"><rect x="{TX}" y="{TY}" width="{CW}" height="{CH}"/></clipPath>'
+        f'<g clip-path="url(#dcp{n})" transform="{transform}">{cell_paths}</g>'
+        f'</g>'
     )
     det_pdata[str(n)] = {"row": row, "col": col, "src_x": round(ax,2), "src_y": round(ay,2)}
 
@@ -208,16 +215,17 @@ for n in range(1, 257):
 css.append("</style>")
 
 # ── 10. Assemble ──────────────────────────────────────────────
-# Insert details layer right after st19 (correct z-order — above body, below chakras)
+# Insert details layer after ALL chakras (so detail renders above chakra shapes)
+# Find last chakra path
 details_html = "\n<g id='details-layer'>\n" + "\n".join(det_groups) + "\n</g>"
-# Find the st19 path end position
-st19_pos = svg.find('class="st19"')
-if st19_pos == -1:
-    st19_pos = 0
-insert_at = svg.find('/>', st19_pos) + 2
-if insert_at <= 1:
-    insert_at = svg.find('</svg>')  # fallback: insert before closing tag
-svg = svg[:insert_at] + details_html + svg[insert_at:]
+last_chakra = 0
+for m in re.finditer(r'class="st126 chakra"', svg):
+    pos = svg.find('/>', m.start()) + 2
+    if pos > last_chakra:
+        last_chakra = pos
+if last_chakra == 0:
+    last_chakra = svg.rfind("</svg>")
+svg = svg[:last_chakra] + details_html + svg[last_chakra:]
 
 # CSS at end — replace only the LAST </svg> (not the nested detail SVG closing tags)
 last_svg_close = svg.rfind("</svg>")
