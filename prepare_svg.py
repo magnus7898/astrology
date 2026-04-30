@@ -156,14 +156,21 @@ for n in range(1, 257):
     ax = col * CW_SRC
     ay = row * CH_SRC
 
-    cell_paths = "\n".join(
-        tag for px, py, tag in det_elems
+    cell_tags_list = [
+        (px, py, tag) for px, py, tag in det_elems
         if ax - 5 <= px <= ax + CW_SRC + 5 and ay - 5 <= py <= ay + CH_SRC + 5
-    )
+    ]
+    cell_paths = "\n".join(tag for _, _, tag in cell_tags_list)
 
-    # Transform: artboard display area → bodygraph target
-    # translate(TX,TY) scale(sx,sy) translate(-ax,-ay)
-    transform = f"translate({TX},{TY}) scale({sx:.6f},{sy:.6f}) translate({-ax:.4f},{-ay:.4f})"
+    if cell_tags_list:
+        # Use actual content top-left as transform origin
+        # so content aligns to target top-left corner (TX, TY)
+        min_x = min(px for px, _, _ in cell_tags_list)
+        min_y = min(py for _, py, _ in cell_tags_list)
+    else:
+        min_x, min_y = ax, ay
+
+    transform = f"translate({TX},{TY}) scale({sx:.6f},{sy:.6f}) translate({-min_x:.4f},{-min_y:.4f})"
 
     det_groups.append(
         f'<g class="detail-part" data-detail="{n}" style="display:none">'
