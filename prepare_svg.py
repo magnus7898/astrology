@@ -210,8 +210,13 @@ css.append("</style>")
 # ── 10. Assemble ──────────────────────────────────────────────
 # Insert details layer right after st19 (correct z-order — above body, below chakras)
 details_html = "\n<g id='details-layer'>\n" + "\n".join(det_groups) + "\n</g>"
-st19_pos = svg.find('style="display:none" class="st19"')
+# Find the st19 path end position
+st19_pos = svg.find('class="st19"')
+if st19_pos == -1:
+    st19_pos = 0
 insert_at = svg.find('/>', st19_pos) + 2
+if insert_at <= 1:
+    insert_at = svg.find('</svg>')  # fallback: insert before closing tag
 svg = svg[:insert_at] + details_html + svg[insert_at:]
 
 # CSS at end — replace only the LAST </svg> (not the nested detail SVG closing tags)
