@@ -56,14 +56,11 @@ def _ensure_hd_svg():
     human  = ROOT / "static" / "human.svg"
     detail = ROOT / "static" / "detail.svg"
     if not human.exists() or not detail.exists():
-        print("[hd] skipping SVG prep — human.svg or detail.svg missing", file=sys.stderr)
+        print("[hd] skipping — files missing", file=sys.stderr)
         return
-    print(f"[hd] building human_prepared.svg ...")
+    print("[hd] building human_prepared.svg ...")
     try:
-        subprocess.check_call(
-            [sys.executable, str(ROOT / "prepare_svg.py")],
-            cwd=str(ROOT),
-        )
+        subprocess.check_call([sys.executable, str(ROOT / "prepare_svg.py")], cwd=str(ROOT))
     except subprocess.CalledProcessError as e:
         print(f"[hd] prepare_svg failed: {e}", file=sys.stderr)
 
