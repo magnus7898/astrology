@@ -170,8 +170,8 @@ for n in range(1, 257):
     else:
         min_x, min_y = ax, ay
 
-    TX_ADJ = TX + 24.5
-    TY_ADJ = TY + 9
+    TX_ADJ = TX + 22
+    TY_ADJ = TY + 7
     transform = f"translate({TX},{TY}) scale({sx:.6f},{sy:.6f}) translate({-ax:.4f},{-ay:.4f})"
     
     det_groups.append(
