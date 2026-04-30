@@ -5,7 +5,6 @@ from pathlib import Path
 ROOT        = Path(__file__).parent
 HUMAN_SRC   = ROOT / "static" / "human.svg"
 DETAILS_SRC = ROOT / "static" / "detail.svg"
-CSV_SRC     = ROOT / "static" / "integration_conditions.csv"
 DST         = ROOT / "static" / "human_prepared.svg"
 POS_JSON    = ROOT / "static" / "gate_positions.json"
 COL_JSON    = ROOT / "static" / "gate_colors.json"
@@ -46,9 +45,8 @@ sblk = re.search(r'<style[^>]*>(.*?)</style>', svg, re.DOTALL).group(1)
 c2col= {m.group(1): m.group(2).upper()
         for m in re.finditer(r'\.(st\d+)\s*\{[^}]*fill:\s*(#[0-9A-Fa-f]+)', sblk)}
 print(f"[info] human.svg {len(svg):,} chars  classes:{len(c2col)}")
-
 svg = re.sub(r'(<path[^>]+class="st19")', r'\1 style="display:none"', svg)
-print('[info] st19 hidden — detail artboard renders on top')
+print('[info] st19 hidden')
 
 # ── 1. Tag channel lines ──────────────────────────────────────
 n_tag = 0
@@ -96,7 +94,6 @@ def _txt(m):
     if g not in tpos: return t
     return re.sub(r'class="(st128 st129)"', f'class="\\1 gate-text" data-gate="{g}"', t, count=1)
 svg = re.sub(r'<text\b[^>]+class="st128 st129"[^>]*>\d+</text>', _txt, svg)
-
 for g, (tx, ty) in tpos.items():
     if g not in gpos: gpos[g] = {"cx": round(tx,1), "cy": round(ty,1)}
 POS_JSON.write_text(json.dumps(gpos, indent=2))
@@ -129,16 +126,13 @@ print(f"[info] st19 bbox: ({TX},{TY}) {CW}x{CH}")
 dsvg = DETAILS_SRC.read_text(encoding="utf-8")
 print(f"[info] detail.svg {len(dsvg):,} chars")
 
-# Grid: 16x16 cells, each cell is CW_SRC x CH_SRC in file coords
-# ViewBox "0 0 152.5 278.9" = display size per cell
-CW_SRC = 2974.7 / 16   # 185.9187
-CH_SRC = 5121.9 / 16   # 320.1187
-# Display size (from detail.svg viewBox) — use this as viewBox dimensions
-CW_DISP, CH_DISP = 152.5, 278.9
+CW_SRC = 2974.7 / 16   # 185.9187 — cell width in detail.svg coords
+CH_SRC = 5121.9 / 16   # 320.1187 — cell height in detail.svg coords
+CW_DISP, CH_DISP = 152.5, 278.9  # display size per cell (from viewBox)
+sx = CW / CW_DISP   # ≈ 1.001 — scale to fit st19 target
+sy = CH / CH_DISP   # ≈ 1.002
 
 DET_COLORS = {'st0':'#FFFFFF','st1':'#292561','st2':'#67328F','st3':'#C3996C','st4':'#020202'}
-
-# Extract paths by M-point only (fast and small file size)
 det_elems = []
 for tag in re.findall(r'<path[^>]+/>|<polygon[^>]+/>', dsvg):
     m = re.search(r'd="M\s*([\d.]+),([\d.]+)', tag) or \
@@ -152,34 +146,28 @@ for tag in re.findall(r'<path[^>]+/>|<polygon[^>]+/>', dsvg):
 print(f"[info] detail elements: {len(det_elems)}")
 
 # ── 8. Build 256 detail groups ────────────────────────────────
-# Use nested SVG with:
-# - x,y,width,height = st19 target area
-# - viewBox = cell origin + DISPLAY SIZE (152.5x278.9)
-# This maps each cell's content to exactly the target area
 det_groups = []
 det_pdata  = {}
 
 for n in range(1, 257):
-    idx = n - 1; row = idx // 16; col = idx % 16
-    ax = col * CW_SRC; ay = row * CH_SRC
+    idx = n - 1
+    row = idx // 16
+    col = idx % 16
+    ax = col * CW_SRC
+    ay = row * CH_SRC
 
     cell_paths = "\n".join(
         tag for px, py, tag in det_elems
         if ax - 5 <= px <= ax + CW_SRC + 5 and ay - 5 <= py <= ay + CH_SRC + 5
     )
 
-    # Transform: scale cell coords to target size, then translate to target position
-    # Step 1: translate cell origin to (0,0): translate(-ax, -ay)
-    # Step 2: scale cell size to target size: scale(CW/CW_DISP, CH/CH_DISP)
-    # Step 3: translate to target position: translate(TX, TY)
-    sx = CW / CW_DISP
-    sy = CH / CH_DISP
+    # Transform: artboard display area → bodygraph target
+    # translate(TX,TY) scale(sx,sy) translate(-ax,-ay)
     transform = f"translate({TX},{TY}) scale({sx:.6f},{sy:.6f}) translate({-ax:.4f},{-ay:.4f})"
 
     det_groups.append(
         f'<g class="detail-part" data-detail="{n}" style="display:none">'
-        f'<clipPath id="dcp{n}"><rect x="{TX}" y="{TY}" width="{CW}" height="{CH}"/></clipPath>'
-        f'<g clip-path="url(#dcp{n})" transform="{transform}">{cell_paths}</g>'
+        f'<g transform="{transform}">{cell_paths}</g>'
         f'</g>'
     )
     det_pdata[str(n)] = {"row": row, "col": col, "src_x": round(ax,2), "src_y": round(ay,2)}
@@ -195,16 +183,16 @@ CCOL = {"Head":"#AA88EE","Ajna":"#9B59B6","Throat":"#F39C12","G":"#FFD700",
         "Heart":"#E74C3C","Solar Plexus":"#E67E22","Spleen":"#27AE60",
         "Sacral":"#E74C3C","Root":"#8B4513"}
 
-css = ["<style id='hd-activation'>",".gate-line{fill:#FFFFFF!important;}"]
-for g,_,_ in GATE_RULES:
+css = ["<style id='hd-activation'>", ".gate-line{fill:#FFFFFF!important;}"]
+for g, _, _ in GATE_RULES:
     css += [
         f"svg.active-p-{g} [data-gate='{g}'].gate-line{{fill:{P_BLUE}!important;}}",
         f"svg.active-d-{g} [data-gate='{g}'].gate-line{{fill:{D_PURP}!important;}}",
         f"svg.active-b-{g} [data-gate='{g}'][data-type='dark'].gate-line{{fill:{P_BLUE}!important;}}",
         f"svg.active-b-{g} [data-gate='{g}'][data-type='light'].gate-line{{fill:{D_PURP}!important;}}",
     ]
-for g in [g for g,_,_ in GATE_RULES]+[10,20,34,57]:
-    for p in ("active-p-","active-d-","active-b-"):
+for g in [g for g,_,_ in GATE_RULES] + [10, 20, 34, 57]:
+    for p in ("active-p-", "active-d-", "active-b-"):
         css.append(f"svg.{p}{g} .gate-circle[data-gate='{g}']{{fill:#1a1a2e!important;}}")
         css.append(f"svg.{p}{g} .gate-text[data-gate='{g}']{{fill:#FFFFFF!important;}}")
 for name, col in CCOL.items():
@@ -215,22 +203,17 @@ for n in range(1, 257):
 css.append("</style>")
 
 # ── 10. Assemble ──────────────────────────────────────────────
-# Insert details layer after ALL chakras (so detail renders above chakra shapes)
-# Find last chakra path
 details_html = "\n<g id='details-layer'>\n" + "\n".join(det_groups) + "\n</g>"
-last_chakra = 0
-for m in re.finditer(r'class="st126 chakra"', svg):
-    pos = svg.find('/>', m.start()) + 2
-    if pos > last_chakra:
-        last_chakra = pos
-if last_chakra == 0:
-    last_chakra = svg.rfind("</svg>")
-svg = svg[:last_chakra] + details_html + svg[last_chakra:]
 
-# CSS at end — replace only the LAST </svg> (not the nested detail SVG closing tags)
+# Insert details BEFORE the first chakra (under chakras in z-order)
+first_chakra = svg.find('class="st126 chakra"')
+insert_at = svg.rfind('<path', 0, first_chakra)  # start of first chakra path
+svg = svg[:insert_at] + details_html + svg[insert_at:]
+
+# CSS at the very end
 last_svg_close = svg.rfind("</svg>")
 svg = svg[:last_svg_close] + "\n" + "\n".join(css) + "\n</svg>"
 
 DST.write_text(svg, encoding="utf-8")
 print(f"\nWrote {DST} ({len(svg)/1e6:.2f} MB)")
-print(f"  st19 hidden: ✓  detail cells: 256 ✓  z-order: after st19 ✓")
+print(f"  st19 hidden: ✓  detail cells: 256 ✓  detail under chakras: ✓")
