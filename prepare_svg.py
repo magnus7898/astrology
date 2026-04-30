@@ -172,8 +172,8 @@ for n in range(1, 257):
 
     TX_ADJ = TX + 24.5
     TY_ADJ = TY + 9
-    transform = f"translate({TX_ADJ},{TY_ADJ}) scale({sx:.6f},{sy:.6f}) translate({-min_x:.4f},{-min_y:.4f})"
-
+    transform = f"translate({TX},{TY}) scale({sx:.6f},{sy:.6f}) translate({-ax:.4f},{-ay:.4f})"
+    
     det_groups.append(
         f'<g class="detail-part" data-detail="{n}" style="display:none">'
         f'<g transform="{transform}">{cell_paths}</g>'
