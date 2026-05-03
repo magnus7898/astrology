@@ -132,7 +132,7 @@ CW_DISP, CH_DISP = 152.5, 278.9  # display size per cell (from viewBox)
 sx = CW / CW_DISP   # ≈ 1.001 — scale to fit st19 target
 sy = CH / CH_DISP   # ≈ 1.002
 
-DET_COLORS = {'st0':'#FFFFFF','st1':'#292561','st2':'#67328F','st3':'#C3996C','st4':'#020202'}
+DET_COLORS = {'st0':'#FFFFFF','st1':'#2C363F','st2':'#E75A7C','st3':'#C3996C','st4':'#020202'}
 det_elems = []
 for tag in re.findall(r'<path[^>]+/>|<polygon[^>]+/>', dsvg):
     m = re.search(r'd="M\s*([\d.]+),([\d.]+)', tag) or \
