@@ -11,7 +11,7 @@ COL_JSON    = ROOT / "static" / "gate_colors.json"
 DET_JSON    = ROOT / "static" / "detail_positions.json"
 
 P_BLUE = "#2D3047"
-D_PURP = "#93B7BE"
+D_PURP = "#E0CA3C"
 
 GATE_RULES = [
     (36,"#FF0000","#FF3333"),(35,"#E60000","#FF4D4D"),(22,"#CC0000","#FF6666"),
