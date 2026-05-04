@@ -592,6 +592,258 @@ def geocode(place: str) -> Tuple[float, float, str, str]:
         f"(get key at https://opencagedata.com — 2500 requests/day free)."
     )
 
+# Complete Incarnation Cross lookup for hd_calc.py
+# Add this dict to hd_calc.py, then use it in calculate_chart_from_coords()
+
+INCARNATION_CROSSES = {
+    # ── Right Angle Crosses ──────────────────────────────────
+    (1, 2, 4, 49):   "Right Angle Cross of the Sphinx 1",
+    (49, 4, 2, 1):   "Right Angle Cross of the Sphinx 2",
+    (4, 49, 1, 2):   "Right Angle Cross of the Sphinx 3",
+    (2, 1, 49, 4):   "Right Angle Cross of the Sphinx 4",
+
+    (13, 7, 1, 2):   "Right Angle Cross of the Sphinx 1",
+    (2, 1, 13, 7):   "Right Angle Cross of the Sphinx 2",
+    (1, 2, 13, 7):   "Right Angle Cross of the Sphinx 3",
+    (7, 13, 2, 1):   "Right Angle Cross of the Sphinx 4",
+
+    (3, 50, 41, 31): "Right Angle Cross of Mutation 1",
+    (31, 41, 50, 3): "Right Angle Cross of Mutation 2",
+    (41, 31, 3, 50): "Right Angle Cross of Mutation 3",
+    (50, 3, 31, 41): "Right Angle Cross of Mutation 4",
+
+    (5, 35, 47, 22): "Right Angle Cross of the Four Ways 1",
+    (22, 47, 35, 5): "Right Angle Cross of the Four Ways 2",
+    (47, 22, 5, 35): "Right Angle Cross of the Four Ways 3",
+    (35, 5, 22, 47): "Right Angle Cross of the Four Ways 4",
+
+    (6, 36, 11, 12): "Right Angle Cross of Eden 1",
+    (12, 11, 36, 6): "Right Angle Cross of Eden 2",
+    (11, 12, 6, 36): "Right Angle Cross of Eden 3",
+    (36, 6, 12, 11): "Right Angle Cross of Eden 4",
+
+    (8, 14, 55, 59): "Right Angle Cross of Contagion 1",
+    (59, 55, 14, 8): "Right Angle Cross of Contagion 2",
+    (55, 59, 8, 14): "Right Angle Cross of Contagion 3",
+    (14, 8, 59, 55): "Right Angle Cross of Contagion 4",
+
+    (9, 16, 64, 63): "Right Angle Cross of Determination 1",
+    (63, 64, 16, 9): "Right Angle Cross of Determination 2",
+    (64, 63, 9, 16): "Right Angle Cross of Determination 3",
+    (16, 9, 63, 64): "Right Angle Cross of Determination 4",
+
+    (10, 15, 18, 17): "Right Angle Cross of the Vessel of Love 1",
+    (17, 18, 15, 10): "Right Angle Cross of the Vessel of Love 2",
+    (18, 17, 10, 15): "Right Angle Cross of the Vessel of Love 3",
+    (15, 10, 17, 18): "Right Angle Cross of the Vessel of Love 4",
+
+    (13, 7, 24, 23): "Right Angle Cross of the Sphinx 1",
+    (23, 24, 7, 13): "Right Angle Cross of the Sphinx 2",
+    (24, 23, 13, 7): "Right Angle Cross of the Sphinx 3",
+    (7, 13, 23, 24): "Right Angle Cross of the Sphinx 4",
+
+    (19, 33, 44, 24): "Right Angle Cross of the Tail 1",
+    (24, 44, 33, 19): "Right Angle Cross of the Tail 2",
+    (44, 24, 19, 33): "Right Angle Cross of the Tail 3",
+    (33, 19, 24, 44): "Right Angle Cross of the Tail 4",
+
+    (20, 34, 37, 40): "Right Angle Cross of the Sleeping Phoenix 1",
+    (40, 37, 34, 20): "Right Angle Cross of the Sleeping Phoenix 2",
+    (37, 40, 20, 34): "Right Angle Cross of the Sleeping Phoenix 3",
+    (34, 20, 40, 37): "Right Angle Cross of the Sleeping Phoenix 4",
+
+    (21, 48, 38, 39): "Right Angle Cross of Rulership 1",
+    (39, 38, 48, 21): "Right Angle Cross of Rulership 2",
+    (38, 39, 21, 48): "Right Angle Cross of Rulership 3",
+    (48, 21, 39, 38): "Right Angle Cross of Rulership 4",
+
+    (25, 46, 58, 52): "Right Angle Cross of the Unexpected 1",
+    (52, 58, 46, 25): "Right Angle Cross of the Unexpected 2",
+    (58, 52, 25, 46): "Right Angle Cross of the Unexpected 3",
+    (46, 25, 52, 58): "Right Angle Cross of the Unexpected 4",
+
+    (26, 45, 6, 36):  "Right Angle Cross of Rulership 1",
+    (36, 6, 45, 26):  "Right Angle Cross of Rulership 2",
+    (6, 36, 26, 45):  "Right Angle Cross of Rulership 3",
+    (45, 26, 36, 6):  "Right Angle Cross of Rulership 4",
+
+    (27, 28, 19, 33): "Right Angle Cross of Unexpected 1",
+    (33, 19, 28, 27): "Right Angle Cross of Unexpected 2",
+    (19, 33, 27, 28): "Right Angle Cross of Unexpected 3",
+    (28, 27, 33, 19): "Right Angle Cross of Unexpected 4",
+
+    (29, 30, 20, 34): "Right Angle Cross of the Sleeping Phoenix 1",
+    (34, 20, 30, 29): "Right Angle Cross of the Sleeping Phoenix 2",
+    (20, 34, 29, 30): "Right Angle Cross of the Sleeping Phoenix 3",
+    (30, 29, 34, 20): "Right Angle Cross of the Sleeping Phoenix 4",
+
+    (32, 42, 56, 60): "Right Angle Cross of Migration 1",
+    (60, 56, 42, 32): "Right Angle Cross of Migration 2",
+    (56, 60, 32, 42): "Right Angle Cross of Migration 3",
+    (42, 32, 60, 56): "Right Angle Cross of Migration 4",
+
+    (43, 23, 29, 30): "Right Angle Cross of Explanation 1",
+    (30, 29, 23, 43): "Right Angle Cross of Explanation 2",
+    (29, 30, 43, 23): "Right Angle Cross of Explanation 3",
+    (23, 43, 30, 29): "Right Angle Cross of Explanation 4",
+
+    (51, 57, 61, 62): "Right Angle Cross of the Clarion 1",
+    (62, 61, 57, 51): "Right Angle Cross of the Clarion 2",
+    (61, 62, 51, 57): "Right Angle Cross of the Clarion 3",
+    (57, 51, 62, 61): "Right Angle Cross of the Clarion 4",
+
+    (53, 54, 42, 32): "Right Angle Cross of the Wheel of Fortune 1",
+    (32, 42, 54, 53): "Right Angle Cross of the Wheel of Fortune 2",
+    (42, 32, 53, 54): "Right Angle Cross of the Wheel of Fortune 3",
+    (54, 53, 32, 42): "Right Angle Cross of the Wheel of Fortune 4",
+
+    # ── Juxtaposition Crosses (single fixed fate) ─────────────
+    (1, 2, 2, 1):    "Juxtaposition Cross of the Self",
+    (2, 1, 1, 2):    "Juxtaposition Cross of the Driver",
+    (3, 50, 50, 3):  "Juxtaposition Cross of Mutation",
+    (4, 49, 49, 4):  "Juxtaposition Cross of Formulization",
+    (5, 35, 35, 5):  "Juxtaposition Cross of Fixed Rhythms",
+    (6, 36, 36, 6):  "Juxtaposition Cross of Friction",
+    (7, 13, 13, 7):  "Juxtaposition Cross of Interaction",
+    (8, 14, 14, 8):  "Juxtaposition Cross of Contribution",
+    (9, 16, 16, 9):  "Juxtaposition Cross of Focus",
+    (10, 15, 15, 10):"Juxtaposition Cross of Behavior",
+    (11, 12, 12, 11):"Juxtaposition Cross of Ideas",
+    (12, 11, 11, 12):"Juxtaposition Cross of Articulation",
+    (13, 7, 7, 13):  "Juxtaposition Cross of the Listener",
+    (14, 8, 8, 14):  "Juxtaposition Cross of Power Skills",
+    (15, 10, 10, 15):"Juxtaposition Cross of Extremes",
+    (16, 9, 9, 16):  "Juxtaposition Cross of Experimentation",
+    (17, 18, 18, 17):"Juxtaposition Cross of Opinions",
+    (18, 17, 17, 18):"Juxtaposition Cross of Correction",
+    (19, 33, 33, 19):"Juxtaposition Cross of Wanting",
+    (20, 34, 34, 20):"Juxtaposition Cross of the Now",
+    (21, 48, 48, 21):"Juxtaposition Cross of Control",
+    (22, 47, 47, 22):"Juxtaposition Cross of Grace",
+    (23, 43, 43, 23):"Juxtaposition Cross of Assimilation",
+    (24, 44, 44, 24):"Juxtaposition Cross of Rationalization",
+    (25, 46, 46, 25):"Juxtaposition Cross of Innocence",
+    (26, 45, 45, 26):"Juxtaposition Cross of Trickery",
+    (27, 28, 28, 27):"Juxtaposition Cross of Caring",
+    (28, 27, 27, 28):"Juxtaposition Cross of Struggle",
+    (29, 30, 30, 29):"Juxtaposition Cross of Commitment",
+    (30, 29, 29, 30):"Juxtaposition Cross of Desires",
+    (31, 41, 41, 31):"Juxtaposition Cross of Influence",
+    (32, 42, 42, 32):"Juxtaposition Cross of Conservation",
+    (33, 19, 19, 33):"Juxtaposition Cross of Privacy",
+    (34, 20, 20, 34):"Juxtaposition Cross of Power",
+    (35, 5, 5, 35):  "Juxtaposition Cross of Experience",
+    (36, 6, 6, 36):  "Juxtaposition Cross of Crisis",
+    (37, 40, 40, 37):"Juxtaposition Cross of Friendship",
+    (38, 39, 39, 38):"Juxtaposition Cross of Opposition",
+    (39, 38, 38, 39):"Juxtaposition Cross of Provocation",
+    (40, 37, 37, 40):"Juxtaposition Cross of Aloneness",
+    (41, 31, 31, 41):"Juxtaposition Cross of Fantasy",
+    (42, 32, 32, 42):"Juxtaposition Cross of Completion",
+    (43, 23, 23, 43):"Juxtaposition Cross of Insight",
+    (44, 24, 24, 44):"Juxtaposition Cross of Alertness",
+    (45, 26, 26, 45):"Juxtaposition Cross of Gathering",
+    (46, 25, 25, 46):"Juxtaposition Cross of Serendipity",
+    (47, 22, 22, 47):"Juxtaposition Cross of Oppression",
+    (48, 21, 21, 48):"Juxtaposition Cross of Depth",
+    (49, 4, 4, 49):  "Juxtaposition Cross of Principles",
+    (50, 3, 3, 50):  "Juxtaposition Cross of Values",
+    (51, 57, 57, 51):"Juxtaposition Cross of Shock",
+    (52, 58, 58, 52):"Juxtaposition Cross of Stillness",
+    (53, 54, 54, 53):"Juxtaposition Cross of Beginnings",
+    (54, 53, 53, 54):"Juxtaposition Cross of Ambition",
+    (55, 59, 59, 55):"Juxtaposition Cross of Moods",
+    (56, 60, 60, 56):"Juxtaposition Cross of Stimulation",
+    (57, 51, 51, 57):"Juxtaposition Cross of Intuition",
+    (58, 52, 52, 58):"Juxtaposition Cross of Vitality",
+    (59, 55, 55, 59):"Juxtaposition Cross of Strategy",
+    (60, 56, 56, 60):"Juxtaposition Cross of Limitation",
+    (61, 62, 62, 61):"Juxtaposition Cross of Mystery",
+    (62, 61, 61, 62):"Juxtaposition Cross of Detail",
+    (63, 64, 64, 63):"Juxtaposition Cross of Doubts",
+    (64, 63, 63, 64):"Juxtaposition Cross of Confusion",
+
+    # ── Left Angle Crosses ────────────────────────────────────
+    (1, 2, 7, 13):   "Left Angle Cross of the Sphinx 1",
+    (13, 7, 2, 1):   "Left Angle Cross of the Sphinx 2",
+    (2, 1, 13, 7):   "Left Angle Cross of the Sphinx 3",
+    (7, 13, 1, 2):   "Left Angle Cross of the Sphinx 4",
+
+    (3, 50, 60, 56): "Left Angle Cross of Mutation 1",
+    (56, 60, 50, 3): "Left Angle Cross of Mutation 2",
+    (60, 56, 3, 50): "Left Angle Cross of Mutation 3",
+    (50, 3, 56, 60): "Left Angle Cross of Mutation 4",
+
+    (5, 35, 36, 6):  "Left Angle Cross of the Four Ways 1",
+    (6, 36, 35, 5):  "Left Angle Cross of the Four Ways 2",
+    (36, 6, 5, 35):  "Left Angle Cross of the Four Ways 3",
+    (35, 5, 6, 36):  "Left Angle Cross of the Four Ways 4",
+
+    (8, 14, 19, 33): "Left Angle Cross of Contagion 1",
+    (33, 19, 14, 8): "Left Angle Cross of Contagion 2",
+    (19, 33, 8, 14): "Left Angle Cross of Contagion 3",
+    (14, 8, 33, 19): "Left Angle Cross of Contagion 4",
+
+    (9, 16, 12, 11): "Left Angle Cross of Determination 1",
+    (11, 12, 16, 9): "Left Angle Cross of Determination 2",
+    (12, 11, 9, 16): "Left Angle Cross of Determination 3",
+    (16, 9, 11, 12): "Left Angle Cross of Determination 4",
+
+    (10, 15, 17, 18): "Left Angle Cross of the Vessel of Love 1",
+    (18, 17, 15, 10): "Left Angle Cross of the Vessel of Love 2",
+    (17, 18, 10, 15): "Left Angle Cross of the Vessel of Love 3",
+    (15, 10, 18, 17): "Left Angle Cross of the Vessel of Love 4",
+
+    (21, 48, 37, 40): "Left Angle Cross of Rulership 1",
+    (40, 37, 48, 21): "Left Angle Cross of Rulership 2",
+    (37, 40, 21, 48): "Left Angle Cross of Rulership 3",
+    (48, 21, 40, 37): "Left Angle Cross of Rulership 4",
+
+    (25, 46, 20, 34): "Left Angle Cross of the Unexpected 1",
+    (34, 20, 46, 25): "Left Angle Cross of the Unexpected 2",
+    (20, 34, 25, 46): "Left Angle Cross of the Unexpected 3",
+    (46, 25, 34, 20): "Left Angle Cross of the Unexpected 4",
+
+    (27, 28, 24, 44): "Left Angle Cross of Healing 1",
+    (44, 24, 28, 27): "Left Angle Cross of Healing 2",
+    (24, 44, 27, 28): "Left Angle Cross of Healing 3",
+    (28, 27, 44, 24): "Left Angle Cross of Healing 4",
+
+    (29, 30, 43, 23): "Left Angle Cross of Dedication 1",
+    (23, 43, 30, 29): "Left Angle Cross of Dedication 2",
+    (43, 23, 29, 30): "Left Angle Cross of Dedication 3",
+    (30, 29, 23, 43): "Left Angle Cross of Dedication 4",
+
+    (32, 42, 53, 54): "Left Angle Cross of Migration 1",
+    (54, 53, 42, 32): "Left Angle Cross of Migration 2",
+    (53, 54, 32, 42): "Left Angle Cross of Migration 3",
+    (42, 32, 54, 53): "Left Angle Cross of Migration 4",
+
+    (38, 39, 21, 48): "Left Angle Cross of Confrontation 1",
+    (48, 21, 39, 38): "Left Angle Cross of Confrontation 2",
+    (39, 38, 48, 21): "Left Angle Cross of Confrontation 3",
+    (21, 48, 38, 39): "Left Angle Cross of Confrontation 4",
+
+    (51, 57, 54, 53): "Left Angle Cross of the Clarion 1",
+    (53, 54, 57, 51): "Left Angle Cross of the Clarion 2",
+    (57, 51, 53, 54): "Left Angle Cross of the Clarion 3",
+    (54, 53, 51, 57): "Left Angle Cross of the Clarion 4",
+
+    (63, 64, 4, 49):  "Left Angle Cross of Dominion 1",
+    (49, 4, 64, 63):  "Left Angle Cross of Dominion 2",
+    (4, 49, 63, 64):  "Left Angle Cross of Dominion 3",
+    (64, 63, 49, 4):  "Left Angle Cross of Dominion 4",
+}
+
+
+def get_incarnation_cross_name(p_sun: int, p_earth: int, d_sun: int, d_earth: int) -> str:
+    """Look up the incarnation cross name from the four gate values."""
+    key = (p_sun, p_earth, d_sun, d_earth)
+    if key in INCARNATION_CROSSES:
+        return INCARNATION_CROSSES[key]
+    # Fallback: show gate numbers
+    return f"{p_sun}/{p_earth} | {d_sun}/{d_earth}"
+
 
 # ---------- Top-level entry points ----------
 
