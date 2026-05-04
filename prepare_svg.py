@@ -188,9 +188,17 @@ COL_JSON.write_text(json.dumps(
     {str(g):{"dark":d,"light":l,"p_blue":P_BLUE,"design":D_PURP} for g,d,l in GATE_RULES}, indent=2))
 
 # ── 9. Activation CSS ─────────────────────────────────────────
-CCOL = {"Head":"#AA88EE","Ajna":"#9B59B6","Throat":"#F39C12","G":"#FFD700",
-        "Heart":"#E74C3C","Solar Plexus":"#E67E22","Spleen":"#27AE60",
-        "Sacral":"#E74C3C","Root":"#8B4513"}
+CCOL = {
+    "Head":         "#9966CC",   # violet — crown
+    "Ajna":         "#6644AA",   # indigo — third eye
+    "Throat":       "#4488CC",   # blue — throat
+    "G":            "#44AA66",   # green — heart
+    "Heart":        "#DD4444",   # red — actually will
+    "Solar Plexus": "#FF8800",   # orange — solar plexus
+    "Spleen":       "#88BB44",   # yellow-green — spleen
+    "Sacral":       "#EE6622",   # deep orange — sacral
+    "Root":         "#CC3333",   # deep red — root
+}
 
 css = ["<style id='hd-activation'>", ".gate-line{fill:#FFFFFF!important;}"]
 for g, _, _ in GATE_RULES:
