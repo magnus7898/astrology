@@ -403,7 +403,7 @@ def analyze(personality: List[Activation], design: List[Activation]) -> Dict:
     p_earth = next(a for a in personality if a.planet == "Earth")
     d_sun  = next(a for a in design if a.planet == "Sun")
     d_earth = next(a for a in design if a.planet == "Earth")
-    _cross_key = f"{p_sun.gate}/{p_earth.gate} | {d_sun.gate}/{d_earth.gate}"
+    _cross_key = (p_sun.gate, p_earth.gate, d_sun.gate, d_earth.gate)
     cross = INCARNATION_CROSSES.get(_cross_key, f"{p_sun.gate}/{p_earth.gate} | {d_sun.gate}/{d_earth.gate}")
 
     return {
