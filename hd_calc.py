@@ -363,11 +363,12 @@ def analyze(personality: List[Activation], design: List[Activation]) -> Dict:
         "Reflector": "Wait a Lunar Cycle (28 days)",
     }
     not_self = {
-        "Manifestor": "Anger",
-        "Generator": "Frustration",
-        "Manifesting Generator": "Anger & Frustration",
-        "Projector": "Bitterness",
-        "Reflector": "Disappointment",
+        "Manifestor": "რისხვა",
+        "Generator": "იმედგაცრუება",
+        "Manifesting Generator": "რისხვა და იმედგაცრუება",
+        "Projector": "სიმწარე",
+        "Reflector": "იმედგაცრუება",
+    }
     }
     signature = {
         "Manifestor": "Peace",
