@@ -5,7 +5,7 @@ the Personality (birth moment) and Design (when the Sun was 88° earlier
 in ecliptic longitude — roughly 88 days before birth).
 
 Each planet's tropical longitude is mapped onto the 64-gate mandala that
-starts at Gate 41 at 2°00' Aquarius (302° tropical). Each gate spans 5.625°
+starts at Gate 41 at 2°00' Aquarius (302° tropical). Each gate spans 5.625° 
 and is subdivided into line (×6), color (×6), tone (×6), base (×5).
 """
 
