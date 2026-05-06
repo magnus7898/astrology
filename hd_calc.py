@@ -891,6 +891,7 @@ def calculate_chart_from_coords(
             "utc_time": utc_dt.strftime("%Y-%m-%d %H:%M UTC"),
         },
         "sun_gift": GATE_GIFTS.get(next(a for a in personality if a.planet == "Sun").gate, ""),
+        "digestion": DIGESTION.get(next(a for a in personality if a.planet == "Sun").color, ""),
         "design_time_utc": "%04d-%02d-%02d %02d:%02d UTC" % (
             design_utc[0], design_utc[1], design_utc[2],
             int(design_utc[3]), int((design_utc[3] % 1) * 60),
