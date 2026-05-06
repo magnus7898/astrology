@@ -293,6 +293,27 @@ GATE_GIFTS = {
     60:"რეალიზმი", 61:"შთაგონება", 62:"სიზუსტე", 63:"კვლევა", 64:"წარმოსახვა",
 }
 
+def get_definition(defined_centers: set, adj: Dict) -> str:
+    if not defined_centers:
+        return "No Definition"
+    unvisited = set(defined_centers)
+    groups = []
+    while unvisited:
+        start = next(iter(unvisited))
+        group = set()
+        stack = [start]
+        while stack:
+            n = stack.pop()
+            if n in unvisited:
+                unvisited.remove(n)
+                group.add(n)
+                for m in adj.get(n, set()):
+                    if m in unvisited:
+                        stack.append(m)
+        groups.append(group)
+    return {1:"Single Definition", 2:"Split Definition",
+            3:"Triple Split Definition", 4:"Quadruple Split Definition"}.get(len(groups), f"{len(groups)}-way Split")
+
 
 # ---------- Body graph / synthesis ----------
 def analyze(personality: List[Activation], design: List[Activation]) -> Dict:
