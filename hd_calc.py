@@ -432,6 +432,7 @@ def analyze(personality: List[Activation], design: List[Activation]) -> Dict:
         "signature": signature[hd_type],
         "authority": authority,
         "profile": profile,
+        "definition": get_definition(defined_centers, adj),
         "incarnation_cross": cross,
     }
 
