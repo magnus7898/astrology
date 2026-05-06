@@ -457,9 +457,7 @@ def analyze(personality: List[Activation], design: List[Activation]) -> Dict:
     d_sun  = next(a for a in design if a.planet == "Sun")
     d_earth = next(a for a in design if a.planet == "Earth")
     cross = get_incarnation_cross_name(p_sun.gate, p_earth.gate, d_sun.gate, d_earth.gate, profile)
-    p_sun = next(a for a in personality if a.planet == "Sun")
-    arrow = "left" if p_sun.tone <= 3 else "right"
-    digestion = DIGESTION.get((p_sun.color, arrow), "")
+
 
     return {
         "gate_sources": gate_sources,             # {gate: {p,d}}
@@ -899,6 +897,9 @@ def calculate_chart_from_coords(
     d_gate_set = {a.gate for a in design}
     integration = integration_condition(p_gate_set, d_gate_set)
 
+    p_sun = next(a for a in personality if a.planet == "Sun")
+    p_sun_arrow = "left" if p_sun.tone <= 3 else "right"
+
     return {
         "input": {
             "date": date_str, "time": time_str,
@@ -909,6 +910,7 @@ def calculate_chart_from_coords(
             "utc_time": utc_dt.strftime("%Y-%m-%d %H:%M UTC"),
         },
         "sun_gift": GATE_GIFTS.get(next(a for a in personality if a.planet == "Sun").gate, ""),
+        "digestion": DIGESTION.get((p_sun.color, p_sun_arrow), ""),
         "design_time_utc": "%04d-%02d-%02d %02d:%02d UTC" % (
             design_utc[0], design_utc[1], design_utc[2],
             int(design_utc[3]), int((design_utc[3] % 1) * 60),
