@@ -906,7 +906,9 @@ def calculate_chart_from_coords(
             "utc_time": utc_dt.strftime("%Y-%m-%d %H:%M UTC"),
         },
         "sun_gift": GATE_GIFTS.get(next(a for a in personality if a.planet == "Sun").gate, ""),
-        "digestion": DIGESTION.get(next(a for a in personality if a.planet == "Sun").line, ""),
+        p_sun = next(a for a in personality if a.planet == "Sun")
+        arrow = "left" if p_sun.tone <= 3 else "right"
+        digestion = DIGESTION.get((p_sun.color, arrow), "")
         "design_time_utc": "%04d-%02d-%02d %02d:%02d UTC" % (
             design_utc[0], design_utc[1], design_utc[2],
             int(design_utc[3]), int((design_utc[3] % 1) * 60),
