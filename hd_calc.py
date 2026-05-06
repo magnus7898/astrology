@@ -370,11 +370,11 @@ def analyze(personality: List[Activation], design: List[Activation]) -> Dict:
         "Reflector": "იმედგაცრუება",
     }
     signature = {
-        "Manifestor": "Peace",
-        "Generator": "Satisfaction",
-        "Manifesting Generator": "Peace & Satisfaction",
-        "Projector": "Success",
-        "Reflector": "Surprise",
+        "Manifestor": "სიმშვიდე",
+        "Generator": "კმაყოფილება",
+        "Manifesting Generator": "სიმშვიდე და კმაყოფილება",
+        "Projector": "წარმატება",
+        "Reflector": "სასიამოვნო გაკვირვება",
     }
 
     # ---------- Authority ----------
