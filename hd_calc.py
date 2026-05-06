@@ -294,12 +294,18 @@ GATE_GIFTS = {
 }
 
 DIGESTION = {
-    1: "Appetite (Consecutive)",
-    2: "Taste (Peripheral)",
-    3: "Thirst (Adjacent)",
-    4: "Touch (Separate)",
-    5: "Sound (Connected)",
-    6: "Light (Cyclical)",
+    (1, "left"):  "Appetite — Consecutive",
+    (1, "right"): "Appetite — Alternating",
+    (2, "left"):  "Taste — Closed",
+    (2, "right"): "Taste — Open",
+    (3, "left"):  "Thirst — Hot",
+    (3, "right"): "Thirst — Cold",
+    (4, "left"):  "Touch — Calm",
+    (4, "right"): "Touch — Nervous",
+    (5, "left"):  "Sound — High",
+    (5, "right"): "Sound — Low",
+    (6, "left"):  "Light — Direct",
+    (6, "right"): "Light — Indirect",
 }
 
 def get_definition(defined_centers: set, adj: Dict) -> str:
