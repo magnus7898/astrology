@@ -927,7 +927,7 @@ def calculate_chart_from_coords(
 
     d_north_node = next(a for a in design if a.planet == "North Node")
     d_nn_arrow = "left" if d_north_node.line >= 4 else "right"
-    environment = ENVIRONMENT.get((d_north_node.tone, d_nn_arrow), "")
+    environment = ENVIRONMENT.get((d_north_node.color, d_nn_arrow), "")
 
     sense = SENSE.get(d_sun.tone, "")
 
