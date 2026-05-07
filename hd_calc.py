@@ -317,6 +317,21 @@ SENSE = {
     6: "შეხება",
 }
 
+ENVIRONMENT = {
+    (1, "right"): "Caves — Selective",
+    (1, "left"):  "Caves — Blending",
+    (2, "right"): "Markets — Internal",
+    (2, "left"):  "Markets — External",
+    (3, "right"): "Kitchens — Taste",
+    (3, "left"):  "Kitchens — Touch",
+    (4, "right"): "Mountains — Low",
+    (4, "left"):  "Mountains — High",
+    (5, "right"): "Valleys — Natural",
+    (5, "left"):  "Valleys — Artificial",
+    (6, "right"): "Shores — Focused",
+    (6, "left"):  "Shores — Diffused",
+}
+
 def get_definition(defined_centers: set, adj: Dict) -> str:
     if not defined_centers:
         return "No Definition"
@@ -910,7 +925,13 @@ def calculate_chart_from_coords(
     d_sun_arrow = "left" if d_sun.line >= 4 else "right"
     digestion = DIGESTION.get((d_sun.color, d_sun_arrow), "")
 
+    d_north_node = next(a for a in design if a.planet == "North Node")
+    d_nn_arrow = "left" if d_north_node.line >= 4 else "right"
+    environment = ENVIRONMENT.get((d_north_node.tone, d_nn_arrow), "")
+
     sense = SENSE.get(d_sun.tone, "")
+
+    
 
     return {
         "input": {
@@ -924,6 +945,7 @@ def calculate_chart_from_coords(
         "sun_gift": GATE_GIFTS.get(next(a for a in personality if a.planet == "Sun").gate, ""),
         "digestion": digestion,
         "sense": sense,
+        "environment": environment,
         "design_time_utc": "%04d-%02d-%02d %02d:%02d UTC" % (
             design_utc[0], design_utc[1], design_utc[2],
             int(design_utc[3]), int((design_utc[3] % 1) * 60),
