@@ -923,7 +923,7 @@ def calculate_chart_from_coords(
         },
         "sun_gift": GATE_GIFTS.get(next(a for a in personality if a.planet == "Sun").gate, ""),
         "digestion": digestion,
-        "sense": sense
+        "sense": sense,
         "design_time_utc": "%04d-%02d-%02d %02d:%02d UTC" % (
             design_utc[0], design_utc[1], design_utc[2],
             int(design_utc[3]), int((design_utc[3] % 1) * 60),
