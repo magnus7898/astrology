@@ -897,8 +897,8 @@ def calculate_chart_from_coords(
     d_gate_set = {a.gate for a in design}
     integration = integration_condition(p_gate_set, d_gate_set)
 
-    p_sun = next(a for a in personality if a.planet == "Sun")
-    p_sun_arrow = "left" if p_sun.line >= 4 else "right"
+    d_sun = next(a for a in design if a.planet == "Sun")
+    d_sun_arrow = "left" if d_sun.line >= 4 else "right"
 
     return {
         "input": {
@@ -910,7 +910,7 @@ def calculate_chart_from_coords(
             "utc_time": utc_dt.strftime("%Y-%m-%d %H:%M UTC"),
         },
         "sun_gift": GATE_GIFTS.get(next(a for a in personality if a.planet == "Sun").gate, ""),
-        digestion = DIGESTION.get((p_sun.color, p_sun_arrow), "")
+        digestion = DIGESTION.get((d_sun.color, d_sun_arrow), "")
         "design_time_utc": "%04d-%02d-%02d %02d:%02d UTC" % (
             design_utc[0], design_utc[1], design_utc[2],
             int(design_utc[3]), int((design_utc[3] % 1) * 60),
