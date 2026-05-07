@@ -308,6 +308,14 @@ DIGESTION = {
     (6, "right"): "Light — Indirect",
 }
 
+SENSE = {
+    1: "ყნოსვა",
+    2: "გემო", 
+    3: "გარეგანი ხედვა",
+    4: "შინაგანი ხეშეხება",
+    6: "ინტუიცია / ხმა",
+}
+
 def get_definition(defined_centers: set, adj: Dict) -> str:
     if not defined_centers:
         return "No Definition"
@@ -901,6 +909,8 @@ def calculate_chart_from_coords(
     d_sun_arrow = "left" if d_sun.line >= 4 else "right"
     digestion = DIGESTION.get((d_sun.color, d_sun_arrow), "")
 
+    sense = SENSE.get(d_sun.tone, "")
+
     return {
         "input": {
             "date": date_str, "time": time_str,
@@ -912,6 +922,7 @@ def calculate_chart_from_coords(
         },
         "sun_gift": GATE_GIFTS.get(next(a for a in personality if a.planet == "Sun").gate, ""),
         "digestion": digestion,
+        "sense": sense
         "design_time_utc": "%04d-%02d-%02d %02d:%02d UTC" % (
             design_utc[0], design_utc[1], design_utc[2],
             int(design_utc[3]), int((design_utc[3] % 1) * 60),
