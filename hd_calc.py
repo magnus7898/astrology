@@ -925,7 +925,7 @@ def calculate_chart_from_coords(
     d_sun_arrow = "left" if d_sun.line >= 4 else "right"
     digestion = DIGESTION.get((d_sun.color, d_sun_arrow), "")
 
-    d_south_node = next(a for a in design if a.planet == "Sorth Node")
+    d_south_node = next(a for a in design if a.planet == "South Node")
     d_sn_arrow = "left" if d_south_node.line >= 4 else "right"
     environment = ENVIRONMENT.get((d_south_node.tone, d_sn_arrow), "")
 
