@@ -295,20 +295,19 @@ GATE_GIFTS = {
 
 
 DIGESTION = {
-    (1, "left"):  "Appetite — Consecutive",
-    (1, "right"): "Appetite — Alternating",
-    (2, "left"):  "Taste — Closed",
-    (2, "right"): "Taste — Open",
-    (3, "left"):  "Thirst — Hot",
-    (3, "right"): "Thirst — Cold",
-    (4, "left"):  "Touch — Calm",
-    (4, "right"): "Touch — Nervous",
-    (5, "left"):  "Sound — High",
-    (5, "right"): "Sound — Low",
-    (6, "left"):  "Light — Direct",
-    (6, "right"): "Light — Indirect",
+    (1, "right"): "მადა — თანმიმდევრული",
+    (1, "left"):  "მადა — მონაცვლეობითი",
+    (2, "right"): "გემო — დახურული",
+    (2, "left"):  "გემო — ღია",
+    (3, "right"): "წყურვილი — ცხელი",
+    (3, "left"):  "წყურვილი — ცივი",
+    (4, "right"): "შეხება — მშვიდი",
+    (4, "left"):  "შეხება — ნერვული",
+    (5, "right"): "ხმა — მაღალი",
+    (5, "left"):  "ხმა — დაბალი",
+    (6, "right"): "სინათლე — პირდაპირი",
+    (6, "left"):  "სინათლე — ირიბი",
 }
-
 SENSE = {
     1: "ყნოსვა",
     2: "გემო", 
@@ -319,49 +318,47 @@ SENSE = {
 }
 
 ENVIRONMENT = {
-    (1, "right"): "Caves — Selective",
-    (1, "left"):  "Caves — Blending",
-    (2, "right"): "Markets — Internal",
-    (2, "left"):  "Markets — External",
-    (3, "right"): "Kitchens — Taste",
-    (3, "left"):  "Kitchens — Touch",
-    (4, "right"): "Mountains — Low",
-    (4, "left"):  "Mountains — High",
-    (5, "right"): "Valleys — Natural",
-    (5, "left"):  "Valleys — Artificial",
-    (6, "right"): "Shores — Focused",
-    (6, "left"):  "Shores — Diffused",
+    (1, "right"): "მღვიმეები — შერჩევითი",
+    (1, "left"):  "მღვიმეები — შერწყმული",
+    (2, "right"): "ბაზრები — შიდა",
+    (2, "left"):  "ბაზრები — გარე",
+    (3, "right"): "სამზარეულო — გემო",
+    (3, "left"):  "სამზარეულო — შეხება",
+    (4, "right"): "მთები — დაბალი",
+    (4, "left"):  "მთები — მაღალი",
+    (5, "right"): "ველები — ბუნებრივი",
+    (5, "left"):  "ველები — ხელოვნური",
+    (6, "right"): "სანაპირო — ფოკუსირებული",
+    (6, "left"):  "სანაპირო — გაფანტული",
 }
-
 
 MOTIVATION = {
-    (1, "right"): "Fear — Probability",
-    (1, "left"):  "Fear — Acceptance",
-    (2, "right"): "Hope — Possibility",
-    (2, "left"):  "Hope — Framing",
-    (3, "right"): "Desire — Wish",
-    (3, "left"):  "Desire — Aspiration",
-    (4, "right"): "Need — Passion",
-    (4, "left"):  "Need — Empathy",
-    (5, "right"): "Guilt — Innocence",
-    (5, "left"):  "Guilt — Responsibility",
-    (6, "right"): "Innocence — Wonder",
-    (6, "left"):  "Innocence — Knowing",
+    (1, "right"): "შიში — კონდიციონირება",
+    (1, "left"):  "შიში — სურვილი",
+    (2, "right"): "იმედი — კონდიციონირება",
+    (2, "left"):  "იმედი — სურვილი",
+    (3, "right"): "სურვილი — კონდიციონირება",
+    (3, "left"):  "სურვილი — სურვილი",
+    (4, "right"): "საჭიროება — კონდიციონირება",
+    (4, "left"):  "საჭიროება — სურვილი",
+    (5, "right"): "დანაშაული — კონდიციონირება",
+    (5, "left"):  "დანაშაული — სურვილი",
+    (6, "right"): "უდანაშაულობა — კონდიციონირება",
+    (6, "left"):  "უდანაშაულობა — სურვილი",
 }
-
 PERSPECTIVE = {
-    (1, "right"): "Survival — Threat",
-    (1, "left"):  "Survival — Comfort",
-    (2, "right"): "Morality — Values",
-    (2, "left"):  "Morality — Harmony",
-    (3, "right"): "Sensitivity — Feeling",
-    (3, "left"):  "Sensitivity — Touch",
-    (4, "right"): "Desire — Imagination",
-    (4, "left"):  "Desire — Satisfaction",
-    (5, "right"): "Wishes — Wanting",
-    (5, "left"):  "Wishes — Dreaming",
-    (6, "right"): "Determination — Victory",
-    (6, "left"):  "Determination — Mastery",
+    (1, "right"): "გადარჩენა — ფოკუსირებული",
+    (1, "left"):  "გადარჩენა — პერიფერიული",
+    (2, "right"): "მორალი — ფოკუსირებული",
+    (2, "left"):  "მორალი — პერიფერიული",
+    (3, "right"): "სენსიტიურობა — ფოკუსირებული",
+    (3, "left"):  "სენსიტიურობა — პერიფერიული",
+    (4, "right"): "სურვილი — ფოკუსირებული",
+    (4, "left"):  "სურვილი — პერიფერიული",
+    (5, "right"): "სურვილები — ფოკუსირებული",
+    (5, "left"):  "სურვილები — პერიფერიული",
+    (6, "right"): "გადაწყვეტილება — ფოკუსირებული",
+    (6, "left"):  "გადაწყვეტილება — პერიფერიული",
 }
 
 def get_definition(defined_centers: set, adj: Dict) -> str:
@@ -488,19 +485,19 @@ def analyze(personality: List[Activation], design: List[Activation]) -> Dict:
 
     # ---------- Authority ----------
     if "Solar Plexus" in defined_centers:
-        authority = "Emotional (Solar Plexus)"
+        authority = "ემოციური (მზის წნული)"
     elif sacral_def:
-        authority = "Sacral"
+        authority = "საკრალური"
     elif "Spleen" in defined_centers:
-        authority = "Splenic"
+        authority = "სპლენური (ელენთა)"
     elif "Heart" in defined_centers:
-        authority = "Ego (Heart)"
+        authority = "ეგო (გული)"
     elif "G" in defined_centers:
-        authority = "Self-Projected (G)"
+        authority = "თვით-პროექცია (G)"
     elif hd_type == "Reflector":
-        authority = "Lunar"
+        authority = "მთვარე"
     else:
-        authority = "Mental / Environmental (no inner authority)"
+        authority = "მენტალური / გარემო"
 
     # ---------- Profile = Personality Sun line / Design Sun line ----------
     p_sun_line = next(a.line for a in personality if a.planet == "Sun")
@@ -919,6 +916,8 @@ def get_incarnation_cross_name(p_sun: int, p_earth: int, d_sun: int, d_earth: in
     else:
         return _CROSS_RIGHT_ANGLE.get(key, f"{p_sun}/{p_earth} | {d_sun}/{d_earth}")
 # ---------- Top-level entry points ----------
+
+
 
 def calculate_chart_from_coords(
     date_str: str, time_str: str,
