@@ -334,7 +334,35 @@ ENVIRONMENT = {
 }
 
 
+MOTIVATION = {
+    (1, "right"): "Fear — Probability",
+    (1, "left"):  "Fear — Acceptance",
+    (2, "right"): "Hope — Possibility",
+    (2, "left"):  "Hope — Framing",
+    (3, "right"): "Desire — Wish",
+    (3, "left"):  "Desire — Aspiration",
+    (4, "right"): "Need — Passion",
+    (4, "left"):  "Need — Empathy",
+    (5, "right"): "Guilt — Innocence",
+    (5, "left"):  "Guilt — Responsibility",
+    (6, "right"): "Innocence — Wonder",
+    (6, "left"):  "Innocence — Knowing",
+}
 
+PERSPECTIVE = {
+    (1, "right"): "Survival — Threat",
+    (1, "left"):  "Survival — Comfort",
+    (2, "right"): "Morality — Values",
+    (2, "left"):  "Morality — Harmony",
+    (3, "right"): "Sensitivity — Feeling",
+    (3, "left"):  "Sensitivity — Touch",
+    (4, "right"): "Desire — Imagination",
+    (4, "left"):  "Desire — Satisfaction",
+    (5, "right"): "Wishes — Wanting",
+    (5, "left"):  "Wishes — Dreaming",
+    (6, "right"): "Determination — Victory",
+    (6, "left"):  "Determination — Mastery",
+}
 
 def get_definition(defined_centers: set, adj: Dict) -> str:
     if not defined_centers:
@@ -933,6 +961,15 @@ def calculate_chart_from_coords(
     d_nn_arrow = "left" if d_south_node.line >= 4 else "right"
     environment = ENVIRONMENT.get((d_south_node.color, d_nn_arrow), "")
 
+    p_sun = next(a for a in personality if a.planet == "Sun")
+    p_north_node = next(a for a in personality if a.planet == "North Node")
+    
+    p_sun_arrow = "left" if p_sun.line >= 4 else "right"
+    p_nn_arrow = "left" if p_north_node.line >= 4 else "right"
+    
+    motivation = MOTIVATION.get((p_sun.color, p_sun_arrow), "")
+    perspective = PERSPECTIVE.get((p_north_node.tone, p_nn_arrow), "")
+
     sense = SENSE.get(d_sun.tone, "")
 
     
@@ -950,6 +987,8 @@ def calculate_chart_from_coords(
         "digestion": digestion,
         "sense": sense,
         "environment": environment,
+        "motivation": motivation
+        "perspective": perspective
         "design_time_utc": "%04d-%02d-%02d %02d:%02d UTC" % (
             design_utc[0], design_utc[1], design_utc[2],
             int(design_utc[3]), int((design_utc[3] % 1) * 60),
