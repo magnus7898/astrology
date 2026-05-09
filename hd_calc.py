@@ -970,6 +970,10 @@ def calculate_chart_from_coords(
     motivation = MOTIVATION.get((p_sun.color, p_sun_arrow), "")
     perspective = PERSPECTIVE.get((p_north_node.tone, p_nn_arrow), "")
 
+    p_sun_gate = next(a for a in personality if a.planet == "Sun").gate
+    all_active_gates = {a.gate for a in personality} | {a.gate for a in design}
+    other_gifts = [GATE_GIFTS[g] for g in sorted(all_active_gates) if g != p_sun_gate and g in GATE_GIFTS]
+
     sense = SENSE.get(d_sun.tone, "")
 
     
@@ -989,6 +993,7 @@ def calculate_chart_from_coords(
         "environment": environment,
         "motivation": motivation,
         "perspective": perspective,
+        "other_gifts": other_gifts,
         "design_time_utc": "%04d-%02d-%02d %02d:%02d UTC" % (
             design_utc[0], design_utc[1], design_utc[2],
             int(design_utc[3]), int((design_utc[3] % 1) * 60),
