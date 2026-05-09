@@ -293,6 +293,7 @@ GATE_GIFTS = {
     60:"რეალიზმი", 61:"შთაგონება", 62:"სიზუსტე", 63:"კვლევა", 64:"წარმოსახვა",
 }
 
+
 DIGESTION = {
     (1, "left"):  "Appetite — Consecutive",
     (1, "right"): "Appetite — Alternating",
@@ -331,6 +332,9 @@ ENVIRONMENT = {
     (6, "right"): "Shores — Focused",
     (6, "left"):  "Shores — Diffused",
 }
+
+
+
 
 def get_definition(defined_centers: set, adj: Dict) -> str:
     if not defined_centers:
