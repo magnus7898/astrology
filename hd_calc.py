@@ -987,8 +987,8 @@ def calculate_chart_from_coords(
         "digestion": digestion,
         "sense": sense,
         "environment": environment,
-        "motivation": motivation
-        "perspective": perspective
+        "motivation": motivation,
+        "perspective": perspective,
         "design_time_utc": "%04d-%02d-%02d %02d:%02d UTC" % (
             design_utc[0], design_utc[1], design_utc[2],
             int(design_utc[3]), int((design_utc[3] % 1) * 60),
