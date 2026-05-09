@@ -964,8 +964,8 @@ def calculate_chart_from_coords(
     p_sun = next(a for a in personality if a.planet == "Sun")
     p_north_node = next(a for a in personality if a.planet == "North Node")
     
-    p_sun_arrow = "left" if p_sun.line >= 4 else "right"
-    p_nn_arrow = "left" if p_north_node.line >= 4 else "right"
+    p_sun_arrow = "left" if p_sun.color >= 4 else "right"
+    p_nn_arrow = "left" if p_north_node.tone >= 4 else "right"
     
     motivation = MOTIVATION.get((p_sun.color, p_sun_arrow), "")
     perspective = PERSPECTIVE.get((p_north_node.tone, p_nn_arrow), "")
