@@ -363,7 +363,7 @@ PERSPECTIVE = {
 
 def get_definition(defined_centers: set, adj: Dict) -> str:
     if not defined_centers:
-        return "No Definition"
+        return "განსაზღვრება არ არის"
     unvisited = set(defined_centers)
     groups = []
     while unvisited:
@@ -379,8 +379,12 @@ def get_definition(defined_centers: set, adj: Dict) -> str:
                     if m in unvisited:
                         stack.append(m)
         groups.append(group)
-    return {1:"Single Definition", 2:"Split Definition",
-            3:"Triple Split Definition", 4:"Quadruple Split Definition"}.get(len(groups), f"{len(groups)}-way Split")
+    return {
+        1: "ერთი განსაზღვრება",
+        2: "გაყოფილი განსაზღვრება",
+        3: "სამმაგი გაყოფა",
+        4: "ოთხმაგი გაყოფა"
+    }.get(len(groups), f"{len(groups)}-ჯერადი გაყოფა")
 
 
 # ---------- Body graph / synthesis ----------
