@@ -929,11 +929,15 @@ _CROSS_LEFT_ANGLE = {
 def get_incarnation_cross_name(p_sun, p_earth, d_sun, d_earth, profile=""):
     key = (p_sun, p_earth, d_sun, d_earth)
     if profile in {"4/1", "4/2"}:
-        return _CROSS_JUXTAPOSITION.get(key, f"{p_sun}/{p_earth} | {d_sun}/{d_earth}")
+        name = _CROSS_JUXTAPOSITION.get(key, "")
     elif profile.split("/")[0] in {"5", "6"}:
-        return _CROSS_LEFT_ANGLE.get(key, f"{p_sun}/{p_earth} | {d_sun}/{d_earth}")
+        name = _CROSS_LEFT_ANGLE.get(key, "")
     else:
-        return _CROSS_RIGHT_ANGLE.get(key, f"{p_sun}/{p_earth} | {d_sun}/{d_earth}")
+        name = _CROSS_RIGHT_ANGLE.get(key, "")
+    
+    if name:
+        return f"{p_sun}/{p_earth} | {d_sun}/{d_earth} — {name}"
+    return f"{p_sun}/{p_earth} | {d_sun}/{d_earth}"
 # ---------- Top-level entry points ----------
 
 
