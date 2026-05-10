@@ -994,7 +994,11 @@ def calculate_chart_from_coords(
 
     p_sun_gate = next(a for a in personality if a.planet == "Sun").gate
     all_active_gates = {a.gate for a in personality} | {a.gate for a in design}
-    other_gifts = [GATE_GIFTS[g] for g in sorted(all_active_gates) if g != p_sun_gate and g in GATE_GIFTS]
+    other_gifts = [
+        f"{g} — {GATE_GIFTS[g]}" 
+        for g in sorted(all_active_gates) 
+        if g != p_sun_gate and g in GATE_GIFTS
+    ]
 
 
 
@@ -1011,7 +1015,7 @@ def calculate_chart_from_coords(
             "tz": tz_name,
             "utc_time": utc_dt.strftime("%Y-%m-%d %H:%M UTC"),
         },
-        "sun_gift": GATE_GIFTS.get(next(a for a in personality if a.planet == "Sun").gate, ""),
+        "sun_gift": f"{p_sun_gate} — {GATE_GIFTS.get(p_sun_gate, '')}",
         "digestion": digestion,
         "sense": sense,
         "environment": environment,
