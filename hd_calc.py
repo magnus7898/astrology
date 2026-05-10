@@ -361,6 +361,22 @@ PERSPECTIVE = {
     (6, "left"):  "გადაწყვეტილება — პერიფერიული",
 }
 
+PROFILE_NAMES = {
+    "1/3": "1/3 — ცოდნისა და სიმართლის დამამკვიდრებელი",
+    "1/4": "1/4 — ყოვლისმცოდნე მასწავლებელი",
+    "2/4": "2/4 — ადვილი გენიოსი",
+    "2/5": "2/5 — უნებლიე გმირი",
+    "3/5": "3/5 — ცხოვრების დიდი ექსპერიმენტატორი",
+    "3/6": "3/6 — ცოცხალი კონტრასტი",
+    "4/1": "4/1 — მეგობრობის საფუძველი",
+    "4/2": "4/2 — მეგობრობის საფუძველი",
+    "4/6": "4/6 — სამეფო ავტორიტეტი",
+    "5/1": "5/1 — გამოწვევების გადამჭრელი",
+    "5/2": "5/2 — თვითმოტივირებული გმირი",
+    "6/2": "6/2 — სანიმუშო ადამიანი",
+    "6/3": "6/3 — პასუხისმგებელი მოგზაური",
+}
+
 def get_definition(defined_centers: set, adj: Dict) -> str:
     if not defined_centers:
         return "განსაზღვრება არ არის"
@@ -975,6 +991,9 @@ def calculate_chart_from_coords(
     p_sun_gate = next(a for a in personality if a.planet == "Sun").gate
     all_active_gates = {a.gate for a in personality} | {a.gate for a in design}
     other_gifts = [GATE_GIFTS[g] for g in sorted(all_active_gates) if g != p_sun_gate and g in GATE_GIFTS]
+
+    profile_key = f"{p_sun_line}/{d_sun_line}"
+    profile = PROFILE_NAMES.get(profile_key, profile_key)
 
     sense = SENSE.get(d_sun.tone, "")
 
