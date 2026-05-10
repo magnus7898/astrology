@@ -521,7 +521,8 @@ def analyze(personality: List[Activation], design: List[Activation]) -> Dict:
     # ---------- Profile = Personality Sun line / Design Sun line ----------
     p_sun_line = next(a.line for a in personality if a.planet == "Sun")
     d_sun_line = next(a.line for a in design if a.planet == "Sun")
-    profile = f"{p_sun_line}/{d_sun_line}"
+    profile_key = f"{p_sun_line}/{d_sun_line}"
+    profile = PROFILE_NAMES.get(profile_key, profile_key)
 
     # ---------- Incarnation Cross ----------
     p_sun  = next(a for a in personality if a.planet == "Sun")
@@ -992,8 +993,7 @@ def calculate_chart_from_coords(
     all_active_gates = {a.gate for a in personality} | {a.gate for a in design}
     other_gifts = [GATE_GIFTS[g] for g in sorted(all_active_gates) if g != p_sun_gate and g in GATE_GIFTS]
 
-    profile_key = f"{p_sun_line}/{d_sun_line}"
-    profile = PROFILE_NAMES.get(profile_key, profile_key)
+
 
     sense = SENSE.get(d_sun.tone, "")
 
