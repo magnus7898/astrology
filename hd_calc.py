@@ -494,7 +494,7 @@ def analyze(personality: List[Activation], design: List[Activation]) -> Dict:
         authority = "ეგო (გული)"
     elif "G" in defined_centers:
         authority = "თვით-პროექცია (G)"
-    elif hd_type == "Reflector":
+    elif hd_type == "რეფლექტორი/ამრეკლი":
         authority = "მთვარე"
     else:
         authority = "მენტალური / გარემო"
