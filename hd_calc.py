@@ -380,10 +380,9 @@ def get_definition(defined_centers: set, adj: Dict) -> str:
                         stack.append(m)
         groups.append(group)
     return {
-        1: "ერთი განსაზღვრება",
+        1: "ერთი მთლიანი განსაზღვრება",
         2: "გაყოფილი განსაზღვრება",
-        3: "სამმაგი გაყოფა",
-        4: "ოთხმაგი გაყოფა"
+        3: "სამად გაყოფილი განსაზღვრება"
     }.get(len(groups), f"{len(groups)}-ჯერადი გაყოფა")
 
 
