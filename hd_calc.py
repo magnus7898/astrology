@@ -926,12 +926,11 @@ _CROSS_LEFT_ANGLE = {
     (63, 64, 26, 45): "სამფლობელოს მარცხენა კუთხის ჯვარი",
     (64, 63, 45, 26): "სამფლობელოს მარცხენა კუთხის ჯვარი 2",
 }
-def get_incarnation_cross_name(p_sun: int, p_earth: int, d_sun: int, d_earth: int, profile: str = "") -> str:
-    """Return the full incarnation cross name based on gates and profile."""
+def get_incarnation_cross_name(p_sun, p_earth, d_sun, d_earth, profile=""):
     key = (p_sun, p_earth, d_sun, d_earth)
-    if profile in {"4/1"}:
+    if profile in {"4/1", "4/2"}:
         return _CROSS_JUXTAPOSITION.get(key, f"{p_sun}/{p_earth} | {d_sun}/{d_earth}")
-    elif profile in {"5/1", "5/2", "6/2", "6/3"}:
+    elif profile.split("/")[0] in {"5", "6"}:
         return _CROSS_LEFT_ANGLE.get(key, f"{p_sun}/{p_earth} | {d_sun}/{d_earth}")
     else:
         return _CROSS_RIGHT_ANGLE.get(key, f"{p_sun}/{p_earth} | {d_sun}/{d_earth}")
