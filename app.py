@@ -345,10 +345,18 @@ def geocode():
             return jsonify({'error': 'City name is empty'}), 400
 
         # Shared cache (same as hd_calc._CITY_CACHE — import it)
-        from hd_calc import _CITY_CACHE, _tf as hd_tf
-
+        from hd_calc import _CITY_CACHE, _GEONAMES_DB, _tf as hd_tf
+        
         key = city.lower()
         city_only = key.split(",")[0].strip()
+        
+        # Check GeoNames first (200k cities)
+        for k in (key, city_only):
+            if k in _GEONAMES_DB:
+                lat, lon, display, tz = _GEONAMES_DB[k]
+                return jsonify({'lat': lat, 'lon': lon, 'tz_name': tz, 'display': display})
+        
+        # Fallback cache
         for k in (key, city_only):
             if k in _CITY_CACHE:
                 lat, lon, display, tz = _CITY_CACHE[k]
