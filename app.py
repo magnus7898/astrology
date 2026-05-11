@@ -66,6 +66,43 @@ def _ensure_hd_svg():
 
 _ensure_hd_svg()
 
+def _ensure_cities500():
+    import urllib.request, zipfile, io
+    dest = ROOT / "cities500.txt"
+    if dest.exists():
+        return
+    url = "https://download.geonames.org/export/dump/cities500.zip"
+    print("[geonames] downloading cities500.zip ...", flush=True)
+    try:
+        with urllib.request.urlopen(url, timeout=120) as r:
+            data = r.read()
+        with zipfile.ZipFile(io.BytesIO(data)) as z:
+            z.extract("cities500.txt", ROOT)
+        print(f"[geonames] saved ({dest.stat().st_size//1024//1024} MB)", flush=True)
+    except Exception as e:
+        print(f"[geonames] download failed: {e}", flush=True)
+
+_ensure_cities500()
+
+def _ensure_cities500():
+    """Download GeoNames cities500.txt if missing."""
+    import urllib.request, zipfile, io
+    dest = ROOT / "cities500.txt"
+    if dest.exists():
+        return
+    url = "https://download.geonames.org/export/dump/cities500.zip"
+    print("[geonames] downloading cities500.zip ...", flush=True)
+    try:
+        with urllib.request.urlopen(url, timeout=120) as r:
+            data = r.read()
+        with zipfile.ZipFile(io.BytesIO(data)) as z:
+            z.extract("cities500.txt", ROOT)
+        print(f"[geonames] saved ({dest.stat().st_size//1024//1024} MB)", flush=True)
+    except Exception as e:
+        print(f"[geonames] download failed: {e}", flush=True)
+
+_ensure_cities500()
+
 
 app = Flask(__name__)
 CORS(app, origins="*")
