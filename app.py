@@ -43,7 +43,7 @@ from timezonefinder import TimezoneFinder
 import pytz
 
 # HD module
-from hd_calc import calculate_chart as hd_calculate_chart
+
 
 
 # ────────────────────────────────────────────────────────────────
@@ -83,6 +83,8 @@ def _ensure_cities500():
         print(f"[geonames] download failed: {e}", flush=True)
 
 _ensure_cities500()
+
+from hd_calc import calculate_chart as hd_calculate_chart
 
 app = Flask(__name__)
 CORS(app, origins="*")
