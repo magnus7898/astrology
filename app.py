@@ -243,6 +243,10 @@ def moon_api():
         jd  = swe.julday(dt.year, dt.month, dt.day,
                          dt.hour + dt.minute/60 + dt.second/3600)
         elong    = _elongation(jd)
+        # ── ZET-style lunar day (tithi): number 1..30 + percent complete ──
+        # Additive only — does NOT affect calc_lunar_day() or any other route.
+        tithi_num = int(elong // 12) + 1
+        tithi_pct = round((elong % 12) / 12 * 100, 2)
         age_days = elong / 360 * 29.53059
         lunar    = calc_lunar_day(jd)
         illum    = round((1 - math.cos(math.radians(elong))) / 2 * 100, 1)
@@ -264,6 +268,8 @@ def moon_api():
             'emoji':            emoji,
             'lunar_day':        lunar['lunar_day'],
             'hours_to_next_nm': lunar['hours_to_next_nm'],
+            'tithi':            tithi_num,
+            'tithi_pct':        tithi_pct,
         })
     except Exception as e:
         return jsonify({'error': str(e)}), 500
