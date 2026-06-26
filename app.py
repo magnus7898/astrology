@@ -200,7 +200,10 @@ def calc_lunar_day(jd, tz_offset=0.0):
 
 def _utc_meta(date_str, time_str, tz_name):
     tz       = pytz.timezone(tz_name)
-    naive_dt = datetime.strptime(f'{date_str} {time_str}', '%Y-%m-%d %H:%M')
+    try:
+        naive_dt = datetime.strptime(f'{date_str} {time_str}', '%Y-%m-%d %H:%M:%S')
+    except ValueError:
+        naive_dt = datetime.strptime(f'{date_str} {time_str}', '%Y-%m-%d %H:%M')
     try:
         local_dt = tz.localize(naive_dt, is_dst=None)
     except Exception:
