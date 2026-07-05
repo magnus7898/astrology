@@ -250,20 +250,7 @@ GATE_GIFTS = {
     60:"რეალიზმი", 61:"შთაგონება", 62:"სიზუსტე", 63:"კვლევა", 64:"წარმოსახვა",
 }
 
-DIGESTION = {
-    (1, "right"): "მადა — თანმიმდევრული",
-    (1, "left"):  "მადა — მონაცვლეობითი",
-    (2, "right"): "გემო — დახურული",
-    (2, "left"):  "გემო — ღია",
-    (3, "right"): "წყურვილი — ცხელი",
-    (3, "left"):  "წყურვილი — ცივი",
-    (4, "right"): "შეხება — მშვიდი",
-    (4, "left"):  "შეხება — ნერვული",
-    (5, "right"): "ხმა — მაღალი",
-    (5, "left"):  "ხმა — დაბალი",
-    (6, "right"): "სინათლე — პირდაპირი",
-    (6, "left"):  "სინათლე — ირიბი",
-}
+
 
 SENSE = {
     1: "ყნოსვა",
@@ -274,51 +261,65 @@ SENSE = {
     6: "შეხება",
 }
 
+DIGESTION = {
+    (1, "left"):  "მადა — თანმიმდევრული",
+    (1, "right"): "მადა — მონაცვლეობითი",
+    (2, "left"):  "გემო — ღია",
+    (2, "right"): "გემო — დახურული",
+    (3, "left"):  "წყურვილი — ცხელი",
+    (3, "right"): "წყურვილი — ცივი",
+    (4, "left"):  "შეხება — მშვიდი",
+    (4, "right"): "შეხება — ნერვული",
+    (5, "left"):  "ხმა — მაღალი",
+    (5, "right"): "ხმა — დაბალი",
+    (6, "left"):  "სინათლე — პირდაპირი",
+    (6, "right"): "სინათლე — ირიბი",
+}
+
 ENVIRONMENT = {
-    (1, "right"): "მღვიმეები — შერჩევითი",
-    (1, "left"):  "მღვიმეები — შერწყმული",
-    (2, "right"): "ბაზრები — შიდა",
-    (2, "left"):  "ბაზრები — გარე",
-    (3, "right"): "სამზარეულო — გემო",
-    (3, "left"):  "სამზარეულო — შეხება",
-    (4, "right"): "მთები — დაბალი",
-    (4, "left"):  "მთები — მაღალი",
-    (5, "right"): "ველები — ბუნებრივი",
-    (5, "left"):  "ველები — ხელოვნური",
-    (6, "right"): "სანაპირო — ფოკუსირებული",
-    (6, "left"):  "სანაპირო — გაფანტული",
+    (1, "left"):  "მღვიმეები — შერჩევითი",
+    (1, "right"): "მღვიმეები — შერწყმული",
+    (2, "left"):  "ბაზრები — შიდა",
+    (2, "right"): "ბაზრები — გარე",
+    (3, "left"):  "სამზარეულო — ნესტიანი",
+    (3, "right"): "სამზარეულო — მშრალი",
+    (4, "left"):  "მთები — აქტიური",
+    (4, "right"): "მთები — პასიური",
+    (5, "left"):  "ველები — ვიწრო",
+    (5, "right"): "ველები — ფართო",
+    (6, "left"):  "სანაპირო — ბუნებრივი",
+    (6, "right"): "სანაპირო — ხელოვნური",
 }
 
 MOTIVATION = {
-    (1, "right"): "შიში — კონდიციონირება",
-    (1, "left"):  "შიში — სურვილი",
-    (2, "right"): "იმედი — კონდიციონირება",
-    (2, "left"):  "იმედი — სურვილი",
-    (3, "right"): "სურვილი — კონდიციონირება",
-    (3, "left"):  "სურვილი — სურვილი",
-    (4, "right"): "საჭიროება — კონდიციონირება",
-    (4, "left"):  "საჭიროება — სურვილი",
-    (5, "right"): "დანაშაული — კონდიციონირება",
-    (5, "left"):  "დანაშაული — სურვილი",
-    (6, "right"): "უდანაშაულობა — კონდიციონირება",
-    (6, "left"):  "უდანაშაულობა — სურვილი",
+    (1, "left"):  "შიში — კომუნალისტი",
+    (1, "right"): "შიში — სეპარატისტი",
+    (2, "left"):  "იმედი — თეისტი",
+    (2, "right"): "იმედი — ანტითეისტი",
+    (3, "left"):  "სურვილი — ლიდერი",
+    (3, "right"): "სურვილი — მიმდევარი",
+    (4, "left"):  "საჭიროება — ოსტატი",
+    (4, "right"): "საჭიროება — ახალბედა",
+    (5, "left"):  "დანაშაული — კონდიციონერი",
+    (5, "right"): "დანაშაული — კონდიცირებული",
+    (6, "left"):  "უდანაშაულობა — დამკვირვებელი",
+    (6, "right"): "უდანაშაულობა — დაკვირვებული",
 }
 
 PERSPECTIVE = {
-    (1, "right"): "გადარჩენა — ფოკუსირებული",
-    (1, "left"):  "გადარჩენა — პერიფერიული",
-    (2, "right"): "მორალი — ფოკუსირებული",
-    (2, "left"):  "მორალი — პერიფერიული",
-    (3, "right"): "სენსიტიურობა — ფოკუსირებული",
-    (3, "left"):  "სენსიტიურობა — პერიფერიული",
-    (4, "right"): "სურვილი — ფოკუსირებული",
-    (4, "left"):  "სურვილი — პერიფერიული",
-    (5, "right"): "სურვილები — ფოკუსირებული",
-    (5, "left"):  "სურვილები — პერიფერიული",
-    (6, "right"): "გადაწყვეტილება — ფოკუსირებული",
-    (6, "left"):  "გადაწყვეტილება — პერიფერიული",
+    (1, "left"):  "გადარჩენა — ფოკუსირებული",
+    (1, "right"): "გადარჩენა — პერიფერიული",
+    (2, "left"):  "შესაძლებლობა — ფოკუსირებული",
+    (2, "right"): "შესაძლებლობა — პერიფერიული",
+    (3, "left"):  "ძალა — ფოკუსირებული",
+    (3, "right"): "ძალა — პერიფერიული",
+    (4, "left"):  "სურვილი — ფოკუსირებული",
+    (4, "right"): "სურვილი — პერიფერიული",
+    (5, "left"):  "ალბათობა — ფოკუსირებული",
+    (5, "right"): "ალბათობა — პერიფერიული",
+    (6, "left"):  "პირადი — ფოკუსირებული",
+    (6, "right"): "პირადი — პერიფერიული",
 }
-
 PROFILE_NAMES = {
     "1/3": "1/3 — ცოდნისა და სიმართლის დამამკვიდრებელი",
     "1/4": "1/4 — ყოვლისმცოდნე მასწავლებელი",
@@ -861,22 +862,22 @@ def calculate_chart_from_coords(
     integration = integration_condition(p_gate_set, d_gate_set)
 
     # Variable calculations
+# Variable calculations (PHS): base = color, arrow = tone (1-3 left, 4-6 right)
+    def _arrow(tone: int) -> str:
+        return "left" if tone <= 3 else "right"
+
     d_sun = next(a for a in design if a.planet == "Sun")
-    d_sun_arrow = "left" if d_sun.line >= 4 else "right"
-    digestion = DIGESTION.get((d_sun.color, d_sun_arrow), "")
+    digestion = DIGESTION.get((d_sun.color, _arrow(d_sun.tone)), "")
     sense = SENSE.get(d_sun.tone, "")
 
     d_north_node = next(a for a in design if a.planet == "North Node")
-    d_nn_arrow = "left" if d_north_node.line >= 4 else "right"
-    environment = ENVIRONMENT.get((d_north_node.tone, d_nn_arrow), "")
+    environment = ENVIRONMENT.get((d_north_node.color, _arrow(d_north_node.tone)), "")
 
     p_sun = next(a for a in personality if a.planet == "Sun")
-    p_sun_arrow = "left" if p_sun.line >= 4 else "right"
-    motivation = MOTIVATION.get((p_sun.color, p_sun_arrow), "")
+    motivation = MOTIVATION.get((p_sun.color, _arrow(p_sun.tone)), "")
 
     p_north_node = next(a for a in personality if a.planet == "North Node")
-    p_nn_arrow = "left" if p_north_node.line >= 4 else "right"
-    perspective = PERSPECTIVE.get((p_north_node.tone, p_nn_arrow), "")
+    perspective = PERSPECTIVE.get((p_north_node.color, _arrow(p_north_node.tone)), "")
 
     p_sun_gate = p_sun.gate
     all_active_gates = {a.gate for a in personality} | {a.gate for a in design}
