@@ -769,7 +769,7 @@ def true_sidereal():
         for name, pid in MAIN.items():
             pos,_ = swe.calc_ut(jd, pid, FLAGS)
             trop  = pos[0]
-            con, pic = get_true_(trop, shift)
+            con, pic = get_true_constellation(trop, shift)
             span = (con['end'] - con['start']) % 360 or 360
             planets[name] = {
                 'tropical':round(trop,4),'':con['name'],
@@ -780,7 +780,7 @@ def true_sidereal():
         for name,pid in [('Chiron',swe.CHIRON),('Lilith',swe.MEAN_APOG)]:
             try:
                 pos,_ = swe.calc_ut(jd,pid,FLAGS); trop=pos[0]
-                con,pic = get_true_(trop, shift)
+                con,pic = get_true_constellation(trop, shift)
                 span=(con['end']-con['start'])%360 or 360
                 planets[name]={'tropical':round(trop,4),'':con['name'],
                     '_ka':con['ka'],'sym':con['sym'],'pos_in_con':round(pic,4),
@@ -789,7 +789,7 @@ def true_sidereal():
         for ast_name,ast_id in [('Selena',swe.AST_OFFSET+1181),('Juno',swe.AST_OFFSET+3)]:
             try:
                 pos,_ = swe.calc_ut(jd,ast_id,FLAGS); trop=pos[0]
-                con,pic = get_true_(trop, shift)
+                con,pic = get_true_constellation(trop, shift)
                 span=(con['end']-con['start'])%360 or 360
                 planets[ast_name]={'tropical':round(trop,4),'':con['name'],
                     '_ka':con['ka'],'sym':con['sym'],'pos_in_con':round(pic,4),
@@ -797,7 +797,7 @@ def true_sidereal():
             except: pass
         try:
             pos,_ = swe.calc_ut(jd,swe.MEAN_NODE,FLAGS); trop=pos[0]
-            con,pic = get_true_(trop, shift)
+            con,pic = get_true_constellation(trop, shift)
             span=(con['end']-con['start'])%360 or 360
             planets['North Node']={'tropical':round(trop,4),'':con['name'],
                 '_ka':con['ka'],'sym':con['sym'],'pos_in_con':round(pic,4),
