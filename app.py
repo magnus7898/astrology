@@ -721,9 +721,9 @@ TRUE_CONSTELLATIONS = [
     {'name':'Virgo',       'ka':'ქალწული',     'sym':'♍',  'start':174.0, 'end':217.5},
     {'name':'Libra',       'ka':'სასწორი',     'sym':'♎',  'start':217.5, 'end':241.0},
     {'name':'Scorpius',    'ka':'მორიელი',     'sym':'♏',  'start':241.0, 'end':247.5},
-    {'name':'Ophiuchus',   'ka':'გველმჭერი',  'sym':'⛎',  'start':247.5, 'end':266.5},
-    {'name':'Sagittarius', 'ka':'მშვილდოსანი', 'sym':'♐',  'start':266.5, 'end':302.0},
-    {'name':'Capricornus', 'ka':'თხის რქა',   'sym':'♑',  'start':302.0, 'end':327.0},
+    {'name':'Ophiuchus',   'ka':'გველმჭერი',  'sym':'⛎',  'start':247.5, 'end':266.5},    
+    {'name':'Sagittarius', 'ka':'მშვილდოსანი', 'sym':'♐',  'start':266.5, 'end':299.7},
+    {'name':'Capricornus', 'ka':'თხის რქა',   'sym':'♑',  'start':299.7, 'end':327.0},
     {'name':'Aquarius',    'ka':'მერწყული',    'sym':'♒',  'start':327.0, 'end':351.5},
     {'name':'Pisces',      'ka':'თევზები',     'sym':'♓',  'start':351.5, 'end':389.0},
 ]
