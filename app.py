@@ -802,7 +802,7 @@ def true_sidereal():
             planets['North Node']={'tropical':round(trop,4),'':con['name'],
                 '_ka':con['ka'],'sym':con['sym'],'pos_in_con':round(pic,4),
                 'dms':true_sid_fmtDMS(con,pic),'span':round(span,1),'pct':round(pic/span*100,1),'retrograde':True}
-            trop2=(trop+180)%360; con2,pic2=get_true_(trop2)
+            trop2=(trop+180)%360; con2,pic2=get_true_constellation(trop2)
             span2=(con2['end']-con2['start'])%360 or 360
             planets['South Node']={'tropical':round(trop2,4),'':con2['name'],
                 '_ka':con2['ka'],'sym':con2['sym'],'pos_in_con':round(pic2,4),
@@ -810,13 +810,13 @@ def true_sidereal():
         except: pass
         cusps,ascmc = swe.houses(jd,lat,lon,b'P')
         asc_trop=float(ascmc[0]); mc_trop=float(ascmc[1])
-        asc_con,asc_pic=get_true_(asc_trop)
-        mc_con,mc_pic=get_true_(mc_trop)
+        asc_con,asc_pic=get_true_constellation(asc_trop)
+        mc_con,mc_pic=get_true_constellation(mc_trop)
         for name in planets:
             planets[name]['house']=get_house(planets[name]['tropical'],cusps)
         if not time_unknown:
             try:
-                vx=float(ascmc[3]); con,pic=get_true_(vx)
+                vx=float(ascmc[3]); con,pic=get_true_constellation(vx)
                 span=(con['end']-con['start'])%360 or 360
                 planets['Vertex']={'tropical':round(vx,4),'':con['name'],
                     '_ka':con['ka'],'sym':con['sym'],'pos_in_con':round(pic,4),
