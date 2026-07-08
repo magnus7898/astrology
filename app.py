@@ -38,6 +38,14 @@ swe.set_ephe_path(EPHE_PATH)
 
 from flask import Flask, request, jsonify, render_template, send_from_directory
 from flask_cors import CORS
+
+# ── AUTH / DB / ADMIN imports ──
+from functools import wraps
+from flask_sqlalchemy import SQLAlchemy
+from werkzeug.security import generate_password_hash, check_password_hash
+from flask_jwt_extended import (JWTManager, create_access_token,
+    jwt_required, get_jwt_identity, get_jwt)
+
 from geopy.geocoders import Nominatim
 from timezonefinder import TimezoneFinder
 import pytz
@@ -88,6 +96,151 @@ from hd_calc import calculate_chart as hd_calculate_chart
 
 app = Flask(__name__)
 CORS(app, origins="*")
+
+# ═══════════════════════════════════════════════════════════════
+#  DATABASE · AUTH · ACTION LOG · ADMIN
+#  Railway: add PostgreSQL plugin (gives DATABASE_URL) and set
+#  JWT_SECRET variable. Local dev falls back to sqlite file.
+# ═══════════════════════════════════════════════════════════════
+_db_url = os.environ.get('DATABASE_URL', 'sqlite:///local.db')
+if _db_url.startswith('postgres://'):
+    _db_url = _db_url.replace('postgres://', 'postgresql://', 1)
+app.config['SQLALCHEMY_DATABASE_URI'] = _db_url
+app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
+app.config['JWT_SECRET_KEY'] = os.environ.get('JWT_SECRET', 'dev-secret-change-me')
+app.config['JWT_ACCESS_TOKEN_EXPIRES'] = False
+
+db = SQLAlchemy(app)
+jwt = JWTManager(app)
+
+class User(db.Model):
+    id = db.Column(db.Integer, primary_key=True)
+    email = db.Column(db.String(120), unique=True, nullable=False)
+    pw_hash = db.Column(db.String(256), nullable=False)
+    name = db.Column(db.String(80), default='')
+    role = db.Column(db.String(10), default='user')          # user | admin
+    created = db.Column(db.DateTime, server_default=db.func.now())
+
+class Event(db.Model):
+    id = db.Column(db.Integer, primary_key=True)
+    user_id = db.Column(db.Integer, db.ForeignKey('user.id'), nullable=True)
+    action = db.Column(db.String(60))
+    detail = db.Column(db.JSON)
+    ip = db.Column(db.String(45))
+    created = db.Column(db.DateTime, server_default=db.func.now())
+
+class Payment(db.Model):
+    id = db.Column(db.Integer, primary_key=True)
+    user_id = db.Column(db.Integer, db.ForeignKey('user.id'))
+    order_id = db.Column(db.String(64), unique=True)
+    amount = db.Column(db.Numeric(10, 2))
+    currency = db.Column(db.String(3), default='GEL')
+    product = db.Column(db.String(60))
+    status = db.Column(db.String(20), default='created')     # created|paid|failed|refunded
+    provider_ref = db.Column(db.String(120))
+    created = db.Column(db.DateTime, server_default=db.func.now())
+
+with app.app_context():
+    try:
+        db.create_all()
+    except Exception as _e:
+        print('DB init warning:', _e)
+
+def admin_required(fn):
+    @wraps(fn)
+    @jwt_required()
+    def wrapper(*a, **k):
+        if get_jwt().get('role') != 'admin':
+            return jsonify(error='forbidden'), 403
+        return fn(*a, **k)
+    return wrapper
+
+@app.route('/api/register', methods=['POST'])
+def api_register():
+    d = request.json or {}
+    email = (d.get('email') or '').strip().lower()
+    pw = d.get('password') or ''
+    if not email or '@' not in email or len(pw) < 6:
+        return jsonify(error='ელფოსტა ან პაროლი არასწორია (პაროლი მინ. 6 სიმბოლო)'), 400
+    if User.query.filter_by(email=email).first():
+        return jsonify(error='ეს ელფოსტა უკვე რეგისტრირებულია'), 409
+    u = User(email=email, name=(d.get('name') or '').strip(),
+             pw_hash=generate_password_hash(pw))
+    db.session.add(u)
+    db.session.add(Event(user_id=None, action='register',
+                         detail={'email': email}, ip=request.remote_addr))
+    db.session.commit()
+    tok = create_access_token(identity=str(u.id), additional_claims={'role': u.role})
+    return jsonify(token=tok, name=u.name, role=u.role)
+
+@app.route('/api/login', methods=['POST'])
+def api_login():
+    d = request.json or {}
+    u = User.query.filter_by(email=(d.get('email') or '').strip().lower()).first()
+    if not u or not check_password_hash(u.pw_hash, d.get('password') or ''):
+        return jsonify(error='არასწორი ელფოსტა ან პაროლი'), 401
+    db.session.add(Event(user_id=u.id, action='login', detail=None, ip=request.remote_addr))
+    db.session.commit()
+    tok = create_access_token(identity=str(u.id), additional_claims={'role': u.role})
+    return jsonify(token=tok, name=u.name, role=u.role)
+
+@app.route('/api/log', methods=['POST'])
+@jwt_required(optional=True)
+def api_log():
+    d = request.json or {}
+    ident = get_jwt_identity()
+    db.session.add(Event(user_id=int(ident) if ident else None,
+                         action=(d.get('action') or '?')[:60],
+                         detail=d.get('detail'), ip=request.remote_addr))
+    db.session.commit()
+    return jsonify(ok=True)
+
+@app.route('/api/me')
+@jwt_required()
+def api_me():
+    u = db.session.get(User, int(get_jwt_identity()))
+    if not u:
+        return jsonify(error='not found'), 404
+    return jsonify(email=u.email, name=u.name, role=u.role, created=str(u.created))
+
+# ── ADMIN ──
+@app.route('/api/admin/stats')
+@admin_required
+def admin_stats():
+    paid = db.session.query(db.func.coalesce(db.func.sum(Payment.amount), 0))\
+        .filter_by(status='paid').scalar()
+    by_action = db.session.query(Event.action, db.func.count())\
+        .group_by(Event.action).order_by(db.func.count().desc()).all()
+    return jsonify(users=User.query.count(),
+                   events=Event.query.count(),
+                   payments=Payment.query.count(),
+                   revenue=float(paid),
+                   by_action=[{'action': a, 'n': n} for a, n in by_action])
+
+@app.route('/api/admin/events')
+@admin_required
+def admin_events():
+    q = Event.query.order_by(Event.id.desc()).limit(300).all()
+    return jsonify([{'id': e.id, 'user_id': e.user_id, 'action': e.action,
+                     'detail': e.detail, 'ip': e.ip, 't': str(e.created)} for e in q])
+
+@app.route('/api/admin/users')
+@admin_required
+def admin_users():
+    q = User.query.order_by(User.id.desc()).limit(300).all()
+    return jsonify([{'id': u.id, 'email': u.email, 'name': u.name,
+                     'role': u.role, 't': str(u.created)} for u in q])
+
+@app.route('/api/admin/payments')
+@admin_required
+def admin_payments():
+    q = Payment.query.order_by(Payment.id.desc()).limit(300).all()
+    return jsonify([{'id': p.id, 'user_id': p.user_id, 'order_id': p.order_id,
+                     'amount': float(p.amount or 0), 'currency': p.currency,
+                     'product': p.product, 'status': p.status, 't': str(p.created)} for p in q])
+# ═══════════════════════ END AUTH/ADMIN ═══════════════════════
+
+
 tf = TimezoneFinder()
 
 # ── JSON error handlers — ensure Flask never returns HTML for API errors ──
