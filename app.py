@@ -164,8 +164,10 @@ def api_register():
         return jsonify(error='ელფოსტა ან პაროლი არასწორია (პაროლი მინ. 6 სიმბოლო)'), 400
     if User.query.filter_by(email=email).first():
         return jsonify(error='ეს ელფოსტა უკვე რეგისტრირებულია'), 409
+    first = User.query.count() == 0
     u = User(email=email, name=(d.get('name') or '').strip(),
-             pw_hash=generate_password_hash(pw))
+             pw_hash=generate_password_hash(pw),
+             role='admin' if first else 'user')
     db.session.add(u)
     db.session.add(Event(user_id=None, action='register',
                          detail={'email': email}, ip=request.remote_addr))
