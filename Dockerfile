@@ -9,15 +9,7 @@ RUN apt-get update && apt-get install -y \
 
 COPY requirements.txt .
 
-RUN pip install --no-cache-dir flask flask-cors gunicorn geopy timezonefinder pytz requests
-
-# Try all possible swisseph package names
 RUN pip install --no-cache-dir -r requirements.txt
-    && python -c "import swisseph; print('pyswisseph OK as swisseph')" \
-    || pip install --no-cache-dir swisseph==2.10.3.2 \
-    || pip install --no-cache-dir astropy \
-    || echo "trying from github..." \
-    && pip install --no-cache-dir git+https://github.com/astrorigin/pyswisseph.git
 
 RUN python -c "import swisseph; print('swisseph READY')"
 
