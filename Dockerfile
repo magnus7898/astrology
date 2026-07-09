@@ -12,7 +12,7 @@ COPY requirements.txt .
 RUN pip install --no-cache-dir flask flask-cors gunicorn geopy timezonefinder pytz requests
 
 # Try all possible swisseph package names
-RUN pip install --no-cache-dir pyswisseph \
+RUN pip install --no-cache-dir -r requirements.txt
     && python -c "import swisseph; print('pyswisseph OK as swisseph')" \
     || pip install --no-cache-dir swisseph==2.10.3.2 \
     || pip install --no-cache-dir astropy \
@@ -23,4 +23,4 @@ RUN python -c "import swisseph; print('swisseph READY')"
 
 COPY . .
 
-CMD [ "sh", "-c" "gunicorn app:app --bind 0.0.0.0:$PORT --workers 1 --timeout 120"]
+CMD sh -c "gunicorn app:app --bind 0.0.0.0:$PORT --workers 1 --timeout 120"
