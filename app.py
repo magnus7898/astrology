@@ -699,6 +699,41 @@ def chart():
         'lat':lat,'lon':lon,'tz_name':tz_name
     })
 
+# ---------------------------------------------------------------
+# DOMINANTS  (Pullen / Astrolog -j influence method)
+# ---------------------------------------------------------------
+from dominants import compute_dominants
+
+@app.route('/api/dominants', methods=['POST'])
+def api_dominants():
+    """Accepts the same payload as /chart. Returns Pullen-style
+    planet & sign dominance powers/percentages (Georgian labels)."""
+    swe.set_ephe_path(EPHE_PATH)
+    d = request.json
+    year, month, day = int(d['year']), int(d['month']), int(d['day'])
+    hour = int(d.get('hour', 12)); minute = int(d.get('minute', 0))
+    second = int(d.get('second', 0))
+    lat, lon = float(d['lat']), float(d['lon'])
+    tz_name = d.get('tz_name', 'UTC')
+    jd = to_jd(year, month, day, hour, minute, second, tz_name)
+
+    ids = {'sun': swe.SUN, 'moon': swe.MOON, 'mercury': swe.MERCURY,
+           'venus': swe.VENUS, 'mars': swe.MARS, 'jupiter': swe.JUPITER,
+           'saturn': swe.SATURN, 'uranus': swe.URANUS,
+           'neptune': swe.NEPTUNE, 'pluto': swe.PLUTO,
+           'chiron': swe.CHIRON, 'node': swe.MEAN_NODE,
+           'lilith': swe.MEAN_APOG}
+    positions = {}
+    for k, pid in ids.items():
+        try:
+            positions[k] = swe.calc_ut(jd, pid)[0][0]
+        except Exception:
+            pass
+    cusps, ascmc = swe.houses(jd, lat, lon, b'P')
+    positions['asc'] = float(ascmc[0]); positions['mc'] = float(ascmc[1])
+    return jsonify(compute_dominants(positions, list(cusps[:12])))
+
+
 @app.route('/lunar', methods=['POST'])
 def lunar():
     swe.set_ephe_path(EPHE_PATH)
