@@ -6,7 +6,8 @@ Scans N years from birth for harmonious transit links among
 Chiron–Venus–Jupiter–Neptune:
   transit Chiron  -> natal Venus / Jupiter / Neptune
   transit Venus / Jupiter / Neptune -> natal Chiron
-Aspects: conjunction (0°), trine (120°), optional sextile (60°).
+Aspects: conjunction (0°), trine (120°), inconjunction/quincunx (150°),
+optional sextile (60°).
 
 Gate = day where the combined weighted score of simultaneous links
 reaches the threshold. If the natal chart is "predisposed" (harmonious
@@ -27,14 +28,17 @@ SIGNS_KA = ["ვერძი", "კურო", "ტყუპები", "კი�
             "მერწყული", "თევზები"]
 
 # transit aspect config: angle -> (weight, symbol)
-ASPECTS = {0.0: (1.0, "☌"), 120.0: (0.9, "△"), 60.0: (0.6, "⚹")}
+ASPECTS = {0.0: (1.0, "☌"), 120.0: (0.9, "△"), 150.0: (0.85, "⚻"),
+           60.0: (0.6, "⚹")}
+# tighter orb factor for minor-angle aspects
+ORB_FACTOR = {60.0: 0.75, 150.0: 0.75}
 # transit orbs per moving body (sextile uses ×0.75)
 TRANSIT_ORB = {"chiron": 2.0, "jupiter": 2.0, "neptune": 2.0, "venus": 1.5}
 # weight of the moving body itself (venus = trigger/amplifier only)
 BODY_WEIGHT = {"chiron": 1.0, "jupiter": 1.0, "neptune": 1.0, "venus": 0.5}
 
 # natal predisposition: harmonious natal aspect chiron<->venus/jupiter/neptune
-NATAL_ORB = {0.0: 6.0, 120.0: 6.0, 60.0: 4.0}
+NATAL_ORB = {0.0: 6.0, 120.0: 6.0, 150.0: 4.0, 60.0: 4.0}
 
 THRESHOLD_NORMAL = 1.5        # needs >= 2 simultaneous links
 THRESHOLD_PREDISPOSED = 0.85  # single jupiter/chiron trine or conj enough
@@ -109,7 +113,7 @@ def compute_cinderella(year, month, day, hour, minute, lat, lon,
         for tb, nb in LINKS:
             d = _sep(tpos[tb], natal[nb])
             for ang, (aw, sym) in aspects.items():
-                orb_max = TRANSIT_ORB[tb] * (0.75 if ang == 60.0 else 1.0)
+                orb_max = TRANSIT_ORB[tb] * ORB_FACTOR.get(ang, 1.0)
                 diff = abs(d - ang)
                 if diff <= orb_max:
                     w = aw * BODY_WEIGHT[tb] * (1.0 - 0.5 * diff / orb_max)
