@@ -22,8 +22,15 @@ OBJ_INF = {"sun": 30, "moon": 25, "mercury": 10, "venus": 10, "mars": 10,
            "pluto": 10, "chiron": 5, "node": 5, "lilith": 5,
            "asc": 20, "mc": 15}
 
-# Inherent strength of each house 1..12 (rHouseInf)
-HOUSE_INF = [20, 0, 0, 10, 0, 0, 5, 0, 0, 15, 0, 0]
+# House strength hierarchy: angular (ASC>MC>DSC>IC) > succedent > cadent
+HOUSE_INF = [20, 5, 2, 8, 5, 2, 10, 5, 2, 15, 5, 2]
+
+# Conjunction-to-angle proximity bonus, linear falloff within ANGLE_ORB
+ANGLE_ORB = 10.0
+ANGLE_PROX = {"asc": 15.0, "mc": 12.0, "dsc": 8.0, "ic": 6.0}
+
+# Critical degrees: 0° and 29° of any sign
+CRITICAL_BONUS = 15.0
 
 # Dignity bonuses (rObjInf[oNorm1+1..2], rHouseInf[cSign+1..2])
 BONUS_RULE_SIGN, BONUS_EXALT_SIGN = 20.0, 10.0
@@ -149,6 +156,8 @@ def compute_dominants(positions, cusps, n_aspects=5, use_minor_objects=True,
 
     p1 = {o: 0.0 for o in objs}                 # position power
     p2 = {o: 0.0 for o in objs}                 # aspect power
+    angles = {"asc": _norm(cusps[0]), "mc": _norm(cusps[9]),
+              "dsc": _norm(cusps[0] + 180.0), "ic": _norm(cusps[9] + 180.0)}
 
     # --- 1. placement power -------------------------------------------
     for o in objs:
@@ -165,6 +174,19 @@ def compute_dominants(positions, cusps, n_aspects=5, use_minor_objects=True,
             p1[o] += BONUS_RULE_HOUSE
         if EXALT.get(o) == h:
             p1[o] += BONUS_EXALT_HOUSE
+        # critical degrees: 0° or 29° within the sign
+        sd = pos[o] % 30.0
+        crit = sd < 1.0 or sd >= 29.0
+        if crit:
+            p1[o] += CRITICAL_BONUS
+        # angular proximity (skip the angle objects themselves)
+        if o not in ("asc", "mc"):
+            best = 0.0
+            for ang, mx in ANGLE_PROX.items():
+                d = _sep(pos[o], angles[ang])
+                if d <= ANGLE_ORB:
+                    best = max(best, mx * (1.0 - d / ANGLE_ORB))
+            p1[o] += best
         # dispersal: rulers of the sign & house the object is in get half
         half = OBJ_INF[o] / 2.0
         for target_sign in (s, h):
@@ -213,6 +235,7 @@ def compute_dominants(positions, cusps, n_aspects=5, use_minor_objects=True,
     planets_out = [{
         "key": o, "name_ka": OBJ_KA[o],
         "retrograde": is_rx[o],
+        "critical": (pos[o] % 30.0) < 1.0 or (pos[o] % 30.0) >= 29.0,
         "sign": sign[o], "sign_ka": SIGNS_KA[sign[o] - 1],
         "house": house[o],
         "position_power": _r1(p1[o]),
