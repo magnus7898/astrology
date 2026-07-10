@@ -736,6 +736,30 @@ def api_dominants():
     return jsonify(compute_dominants(positions, list(cusps[:12]), retro=retro))
 
 
+# ---------------------------------------------------------------
+# CINDERELLA GATE  (Chiron-Venus-Jupiter-Neptune transit windows)
+# ---------------------------------------------------------------
+from cinderella import compute_cinderella
+
+@app.route('/api/cinderella', methods=['POST'])
+def api_cinderella():
+    """Accepts the same payload as /chart (+ optional years, use_sextile).
+    Scans N years from birth for Cinderella-gate transit windows."""
+    swe.set_ephe_path(EPHE_PATH)
+    d = request.json
+    year, month, day = int(d['year']), int(d['month']), int(d['day'])
+    hour = int(d.get('hour', 12)); minute = int(d.get('minute', 0))
+    second = int(d.get('second', 0))
+    lat, lon = float(d['lat']), float(d['lon'])
+    tz_name = d.get('tz_name', 'UTC')
+    years = min(int(d.get('years', 100)), 120)
+    use_sextile = bool(d.get('use_sextile', True))
+    jd = to_jd(year, month, day, hour, minute, second, tz_name)
+    return jsonify(compute_cinderella(
+        year, month, day, hour, minute, lat, lon, jd,
+        years=years, use_sextile=use_sextile))
+
+
 @app.route('/lunar', methods=['POST'])
 def lunar():
     swe.set_ephe_path(EPHE_PATH)
@@ -1108,4 +1132,3 @@ def static_files(filename):
 if __name__ == '__main__':
     port = int(os.environ.get("PORT", 8080))
     app.run(host='0.0.0.0', port=port)
-
