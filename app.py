@@ -723,15 +723,17 @@ def api_dominants():
            'neptune': swe.NEPTUNE, 'pluto': swe.PLUTO,
            'chiron': swe.CHIRON, 'node': swe.MEAN_NODE,
            'lilith': swe.MEAN_APOG}
-    positions = {}
+    positions, retro = {}, {}
     for k, pid in ids.items():
         try:
-            positions[k] = swe.calc_ut(jd, pid)[0][0]
+            xx = swe.calc_ut(jd, pid)[0]
+            positions[k] = xx[0]
+            retro[k] = len(xx) > 3 and xx[3] < 0
         except Exception:
             pass
     cusps, ascmc = swe.houses(jd, lat, lon, b'P')
     positions['asc'] = float(ascmc[0]); positions['mc'] = float(ascmc[1])
-    return jsonify(compute_dominants(positions, list(cusps[:12])))
+    return jsonify(compute_dominants(positions, list(cusps[:12]), retro=retro))
 
 
 @app.route('/lunar', methods=['POST'])
