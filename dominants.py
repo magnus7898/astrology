@@ -1,4 +1,4 @@
- # -*- coding: utf-8 -*-
+# -*- coding: utf-8 -*-
 """
 dominants.py — Walter Pullen (Astrolog) "-j" influence chart algorithm.
 Exact port of ComputeInfluence()/ChartInfluence() from Astrolog 7.x
