@@ -85,6 +85,14 @@ RETRO_ELIGIBLE = {"mercury", "venus", "mars", "jupiter", "saturn",
 SIGNS_KA = ["ვერძი", "კურო", "ტყუპები", "კირჩხიბი", "ლომი", "ქალწული",
             "სასწორი", "მორიელი", "მშვილდოსანი", "თხის რქა",
             "მერწყული", "თევზები"]
+ELEMENTS = {"fire": [1, 5, 9], "earth": [2, 6, 10],
+            "air": [3, 7, 11], "water": [4, 8, 12]}
+ELEM_KA = {"fire": "ცეცხლი", "earth": "მიწა", "air": "ჰაერი",
+           "water": "წყალი"}
+MODALITIES = {"cardinal": [1, 4, 7, 10], "fixed": [2, 5, 8, 11],
+              "mutable": [3, 6, 9, 12]}
+MODE_KA = {"cardinal": "კარდინალური", "fixed": "ფიქსირებული",
+           "mutable": "მუტაბელური"}
 OBJ_KA = {"sun": "მზე", "moon": "მთვარე", "mercury": "მერკური",
           "venus": "ვენერა", "mars": "მარსი", "jupiter": "იუპიტერი",
           "saturn": "სატურნი", "uranus": "ურანი", "neptune": "ნეპტუნი",
@@ -273,10 +281,38 @@ def compute_dominants(positions, cusps, n_aspects=5, use_minor_objects=True,
         "rank": i + 1,
     } for i, s in enumerate(sorder)]
 
+    # --- 5. elements & modalities (from sign-power distribution) -------
+    def _group(mapping, ka):
+        gp = {k: sum(sp[s] for s in v) for k, v in mapping.items()}
+        gt = sum(gp.values())
+        go = sorted(gp, key=lambda k: -gp[k])
+        return [{"key": k, "name_ka": ka[k], "power": _r1(gp[k]),
+                 "percent": _r1(gp[k] / gt * 100.0) if gt else 0.0,
+                 "rank": i + 1} for i, k in enumerate(go)]
+    elements_out = _group(ELEMENTS, ELEM_KA)
+    modalities_out = _group(MODALITIES, MODE_KA)
+
+    # --- 6. house power (planets weighted by their total power) --------
+    hp = {h: 0.0 for h in range(1, 13)}
+    for o in objs:
+        if o in ("asc", "mc"):
+            continue
+        hp[house[o]] += tot[o]
+    htotal = sum(hp.values())
+    horder = sorted(hp, key=lambda h: -hp[h])
+    houses_out = [{"house": h, "power": _r1(hp[h]),
+                   "percent": _r1(hp[h] / htotal * 100.0) if htotal else 0.0,
+                   "rank": i + 1} for i, h in enumerate(horder)]
+
     return {"planets": planets_out, "signs": signs_out,
+            "elements": elements_out, "modalities": modalities_out,
+            "houses": houses_out,
             "aspects_found": found,
             "dominant_planet": planets_out[0]["key"] if planets_out else None,
-            "dominant_sign": signs_out[0]["sign"] if signs_out else None}
+            "dominant_sign": signs_out[0]["sign"] if signs_out else None,
+            "dominant_element": elements_out[0]["key"],
+            "dominant_modality": modalities_out[0]["key"],
+            "dominant_house": houses_out[0]["house"]}
 
 
 # ------------------------------------------------ optional Flask endpoint
