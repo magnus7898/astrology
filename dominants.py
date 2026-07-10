@@ -32,6 +32,9 @@ ANGLE_PROX = {"asc": 15.0, "mc": 12.0, "dsc": 8.0, "ic": 6.0}
 # Critical degrees: 0° and 29° of any sign
 CRITICAL_BONUS = 15.0
 
+# Flat bonus per aspect a planet participates in (aspect-count factor)
+ASPECT_COUNT_BONUS = 3.0
+
 # Dignity bonuses (rObjInf[oNorm1+1..2], rHouseInf[cSign+1..2])
 BONUS_RULE_SIGN, BONUS_EXALT_SIGN = 20.0, 10.0
 BONUS_RULE_HOUSE, BONUS_EXALT_HOUSE = 15.0, 5.0
@@ -204,6 +207,7 @@ def compute_dominants(positions, cusps, n_aspects=5, use_minor_objects=True,
     # --- 2. aspect power ----------------------------------------------
     asps = ASPECTS[:n_aspects]
     found = []
+    asp_count = {o: 0 for o in objs}
     for i in range(len(objs)):
         for j in range(i + 1, len(objs)):
             a, b = objs[i], objs[j]
@@ -219,8 +223,12 @@ def compute_dominants(positions, cusps, n_aspects=5, use_minor_objects=True,
                 frac = 1.0 - diff / orb
                 p2[a] += inf * OBJ_INF[b] * frac
                 p2[b] += inf * OBJ_INF[a] * frac
+                asp_count[a] += 1
+                asp_count[b] += 1
                 found.append({"a": a, "b": b, "aspect": name,
                               "orb": round(diff, 2)})
+    for o in objs:
+        p2[o] += ASPECT_COUNT_BONUS * asp_count[o]
 
     # --- 3. retro scaling, totals, ranks, percentages -----------------
     for o in objs:
@@ -236,6 +244,7 @@ def compute_dominants(positions, cusps, n_aspects=5, use_minor_objects=True,
         "key": o, "name_ka": OBJ_KA[o],
         "retrograde": is_rx[o],
         "critical": (pos[o] % 30.0) < 1.0 or (pos[o] % 30.0) >= 29.0,
+        "aspect_count": asp_count[o],
         "sign": sign[o], "sign_ka": SIGNS_KA[sign[o] - 1],
         "house": house[o],
         "position_power": _r1(p1[o]),
