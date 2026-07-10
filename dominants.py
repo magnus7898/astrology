@@ -30,18 +30,18 @@ BONUS_RULE_SIGN, BONUS_EXALT_SIGN = 20.0, 10.0
 BONUS_RULE_HOUSE, BONUS_EXALT_HOUSE = 15.0, 5.0
 
 # Sign (1..12) -> ruling planet(s)  (rules / rules2)
-RULES1 = {1: "mars", 2: "venus", 3: "mercury", 4: "moon", 5: "sun",
-          6: "mercury", 7: "venus", 8: "pluto", 9: "jupiter",
+RULES1 = {1: "pluto", 2: "venus", 3: "mercury", 4: "moon", 5: "sun",
+          6: "mercury", 7: "venus", 8: "mars", 9: "jupiter",
           10: "saturn", 11: "uranus", 12: "neptune"}
-RULES2 = {8: "mars", 11: "saturn", 12: "jupiter"}
+RULES2 = {1: "mars", 8: "pluto", 11: "saturn", 12: "jupiter"}
 
 # Object -> sign(s) it rules (ruler1 / ruler2) and sign of exaltation (exalt)
-RULER1 = {"sun": 5, "moon": 4, "mercury": 3, "venus": 7, "mars": 1,
+RULER1 = {"sun": 5, "moon": 4, "mercury": 3, "venus": 7, "mars": 8,
           "jupiter": 9, "saturn": 10, "uranus": 11, "neptune": 12,
-          "pluto": 8, "chiron": 9, "node": 11, "lilith": 8,
+          "pluto": 1, "chiron": 9, "node": 11, "lilith": 8,
           "asc": 1, "mc": 10}
-RULER2 = {"mercury": 6, "venus": 2, "mars": 8, "jupiter": 12,
-          "saturn": 11}
+RULER2 = {"mercury": 6, "venus": 2, "mars": 1, "jupiter": 12,
+          "saturn": 11, "pluto": 8}
 EXALT = {"sun": 1, "moon": 2, "mercury": 6, "venus": 12, "mars": 10,
          "jupiter": 4, "saturn": 7, "uranus": 8, "neptune": 4,
          "pluto": 11, "chiron": 12, "node": 3, "lilith": 12,
@@ -66,6 +66,12 @@ ASPECTS = [
 OBJ_ORB = {"node": 2.0, "lilith": 360.0}          # default 360
 OBJ_ADD = {"sun": 1.0, "moon": 1.0}               # default 0
 
+# Retrograde weighting (Astrolog -j itself ignores retrogradation).
+# Applied to the base influence of real planets only.
+RETRO_FACTOR = 0.9
+RETRO_ELIGIBLE = {"mercury", "venus", "mars", "jupiter", "saturn",
+                  "uranus", "neptune", "pluto", "chiron"}
+
 SIGNS_KA = ["ვერძი", "კურო", "ტყუპები", "კირჩხიბი", "ლომი", "ქალწული",
             "სასწორი", "მორიელი", "მშვილდოსანი", "თხის რქა",
             "მერწყული", "თევზები"]
@@ -77,6 +83,9 @@ OBJ_KA = {"sun": "მზე", "moon": "მთვარე", "mercury": "მე�
           "asc": "ასცენდენტი", "mc": "MC"}
 
 # ---------------------------------------------------------------- helpers
+
+def _r1(x):
+    return int(x * 10 + 0.5) / 10.0
 
 def _norm(d):
     d %= 360.0
@@ -107,12 +116,15 @@ def _get_orb(o1, o2, asp_orb):
 
 # ---------------------------------------------------------------- core
 
-def compute_dominants(positions, cusps, n_aspects=5, use_minor_objects=True):
+def compute_dominants(positions, cusps, n_aspects=5, use_minor_objects=True,
+                      retro=None, retro_factor=RETRO_FACTOR):
     """
     positions: {objkey: longitude}. Keys from OBJ_KEYS; 'asc'/'mc' optional
                (taken from cusps[0]/cusps[9] if absent).
     cusps:     list of 12 house-cusp longitudes, house 1 first.
     n_aspects: how many aspects from ASPECTS to use (Astrolog default 5).
+    retro:     {objkey: bool} retrograde flags; retro planets get their
+               base influence scaled by retro_factor (planets only).
     """
     pos = {k: _norm(v) for k, v in positions.items() if k in OBJ_INF
            and v is not None}
@@ -125,6 +137,8 @@ def compute_dominants(positions, cusps, n_aspects=5, use_minor_objects=True):
             pos.pop(k, None)
 
     objs = [k for k in OBJ_KEYS if k in pos]
+    retro = retro or {}
+    is_rx = {o: bool(retro.get(o)) and o in RETRO_ELIGIBLE for o in objs}
     sign = {o: _sign_of(pos[o]) for o in objs}
     house = {o: _house_of(pos[o], cusps) for o in objs}
     # cusp objects live on their own cusps by definition
@@ -186,7 +200,11 @@ def compute_dominants(positions, cusps, n_aspects=5, use_minor_objects=True):
                 found.append({"a": a, "b": b, "aspect": name,
                               "orb": round(diff, 2)})
 
-    # --- 3. totals, ranks, percentages --------------------------------
+    # --- 3. retro scaling, totals, ranks, percentages -----------------
+    for o in objs:
+        if is_rx[o]:
+            p1[o] *= retro_factor
+            p2[o] *= retro_factor
     total = sum(p1.values()) + sum(p2.values())
     tot = {o: p1[o] + p2[o] for o in objs}
     order = sorted(objs, key=lambda o: -tot[o])
@@ -194,12 +212,13 @@ def compute_dominants(positions, cusps, n_aspects=5, use_minor_objects=True):
 
     planets_out = [{
         "key": o, "name_ka": OBJ_KA[o],
+        "retrograde": is_rx[o],
         "sign": sign[o], "sign_ka": SIGNS_KA[sign[o] - 1],
         "house": house[o],
-        "position_power": round(p1[o], 1),
-        "aspect_power": round(p2[o], 1),
-        "total": round(tot[o], 1),
-        "percent": round(tot[o] / total * 100.0, 1) if total else 0.0,
+        "position_power": _r1(p1[o]),
+        "aspect_power": _r1(p2[o]),
+        "total": _r1(tot[o]),
+        "percent": _r1(tot[o] / total * 100.0) if total else 0.0,
         "rank": rank[o],
     } for o in order]
 
@@ -217,8 +236,8 @@ def compute_dominants(positions, cusps, n_aspects=5, use_minor_objects=True):
     sorder = sorted(sp, key=lambda s: -sp[s])
     signs_out = [{
         "sign": s, "name_ka": SIGNS_KA[s - 1],
-        "power": round(sp[s], 1),
-        "percent": round(sp[s] / stotal * 100.0, 1) if stotal else 0.0,
+        "power": _r1(sp[s]),
+        "percent": _r1(sp[s] / stotal * 100.0) if stotal else 0.0,
         "rank": i + 1,
     } for i, s in enumerate(sorder)]
 
@@ -255,14 +274,16 @@ def dominants_from_birth(year, month, day, hour, minute, lat, lon,
            "neptune": swe.NEPTUNE, "pluto": swe.PLUTO,
            "chiron": swe.CHIRON, "node": swe.TRUE_NODE,
            "lilith": swe.MEAN_APOG}
-    positions = {}
+    positions, retro = {}, {}
     for k, pid in ids.items():
         try:
-            positions[k] = swe.calc_ut(jd, pid, flags)[0][0]
+            xx = swe.calc_ut(jd, pid, flags)[0]
+            positions[k] = xx[0]
+            retro[k] = len(xx) > 3 and xx[3] < 0
         except Exception:
             pass                                # e.g. Chiron w/o ephemeris
     if sidereal:
         cusps, _ = swe.houses_ex(jd, lat, lon, hsys, swe.FLG_SIDEREAL)
     else:
         cusps, _ = swe.houses(jd, lat, lon, hsys)
-    return compute_dominants(positions, list(cusps[:12]))
+    return compute_dominants(positions, list(cusps[:12]), retro=retro)
