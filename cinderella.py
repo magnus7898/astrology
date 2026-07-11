@@ -30,10 +30,8 @@ SIGNS_KA = ["ვერძი", "კურო", "ტყუპები", "კი�
 # transit aspect config: angle -> (weight, symbol)
 ASPECTS = {0.0: (1.0, "☌"), 120.0: (0.9, "△"), 150.0: (0.85, "⚻"),
            60.0: (0.6, "⚹")}
-# tighter orb factor for minor-angle aspects
-ORB_FACTOR = {60.0: 0.75, 150.0: 0.75}
-# transit orbs per moving body (sextile uses ×0.75)
-TRANSIT_ORB = {"chiron": 2.0, "jupiter": 2.0, "neptune": 2.0, "venus": 1.5}
+# transit orbs per aspect (max allowed deviation)
+ASPECT_ORB = {0.0: 3.0, 120.0: 1.5, 150.0: 1.0, 60.0: 1.0}
 # weight of the moving body itself (venus = trigger/amplifier only)
 BODY_WEIGHT = {"chiron": 1.0, "jupiter": 1.0, "neptune": 1.0, "venus": 0.5}
 
@@ -113,7 +111,7 @@ def compute_cinderella(year, month, day, hour, minute, lat, lon,
         for tb, nb in LINKS:
             d = _sep(tpos[tb], natal[nb])
             for ang, (aw, sym) in aspects.items():
-                orb_max = TRANSIT_ORB[tb] * ORB_FACTOR.get(ang, 1.0)
+                orb_max = ASPECT_ORB[ang]
                 diff = abs(d - ang)
                 if diff <= orb_max:
                     w = aw * BODY_WEIGHT[tb] * (1.0 - 0.5 * diff / orb_max)
