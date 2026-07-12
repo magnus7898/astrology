@@ -1,4 +1,4 @@
-  # -*-coding: utf-8 -*-
+# -*- coding: utf-8 -*-
 """
 pastlife.py — past-life incarnation scanner (dragon chart method).
 
@@ -8,10 +8,17 @@ when transiting Pluto occupied that same zodiacal degree are taken as
 prior incarnation epochs. Pluto's ~248-year cycle gives up to ~8 passages
 per 2000 years; retrograde loops within one passage are grouped together.
 
-For each incarnation epoch the Sun-IC astrocartography meridian is
-computed: the geographic longitude where the Sun was exactly on the IC
-(4th house cusp — roots, homeland) at that moment. Uses the Moshier
-ephemeris so dates back to antiquity need no ephemeris files.
+A Pluto passage alone is only a CANDIDATE: many epochs have Pluto at
+that degree with no other tie to the natal chart. Each candidate is
+therefore scored by RESONANCE — cross-aspects between the historical
+chart and the natal chart (karmic weight on Sun/Moon/Nodes), plus a
+geographic bonus when the historical Sun-IC meridian falls close to
+the NATAL Sun-IC astrocartography line. High-scoring passages are the
+probable incarnations; low scores are Pluto coincidences.
+
+For each epoch the Sun-IC meridian is computed: the geographic
+longitude where the Sun was exactly on the IC (4th house — roots,
+homeland). Uses the Moshier ephemeris (no ephemeris file limits).
 """
 
 import swisseph as swe
@@ -24,6 +31,29 @@ MONTHS_KA = ["იანვარი", "თებერვალი", "მარ�
              "ნოემბერი", "დეკემბერი"]
 
 GREGORIAN_START_JD = 2299160.5     # 1582-10-15
+
+# ---- resonance scoring configuration ----
+RES_BODIES = {"sun": swe.SUN, "moon": swe.MOON, "mercury": swe.MERCURY,
+              "venus": swe.VENUS, "mars": swe.MARS, "jupiter": swe.JUPITER,
+              "saturn": swe.SATURN, "uranus": swe.URANUS,
+              "neptune": swe.NEPTUNE, "pluto": swe.PLUTO,
+              "node": swe.MEAN_NODE, "lilith": swe.MEAN_APOG}
+RES_KA = {"sun": "მზე", "moon": "მთვარე", "mercury": "მერკური",
+          "venus": "ვენერა", "mars": "მარსი", "jupiter": "იუპიტერი",
+          "saturn": "სატურნი", "uranus": "ურანი", "neptune": "ნეპტუნი",
+          "pluto": "პლუტონი", "node": "კვანძი", "snode": "სამხ. კვანძი",
+          "lilith": "ლილიტი"}
+# karmic planet weights
+RES_W = {"sun": 1.0, "moon": 1.0, "node": 1.2, "snode": 1.2,
+         "pluto": 0.8, "saturn": 0.8, "lilith": 0.7}
+RES_W_DEFAULT = 0.6
+# aspect: angle -> (max orb, quality, symbol)
+RES_ASP = {0.0: (3.0, 1.0, "☌"), 180.0: (2.5, 0.6, "☍"),
+           120.0: (2.0, 0.45, "△"), 90.0: (2.0, 0.4, "□")}
+GEO_ORB = 15.0        # meridian closeness bonus range (degrees)
+GEO_BONUS = 1.5
+STRONG_SCORE = 3.0    # probable incarnation
+MID_SCORE = 1.8
 
 
 def _norm(d):
@@ -54,13 +84,56 @@ def _date_of(jd):
             "julian_cal": jd < GREGORIAN_START_JD}
 
 
+def _chart(jd):
+    ch = {}
+    for k, pid in RES_BODIES.items():
+        ch[k] = swe.calc_ut(jd, pid, swe.FLG_MOSEPH)[0][0]
+    ch["snode"] = _norm(ch["node"] + 180.0)
+    return ch
+
+
+def _resonance(hist, natal):
+    """cross-aspects historical chart -> natal chart, karmic-weighted."""
+    conns, score = [], 0.0
+    for hk, hlon in hist.items():
+        for nk, nlon in natal.items():
+            if hk == "snode" and nk == "node":
+                continue                      # mirror duplicates
+            if hk == "node" and nk == "snode":
+                continue
+            d = abs(_sdiff(hlon, nlon))
+            nodal = hk in ("node", "snode") or nk in ("node", "snode")
+            for ang, (orb, q, sym) in RES_ASP.items():
+                if nodal and ang != 0.0:
+                    continue        # nodal axis: conjunctions only
+                                    # (opp node = conj snode; avoids doubles)
+                diff = abs(d - ang)
+                if diff <= orb:
+                    w = (RES_W.get(hk, RES_W_DEFAULT)
+                         + RES_W.get(nk, RES_W_DEFAULT)) / 2.0
+                    v = w * q * (1.0 - diff / orb)
+                    score += v
+                    conns.append({"h": hk, "n": nk,
+                                  "h_ka": RES_KA[hk], "n_ka": RES_KA[nk],
+                                  "aspect": sym, "orb": round(diff, 2),
+                                  "v": round(v, 2)})
+                    break
+    conns.sort(key=lambda c: -c["v"])
+    return score, conns
+
+
 def compute_pastlife(jd_birth, count=4, span_years=2000, step_days=30.0):
     """Returns up to `count` most recent incarnation passages within
-    span_years before birth, each with its Sun-IC meridian."""
-    # ---- draconic Pluto target ----------------------------------------
-    pl = swe.calc_ut(jd_birth, swe.PLUTO, swe.FLG_MOSEPH)[0][0]
-    nn = swe.calc_ut(jd_birth, swe.MEAN_NODE, swe.FLG_MOSEPH)[0][0]
+    span_years before birth, resonance-scored against the natal chart."""
+    # ---- natal chart + draconic Pluto target ---------------------------
+    natal = _chart(jd_birth)
+    pl, nn = natal["pluto"], natal["node"]
     target = _norm(pl - nn)
+    # natal Sun-IC astrocartography meridian (location-independent)
+    n_ra = swe.calc_ut(jd_birth, swe.SUN,
+                       swe.FLG_MOSEPH | swe.FLG_EQUATORIAL)[0][0]
+    n_gst = swe.sidtime(jd_birth) * 15.0
+    natal_ic_lon = _norm180(_norm180(n_ra - n_gst) + 180.0)
 
     # ---- scan for crossings -------------------------------------------
     jd0 = jd_birth - span_years * 365.25
@@ -99,18 +172,24 @@ def compute_pastlife(jd_birth, count=4, span_years=2000, step_days=30.0):
         else:
             passages.append([c])
 
-    recent = passages[-count:][::-1]            # newest first
+    recent = passages[::-1]                     # ALL passages, newest first
 
-    # ---- per-passage data: date + Sun-IC meridian ----------------------
+    # ---- per-passage: date, Sun-IC meridian, resonance score -----------
     out = []
     for grp in recent:
         jdp = grp[len(grp) // 2]                # exact middle crossing
-        sun = swe.calc_ut(jdp, swe.SUN, swe.FLG_MOSEPH)[0][0]
+        hist = _chart(jdp)
+        sun = hist["sun"]
         ra = swe.calc_ut(jdp, swe.SUN,
                          swe.FLG_MOSEPH | swe.FLG_EQUATORIAL)[0][0]
         gst = swe.sidtime(jdp) * 15.0           # GMST in degrees
         mc_lon = _norm180(ra - gst)             # Sun-on-MC meridian
         ic_lon = _norm180(mc_lon + 180.0)       # Sun-on-IC meridian
+        score, conns = _resonance(hist, natal)
+        geo_d = abs(_sdiff(ic_lon, natal_ic_lon))
+        geo_hit = geo_d <= GEO_ORB
+        if geo_hit:
+            score += GEO_BONUS * (1.0 - geo_d / GEO_ORB)
         si = int(sun // 30)
         out.append({
             "date": _date_of(jdp),
@@ -122,7 +201,20 @@ def compute_pastlife(jd_birth, count=4, span_years=2000, step_days=30.0):
                     "sign_ka": SIGNS_KA[si], "deg": round(sun % 30.0, 1)},
             "ic_lon": round(ic_lon, 2),
             "mc_lon": round(mc_lon, 2),
+            "score": round(score, 2),
+            "n_connections": len(conns),
+            "connections": conns[:12],
+            "geo_match": geo_hit,
+            "geo_delta": round(geo_d, 1),
+            "grade": "strong" if score >= STRONG_SCORE
+                     else ("mid" if score >= MID_SCORE else "weak"),
         })
+    # probable incarnations = highest resonance; keep `count` strongest,
+    # but return all so the UI can show weak Pluto-coincidences dimmed
+    ranked = sorted(range(len(out)), key=lambda i: -out[i]["score"])
+    for r_i, idx in enumerate(ranked):
+        out[idx]["rank"] = r_i + 1
+        out[idx]["probable"] = r_i < count and out[idx]["grade"] != "weak"
 
     si = int(target // 30)
     return {
@@ -130,5 +222,6 @@ def compute_pastlife(jd_birth, count=4, span_years=2000, step_days=30.0):
                    "sign_ka": SIGNS_KA[si], "deg": round(target % 30.0, 1)},
         "span_years": span_years,
         "total_passages": len(passages),
+        "natal_ic_lon": round(natal_ic_lon, 2),
         "incarnations": out,
     }
