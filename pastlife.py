@@ -122,7 +122,41 @@ def _resonance(hist, natal):
     return score, conns
 
 
-def compute_pastlife(jd_birth, count=4, span_years=2000, step_days=30.0):
+GEO_KA = {"sun": "მზე", "moon": "მთვარე", "mercury": "მერკური",
+          "venus": "ვენერა", "mars": "მარსი", "jupiter": "იუპიტერი",
+          "saturn": "სატურნი", "uranus": "ურანი", "neptune": "ნეპტუნი",
+          "pluto": "პლუტონი", "lilith": "ლილიტი"}
+
+
+def _chart_payload(jd, hist, lat, lon):
+    """Historical chart in the same shape /chart returns, so the frontend
+    wheel renders it directly (Moshier — works for any epoch)."""
+    def disp(deg):
+        d = int(deg % 30)
+        return d, round((deg % 30 - d) * 60 / 60 * 100)
+    planets = {}
+    for k, ka in GEO_KA.items():
+        deg = hist[k]
+        xx = swe.calc_ut(jd, RES_BODIES[k], swe.FLG_MOSEPH)[0]
+        dv, c = disp(deg)
+        planets[ka] = {"degree": round(deg, 4),
+                       "sign": SIGNS_KA[int(_norm(deg) // 30)],
+                       "sign_degree": dv, "centesimal": c,
+                       "retrograde": len(xx) > 3 and xx[3] < 0}
+    for ka, deg in (("ჩრდ. კვანძი", hist["node"]),
+                    ("სამხ. კვანძი", hist["snode"])):
+        dv, c = disp(deg)
+        planets[ka] = {"degree": round(deg, 4),
+                       "sign": SIGNS_KA[int(_norm(deg) // 30)],
+                       "sign_degree": dv, "centesimal": c,
+                       "retrograde": True}
+    cusps, ascmc = swe.houses_ex(jd, lat, lon, b'P', swe.FLG_MOSEPH)
+    return {"planets": planets, "houses": [round(c, 4) for c in cusps[:12]],
+            "asc": round(ascmc[0], 4), "mc": round(ascmc[1], 4)}
+
+
+def compute_pastlife(jd_birth, count=4, span_years=2000, step_days=30.0,
+                     lat=0.0, lon=0.0):
     """Returns up to `count` most recent incarnation passages within
     span_years before birth, resonance-scored against the natal chart."""
     # ---- natal chart + draconic Pluto target ---------------------------
@@ -201,6 +235,8 @@ def compute_pastlife(jd_birth, count=4, span_years=2000, step_days=30.0):
                     "sign_ka": SIGNS_KA[si], "deg": round(sun % 30.0, 1)},
             "ic_lon": round(ic_lon, 2),
             "mc_lon": round(mc_lon, 2),
+            "crossing_dates": [_date_of(c)["label"] for c in grp],
+            "chart": _chart_payload(jdp, hist, lat, lon),
             "score": round(score, 2),
             "n_connections": len(conns),
             "connections": conns[:12],
