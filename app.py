@@ -776,8 +776,10 @@ def api_pastlife():
     tz_name = d.get('tz_name', 'UTC')
     count = min(int(d.get('count', 4)), 8)
     span = min(int(d.get('span_years', 2000)), 3000)
+    lat, lon = float(d.get('lat', 0.0)), float(d.get('lon', 0.0))
     jd = to_jd(year, month, day, hour, minute, second, tz_name)
-    return jsonify(compute_pastlife(jd, count=count, span_years=span))
+    return jsonify(compute_pastlife(jd, count=count, span_years=span,
+                                    lat=lat, lon=lon))
 
 
 @app.route('/lunar', methods=['POST'])
