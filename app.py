@@ -760,6 +760,26 @@ def api_cinderella():
         years=years, use_sextile=use_sextile))
 
 
+# ---------------------------------------------------------------
+# PAST LIFE INCARNATIONS  (dragon-chart Pluto method + Sun-IC lines)
+# ---------------------------------------------------------------
+from pastlife import compute_pastlife
+
+@app.route('/api/pastlife', methods=['POST'])
+def api_pastlife():
+    """Accepts the same payload as /chart (+ optional count, span_years).
+    Returns past incarnation epochs with Sun-IC meridians."""
+    d = request.json
+    year, month, day = int(d['year']), int(d['month']), int(d['day'])
+    hour = int(d.get('hour', 12)); minute = int(d.get('minute', 0))
+    second = int(d.get('second', 0))
+    tz_name = d.get('tz_name', 'UTC')
+    count = min(int(d.get('count', 4)), 8)
+    span = min(int(d.get('span_years', 2000)), 3000)
+    jd = to_jd(year, month, day, hour, minute, second, tz_name)
+    return jsonify(compute_pastlife(jd, count=count, span_years=span))
+
+
 @app.route('/lunar', methods=['POST'])
 def lunar():
     swe.set_ephe_path(EPHE_PATH)
@@ -1132,3 +1152,4 @@ def static_files(filename):
 if __name__ == '__main__':
     port = int(os.environ.get("PORT", 8080))
     app.run(host='0.0.0.0', port=port)
+
