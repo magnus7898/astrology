@@ -782,6 +782,26 @@ def api_pastlife():
                                     lat=lat, lon=lon))
 
 
+# ---------------------------------------------------------------
+# NEGATIVE / HARD TRANSIT PERIODS
+# ---------------------------------------------------------------
+from negative import compute_negative
+
+@app.route('/api/hardperiods', methods=['POST'])
+def api_hardperiods():
+    """Accepts the same payload as /chart (+ optional years).
+    Returns periods when many hard transits hit the natal chart."""
+    d = request.json
+    year, month, day = int(d['year']), int(d['month']), int(d['day'])
+    hour = int(d.get('hour', 12)); minute = int(d.get('minute', 0))
+    second = int(d.get('second', 0))
+    lat, lon = float(d.get('lat', 0.0)), float(d.get('lon', 0.0))
+    tz_name = d.get('tz_name', 'UTC')
+    years = min(int(d.get('years', 100)), 120)
+    jd = to_jd(year, month, day, hour, minute, second, tz_name)
+    return jsonify(compute_negative(jd, lat, lon, years=years))
+
+
 @app.route('/lunar', methods=['POST'])
 def lunar():
     swe.set_ephe_path(EPHE_PATH)
