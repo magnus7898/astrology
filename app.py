@@ -802,6 +802,25 @@ def api_hardperiods():
     return jsonify(compute_negative(jd, lat, lon, years=years))
 
 
+# ---------------------------------------------------------------
+# ASTRONOMICAL SKY MAP  (IAU constellations + fixed stars)
+# ---------------------------------------------------------------
+from skymap import compute_skymap
+
+@app.route('/api/skymap', methods=['POST'])
+def api_skymap():
+    """True astronomical placement: IAU constellations (Roman 1987
+    boundaries) + fixed-star conjunctions. Same payload as /chart."""
+    swe.set_ephe_path(EPHE_PATH)
+    d = request.json
+    year, month, day = int(d['year']), int(d['month']), int(d['day'])
+    hour = int(d.get('hour', 12)); minute = int(d.get('minute', 0))
+    second = int(d.get('second', 0))
+    tz_name = d.get('tz_name', 'UTC')
+    jd = to_jd(year, month, day, hour, minute, second, tz_name)
+    return jsonify(compute_skymap(jd))
+
+
 @app.route('/lunar', methods=['POST'])
 def lunar():
     swe.set_ephe_path(EPHE_PATH)
