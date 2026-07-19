@@ -854,6 +854,61 @@ def combo_log():
     return jsonify({'added': added})
 
 
+@app.route('/matrix_combos.js', methods=['GET'])
+def combo_merged():
+    """Serve matrix_combos.js = your hand-written file (in this repo) with
+    every auto-collected code injected as an empty stub into its zone's
+    combos{}. Your written entries always take precedence; new codes from
+    real users appear automatically. matrix.html loads THIS url instead of
+    the static file, so the database self-updates the served file."""
+    import re as _re, json as _json2
+    path = ROOT / 'matrix_combos.js'
+    try:
+        src = path.read_text(encoding='utf-8')
+    except Exception:
+        return app.response_class('/* matrix_combos.js not found on server */',
+                                  mimetype='application/javascript'), 404
+
+    # collect DB codes grouped by zone
+    zones = {}
+    for r in MatrixCombo.query.order_by(MatrixCombo.key).all():
+        if ':' not in r.key:
+            continue
+        zone, code = r.key.split(':', 1)
+        zones.setdefault(zone, set()).add(code)
+
+    # for each zone, find the combos:{ ... } block and add codes it lacks
+    def inject(zone, codes):
+        nonlocal src
+        # match:  <zone>: { ... combos:{  (capture up to the matching content start)
+        # we insert stubs right after the `combos:{` of that zone.
+        pat = _re.compile(r'(\b' + _re.escape(zone) + r'\s*:\s*\{[^}]*?combos\s*:\s*\{)',
+                          _re.S)
+        m = pat.search(src)
+        if not m:
+            return
+        block_start = m.end()
+        # existing codes already written in that zone (avoid dup)
+        # grab the combos block text up to its closing brace depth
+        i = block_start; depth = 1; n = len(src)
+        while i < n and depth > 0:
+            if src[i] == '{': depth += 1
+            elif src[i] == '}': depth -= 1
+            i += 1
+        block_text = src[block_start:i-1]
+        have = set(_re.findall(r'"(\d+-\d+-\d+)"\s*:', block_text))
+        new = [c for c in sorted(codes) if c not in have]
+        if not new:
+            return
+        stub = ''.join('\n      "%s": { title:"", text:"" },' % c for c in new)
+        src = src[:block_start] + stub + src[block_start:]
+
+    for zone, codes in zones.items():
+        inject(zone, codes)
+
+    return app.response_class(src, mimetype='application/javascript; charset=utf-8')
+
+
 @app.route('/api/combo/export', methods=['GET'])
 def combo_export():
     """All collected keys as a ready matrix-combo.js skeleton
@@ -1253,4 +1308,3 @@ def static_files(filename):
 if __name__ == '__main__':
     port = int(os.environ.get("PORT", 8080))
     app.run(host='0.0.0.0', port=port)
-
