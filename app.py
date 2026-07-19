@@ -140,6 +140,13 @@ class Payment(db.Model):
     provider_ref = db.Column(db.String(120))
     created = db.Column(db.DateTime, server_default=db.func.now())
 
+class MatrixCombo(db.Model):
+    """Auto-collected Matrix of Destiny circle combos (unique keys)."""
+    id = db.Column(db.Integer, primary_key=True)
+    key = db.Column(db.String(40), unique=True, nullable=False, index=True)
+    first_seen = db.Column(db.DateTime, server_default=db.func.now())
+
+
 with app.app_context():
     try:
         db.create_all()
@@ -819,6 +826,59 @@ def api_skymap():
     tz_name = d.get('tz_name', 'UTC')
     jd = to_jd(year, month, day, hour, minute, second, tz_name)
     return jsonify(compute_skymap(jd))
+
+
+# ---------------------------------------------------------------
+# MATRIX COMBO COLLECTOR
+# ---------------------------------------------------------------
+import re as _re_combo
+
+@app.route('/api/combo/log', methods=['POST'])
+def combo_log():
+    """Receive combo keys from matrix.html; insert each once (dedup)."""
+    keys = (request.json or {}).get('keys', [])
+    added = 0
+    for k in keys[:40]:
+        k = str(k)[:40]
+        if not (_re_combo.fullmatch(r'[A-Z]{1,3}_\d{1,2}-\d{1,2}-\d{1,2}', k)
+                or _re_combo.fullmatch(r'[a-z_]{2,24}:\d{1,2}-\d{1,2}-\d{1,2}', k)):
+            continue
+        if not MatrixCombo.query.filter_by(key=k).first():
+            db.session.add(MatrixCombo(key=k))
+            added += 1
+    if added:
+        try:
+            db.session.commit()
+        except Exception:
+            db.session.rollback()
+    return jsonify({'added': added})
+
+
+@app.route('/api/combo/export', methods=['GET'])
+def combo_export():
+    """All collected keys as a ready matrix-combo.js skeleton
+    (paste your texts into the empty strings; merge with existing file)."""
+    rows = MatrixCombo.query.order_by(MatrixCombo.key).all()
+    zones, legacy = {}, []
+    for r in rows:
+        if ':' in r.key:
+            zone, code = r.key.split(':', 1)
+            zones.setdefault(zone, []).append(code)
+        else:
+            legacy.append(r.key)
+    parts = []
+    for zone in sorted(zones):
+        combos = ',\n'.join(
+            '      "%s": { title:"", text:"" }' % c for c in sorted(zones[zone]))
+        parts.append('  %s: {\n    combos:{\n%s\n    }\n  }' % (zone, combos))
+    body = ('/* MATRIX_DB skeleton — collected from real users: %d combos in %d zones.\n'
+            '   Write texts, then merge each zone into matrix_combos.js\n'
+            '   (entries you already wrote keep working — just add the new codes). */\n'
+            'const MATRIX_DB_COLLECTED = {\n%s\n};\n') % (
+        sum(len(v) for v in zones.values()), len(zones), ',\n'.join(parts))
+    if legacy:
+        body += '\n/* legacy flat keys: ' + ', '.join(legacy) + ' */\n'
+    return app.response_class(body, mimetype='text/plain; charset=utf-8')
 
 
 @app.route('/lunar', methods=['POST'])
