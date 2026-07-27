@@ -39,6 +39,26 @@ swe.set_ephe_path(EPHE_PATH)
 from flask import Flask, request, jsonify, render_template, send_from_directory
 from flask_cors import CORS
 
+# constellation_routes.py  — new file, Railway repo
+from flask import Blueprint, request, jsonify
+# reuse the SAME lookup /api/skymap already uses:
+from skymap_routes import constellation_of   # ← adjust name to your actual function
+
+constellation_bp = Blueprint('constellation', __name__)
+
+@constellation_bp.route('/api/constellation', methods=['POST'])
+def constellation():
+    """Body: {"points":[{"id":"მზე","ra":123.4,"dec":-5.6}, ...]}  (J2000)"""
+    pts = (request.get_json(silent=True) or {}).get('points', [])
+    out = []
+    for p in pts:
+        try:
+            name, name_ka = constellation_of(float(p['ra']), float(p['dec']))
+            out.append({'id': p.get('id'), 'constellation': name, 'constellation_ka': name_ka})
+        except Exception as e:
+            out.append({'id': p.get('id'), 'error': str(e)})
+    return jsonify({'points': out})
+
 # ── AUTH / DB / ADMIN imports ──
 from functools import wraps
 from flask_sqlalchemy import SQLAlchemy
