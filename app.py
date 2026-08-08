@@ -39,26 +39,6 @@ swe.set_ephe_path(EPHE_PATH)
 from flask import Flask, request, jsonify, render_template, send_from_directory
 from flask_cors import CORS
 
-# constellation_routes.py  — new file, Railway repo
-from flask import Blueprint, request, jsonify
-# reuse the SAME lookup /api/skymap already uses:
-from skymap_routes import constellation_of   # ← adjust name to your actual function
-
-constellation_bp = Blueprint('constellation', __name__)
-
-@constellation_bp.route('/api/constellation', methods=['POST'])
-def constellation():
-    """Body: {"points":[{"id":"მზე","ra":123.4,"dec":-5.6}, ...]}  (J2000)"""
-    pts = (request.get_json(silent=True) or {}).get('points', [])
-    out = []
-    for p in pts:
-        try:
-            name, name_ka = constellation_of(float(p['ra']), float(p['dec']))
-            out.append({'id': p.get('id'), 'constellation': name, 'constellation_ka': name_ka})
-        except Exception as e:
-            out.append({'id': p.get('id'), 'error': str(e)})
-    return jsonify({'points': out})
-
 # ── AUTH / DB / ADMIN imports ──
 from functools import wraps
 from flask_sqlalchemy import SQLAlchemy
@@ -954,6 +934,23 @@ def combo_export():
     if legacy:
         body += '\n/* legacy flat keys: ' + ', '.join(legacy) + ' */\n'
     return app.response_class(body, mimetype='text/plain; charset=utf-8')
+
+
+# ---------------------------------------------------------------
+# PLANETARY MOONS  (planetocentric satellite positions)
+# ---------------------------------------------------------------
+from moons import compute_moons
+
+@app.route('/api/moons', methods=['POST'])
+def api_moons():
+    """Major moons of the observer planet, as seen FROM that planet.
+    Payload: {planet, year, month, day, hour, minute}
+    Returns J2000 ecliptic lon/lat and distance in planet radii."""
+    d = request.json or {}
+    return jsonify(compute_moons(
+        d.get('planet', 'mars'),
+        int(d.get('year', 2000)), int(d.get('month', 1)), int(d.get('day', 1)),
+        int(d.get('hour', 12)), int(d.get('minute', 0))))
 
 
 @app.route('/lunar', methods=['POST'])
