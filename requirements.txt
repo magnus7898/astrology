@@ -9,3 +9,4 @@ gunicorn>=21.0
 flask-sqlalchemy>=3.1
 flask-jwt-extended>=4.6
 psycopg2-binary>=2.9
+ephem>=4.1
