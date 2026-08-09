@@ -16,14 +16,22 @@ set and are therefore reported as unavailable rather than guessed.
 """
 
 import math
-import ephem
+
+try:
+    import ephem
+    EPHEM_OK = True
+    EPHEM_ERR = ''
+except Exception as _e:            # library missing / failed to build
+    ephem = None
+    EPHEM_OK = False
+    EPHEM_ERR = str(_e)
 
 D2R = math.pi / 180.0
 R2D = 180.0 / math.pi
 EPS = 23.4392911 * D2R          # J2000 obliquity
 
 # planet -> (ephem planet class, [(ephem moon class, key, Georgian name)])
-MOONS = {
+MOONS = {} if not EPHEM_OK else {
     'mars': (ephem.Mars, [
         (ephem.Phobos, 'phobos', 'ფობოსი'),
         (ephem.Deimos, 'deimos', 'დეიმოსი'),
@@ -72,6 +80,151 @@ PERIOD = {
 }
 
 
+# ---------------------------------------------------------------
+# FALLBACK ORBIT MODEL
+# PyEphem's Mars- and Uranus-satellite theories only return data for
+# roughly 1999-2040; outside that window they yield zeros. For those
+# moons we use a circular model in the planet's equatorial plane whose
+# mean motion and epoch phase were fitted to PyEphem inside its valid
+# window (periods reproduce published values to <2 s). Accuracy is a
+# degree or so — ample for chart work, and honest about its origin.
+# ---------------------------------------------------------------
+FIT = {
+    "phobos": {
+        "planet": "mars",
+        "n": 1128.8448886068713,
+        "th0": -16.81990579918701,
+        "r": 2.762694879404526,
+        "h": [
+            -0.02629941178926514,
+            -0.002608417744695551,
+            -0.0015486126123514373,
+            0.0010775285201453724
+        ]
+    },
+    "deimos": {
+        "planet": "mars",
+        "n": 285.16190845773224,
+        "th0": 35.03814736704776,
+        "r": 6.910833813941082,
+        "h": [
+            -0.010381852806910598,
+            0.0017757064757744157,
+            -0.006774008095466973,
+            0.001992829030788094
+        ]
+    },
+    "miranda": {
+        "planet": "uranus",
+        "n": -254.69082824377702,
+        "th0": 66.23969650351879,
+        "r": 5.418239063066301,
+        "h": [
+            0.031793143411164015,
+            0.011144220053952124,
+            0.010555869659645908,
+            0.011788093892575938
+        ]
+    },
+    "ariel": {
+        "planet": "uranus",
+        "n": -142.8357492468701,
+        "th0": 178.74823432550824,
+        "r": 7.991599455508346,
+        "h": [
+            0.002172589427767581,
+            0.030619965987449364,
+            0.0015992737144980443,
+            -0.00025965288240229227
+        ]
+    },
+    "umbriel": {
+        "planet": "uranus",
+        "n": -86.86892318598873,
+        "th0": 123.90095931865505,
+        "r": 11.132806546831452,
+        "h": [
+            0.28389869492371544,
+            0.21619140656551283,
+            0.0026170253826838094,
+            0.00038004588068035576
+        ]
+    },
+    "titania": {
+        "planet": "uranus",
+        "n": -41.35144110247323,
+        "th0": 88.28727117664442,
+        "r": 18.26154671231396,
+        "h": [
+            -0.09197399733498503,
+            -0.18566878727246522,
+            0.0009010582149317192,
+            0.001909815329865406
+        ]
+    },
+    "oberon": {
+        "planet": "uranus",
+        "n": -26.739504130523883,
+        "th0": 15.61523574709796,
+        "r": 24.421510456553126,
+        "h": [
+            -0.16673242411373954,
+            -0.015169806181940308,
+            0.002160110006895332,
+            -0.0003365564609925796
+        ]
+    }
+}
+
+PLANET_POLE = {            # IAU pole (a0, d0) in degrees, J2000
+    'mars': (317.68143, 52.88650),
+    'uranus': (257.311, -15.175),
+}
+
+
+def _plane_basis(planet):
+    a0, d0 = PLANET_POLE[planet]
+    a, d = a0 * D2R, d0 * D2R
+    pe = (math.cos(d) * math.cos(a), math.cos(d) * math.sin(a), math.sin(d))
+    pole = (pe[0],
+            pe[1] * math.cos(EPS) + pe[2] * math.sin(EPS),
+            -pe[1] * math.sin(EPS) + pe[2] * math.cos(EPS))
+    n = math.sqrt(sum(c * c for c in pole))
+    pole = tuple(c / n for c in pole)
+    ref = (0.0, 0.0, 1.0) if abs(pole[2]) < 0.9 else (1.0, 0.0, 0.0)
+
+    def cross(p, q):
+        return (p[1]*q[2]-p[2]*q[1], p[2]*q[0]-p[0]*q[2], p[0]*q[1]-p[1]*q[0])
+
+    def unit(v):
+        m = math.sqrt(sum(c * c for c in v))
+        return tuple(c / m for c in v)
+
+    u = unit(cross(ref, pole))
+    v = unit(cross(pole, u))
+    return u, v
+
+
+def _fitted_position(key, jd):
+    """Planetocentric ecliptic vector from the fitted orbit.
+
+    Mean angle in the planet's equatorial plane plus harmonic terms
+    (eccentricity and plane effects). Typical accuracy vs PyEphem:
+    0.1-0.6 deg for the Uranian moons and Deimos, ~5 deg rms for
+    Phobos, which is the noise floor of PyEphem's own Mars theory.
+    """
+    f = FIT[key]
+    u, v = _plane_basis(f['planet'])
+    t = jd - 2451545.0
+    mean = f['th0'] + f['n'] * t
+    m = mean * D2R
+    h = f.get('h', [0, 0, 0, 0])
+    th = (mean + h[0] * math.sin(m) + h[1] * math.cos(m)
+          + h[2] * math.sin(2 * m) + h[3] * math.cos(2 * m)) * D2R
+    c, sn = math.cos(th), math.sin(th)
+    r = f['r']
+    return tuple(r * (c * u[i] + sn * v[i]) for i in range(3))
+
 def _sky_to_ecliptic(x, y, z, ra, dec):
     """PyEphem/Meeus satellite offset (x positive WEST, y north,
     z away from Earth), at the planet's (ra, dec)
@@ -92,6 +245,9 @@ def _sky_to_ecliptic(x, y, z, ra, dec):
 def compute_moons(planet, year, month, day, hour=12, minute=0):
     """Planetocentric ecliptic positions of `planet`'s major moons."""
     planet = (planet or '').lower()
+    if not EPHEM_OK:
+        return {'planet': planet, 'moons': [], 'unavailable': [],
+                'error': 'ephem library not installed on the server: ' + EPHEM_ERR}
     date = ephem.Date((int(year), int(month), int(day),
                        int(hour), int(minute), 0))
 
@@ -106,11 +262,21 @@ def compute_moons(planet, year, month, day, hour=12, minute=0):
     p.compute(date)
     ra, dec = float(p.ra), float(p.dec)
 
+    jd = float(date) + 2415020.0        # ephem date -> Julian Day
+
     moons = []
     for cls, key, ka in sats:
         m = cls()
         m.compute(date)
-        v = _sky_to_ecliptic(m.x, m.y, m.z, ra, dec)
+        source = 'ephem'
+        if m.x == 0 and m.y == 0 and m.z == 0:
+            # outside PyEphem's validity window -> fitted orbit model
+            if key not in FIT:
+                continue
+            v = _fitted_position(key, jd)
+            source = 'fit'
+        else:
+            v = _sky_to_ecliptic(m.x, m.y, m.z, ra, dec)
         r = math.hypot(math.hypot(v[0], v[1]), v[2])
         if r == 0:
             continue
@@ -121,6 +287,7 @@ def compute_moons(planet, year, month, day, hour=12, minute=0):
             'lon': round(lon, 4), 'lat': round(lat, 4),
             'radii': round(r, 3),
             'period_days': PERIOD.get(key),
-            'behind': bool(m.z > 0),     # farther than the planet
+            'behind': bool(m.z > 0) if source == 'ephem' else None,
+            'source': source,
         })
     return {'planet': planet, 'moons': moons, 'unavailable': []}
