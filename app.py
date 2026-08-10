@@ -953,6 +953,31 @@ def api_moons():
         int(d.get('hour', 12)), int(d.get('minute', 0))))
 
 
+# ---------------------------------------------------------------
+# ASTEROIDS  (real Swiss Ephemeris positions + contacts)
+# ---------------------------------------------------------------
+from asteroids import compute_asteroids
+
+@app.route('/api/asteroids', methods=['POST'])
+def api_asteroids():
+    """Payload: same as /chart plus {ids:[...], orb, aspects}.
+    Returns real asteroid positions, houses and contacts to the natal
+    planets. Asteroids whose Swiss Ephemeris file is not installed are
+    listed under 'unavailable' -- never estimated."""
+    swe.set_ephe_path(EPHE_PATH)
+    d = request.json or {}
+    year, month, day = int(d['year']), int(d['month']), int(d['day'])
+    hour = int(d.get('hour', 12)); minute = int(d.get('minute', 0))
+    second = int(d.get('second', 0))
+    lat = float(d.get('lat', 0.0)); lon = float(d.get('lon', 0.0))
+    tz_name = d.get('tz_name', 'UTC')
+    ids = [int(x) for x in (d.get('ids') or [])][:200]
+    orb = float(d.get('orb', 3.0))
+    jd = to_jd(year, month, day, hour, minute, second, tz_name)
+    return jsonify(compute_asteroids(jd, lat, lon, ids, orb=orb,
+                                     aspects=bool(d.get('aspects'))))
+
+
 @app.route('/lunar', methods=['POST'])
 def lunar():
     swe.set_ephe_path(EPHE_PATH)
