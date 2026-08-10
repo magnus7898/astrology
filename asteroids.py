@@ -15,7 +15,60 @@ exact filename needed, so nothing is ever invented.
 """
 
 import math
+import os
+import urllib.request
 import swisseph as swe
+
+# Where the ephemeris lives (set by app.py; falls back to ./ephe)
+EPHE_DIR = os.environ.get('SE_EPHE_PATH') or os.path.join(
+    os.path.dirname(os.path.abspath(__file__)), 'ephe')
+
+# Astrodienst mirrors, tried in order. The backend downloads an
+# asteroid's file the first time it is requested and caches it in
+# ephe/astN/, so no files have to be committed to the repo.
+FILE_SOURCES = [
+    'https://www.astro.com/ftp/swisseph/ephe/{folder}{file}',
+    'https://www.astro.com/ftp/swisseph/ephe/asteroids/{folder}{file}',
+    'https://raw.githubusercontent.com/aloistr/swisseph/master/ephe/{folder}{file}',
+]
+_TRIED = set()
+
+
+def ensure_file(num):
+    """Fetch this asteroid's Swiss Ephemeris file if we don't have it.
+
+    Returns True when the file is present afterwards. Failures are
+    remembered so a missing asteroid is only attempted once per process.
+    """
+    fn, folder = _file_for(num)
+    if folder.startswith('ephe/'):
+        folder = folder[5:]
+    dest_dir = os.path.join(EPHE_DIR, folder) if folder else EPHE_DIR
+    dest = os.path.join(dest_dir, fn)
+    if os.path.exists(dest) and os.path.getsize(dest) > 1000:
+        return True
+    if num in _TRIED:
+        return False
+    _TRIED.add(num)
+    try:
+        os.makedirs(dest_dir, exist_ok=True)
+    except Exception:
+        return False
+    for tpl in FILE_SOURCES:
+        url = tpl.format(folder=folder, file=fn)
+        try:
+            req = urllib.request.Request(url, headers={'User-Agent': 'magnus-astro/1.0'})
+            with urllib.request.urlopen(req, timeout=25) as r:
+                data = r.read()
+            if len(data) < 1000:          # not a real ephemeris file
+                continue
+            with open(dest, 'wb') as f:
+                f.write(data)
+            swe.set_ephe_path(EPHE_DIR)   # re-scan so the new file is seen
+            return True
+        except Exception:
+            continue
+    return False
 
 SIGNS_KA = ['ვერძი', 'კურო', 'ტყუპები', 'კირჩხიბი', 'ლომი', 'ქალწული',
             'სასწორი', 'მორიელი', 'მშვილდოსანი', 'თხის რქა',
@@ -91,9 +144,17 @@ def compute_asteroids(jd, lat, lon, ids, orb=3.0, aspects=False):
         try:
             xx = swe.calc_ut(jd, pid)[0]
         except Exception:
-            fn, folder = _file_for(num)
-            missing.append({'id': num, 'file': fn, 'folder': folder})
-            continue
+            # not installed yet - try to fetch it once, then retry
+            got = ensure_file(num)
+            if got:
+                try:
+                    xx = swe.calc_ut(jd, pid)[0]
+                except Exception:
+                    got = False
+            if not got:
+                fn, folder = _file_for(num)
+                missing.append({'id': num, 'file': fn, 'folder': folder})
+                continue
         deg = xx[0] % 360.0
         si = int(deg // 30)
         hits = []
