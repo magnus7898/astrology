@@ -252,3 +252,4 @@ def compute_asteroids(jd, lat, lon, ids, orb=3.0, aspects=False):
     return {'asteroids': out, 'unavailable': missing,
             'planets': {k: round(v, 4) for k, v in planets.items()},
             'houses': [round(c, 4) for c in cusps], 'orb': orb}
+ 
