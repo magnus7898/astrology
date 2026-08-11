@@ -17,6 +17,7 @@ exact filename needed, so nothing is ever invented.
 import math
 import os
 import urllib.request
+import urllib.parse
 import swisseph as swe
 
 # Where the ephemeris lives (set by app.py; falls back to ./ephe)
@@ -32,6 +33,7 @@ FILE_SOURCES = [
     'https://raw.githubusercontent.com/aloistr/swisseph/master/ephe/{folder}{file}',
 ]
 _TRIED = set()
+LAST_ERRORS = []          # why downloads failed (see /api/asteroids/diag)
 
 
 def ensure_file(num):
@@ -61,14 +63,70 @@ def ensure_file(num):
             with urllib.request.urlopen(req, timeout=25) as r:
                 data = r.read()
             if len(data) < 1000:          # not a real ephemeris file
+                LAST_ERRORS.append('%s -> only %d bytes' % (url, len(data)))
                 continue
             with open(dest, 'wb') as f:
                 f.write(data)
             swe.set_ephe_path(EPHE_DIR)   # re-scan so the new file is seen
             return True
-        except Exception:
+        except Exception as e:
+            LAST_ERRORS.append('%s -> %s' % (url, e))
             continue
     return False
+
+
+# ---------------------------------------------------------------
+# FILE-FREE FALLBACK: NASA/JPL Horizons
+# Astrodienst may refuse downloads from cloud IPs (the same problem
+# app.py documents for the geocoders). Horizons serves positions over
+# a plain HTTPS API and needs no local files at all.
+# ---------------------------------------------------------------
+HORIZONS = 'https://ssd.jpl.nasa.gov/api/horizons.api'
+_HZ_CACHE = {}
+
+
+def horizons_lonlat(num, jd):
+    """Geocentric ecliptic longitude/latitude of asteroid `num` at jd."""
+    key = (num, round(jd, 5))
+    if key in _HZ_CACHE:
+        return _HZ_CACHE[key]
+    q = {
+        'format': 'text',
+        'COMMAND': "'%d;'" % num,        # ';' = small-body lookup by number
+        'OBJ_DATA': 'NO',
+        'MAKE_EPHEM': 'YES',
+        'EPHEM_TYPE': 'OBSERVER',
+        'CENTER': "'500@399'",           # geocentric
+        'QUANTITIES': "'31'",            # observer ecliptic lon & lat
+        'TLIST': '%.6f' % jd,
+        'CSV_FORMAT': 'YES',
+    }
+    url = HORIZONS + '?' + urllib.parse.urlencode(q)
+    try:
+        req = urllib.request.Request(url, headers={'User-Agent': 'magnus-astro/1.0'})
+        with urllib.request.urlopen(req, timeout=30) as r:
+            txt = r.read().decode('utf-8', 'replace')
+    except Exception as e:
+        LAST_ERRORS.append('horizons %d -> %s' % (num, e))
+        return None
+    if '$$SOE' not in txt:
+        LAST_ERRORS.append('horizons %d -> no ephemeris block' % num)
+        return None
+    body = txt.split('$$SOE', 1)[1].split('$$EOE', 1)[0].strip()
+    line = body.splitlines()[0] if body.splitlines() else ''
+    parts = [p.strip() for p in line.split(',')]
+    nums = []
+    for p in parts:
+        try:
+            nums.append(float(p))
+        except ValueError:
+            pass
+    if len(nums) < 2:
+        LAST_ERRORS.append('horizons %d -> unparsed: %s' % (num, line[:80]))
+        return None
+    lon, lat = nums[-2], nums[-1]
+    _HZ_CACHE[key] = (lon % 360.0, lat)
+    return _HZ_CACHE[key]
 
 SIGNS_KA = ['ვერძი', 'კურო', 'ტყუპები', 'კირჩხიბი', 'ლომი', 'ქალწული',
             'სასწორი', 'მორიელი', 'მშვილდოსანი', 'თხის რქა',
@@ -152,9 +210,14 @@ def compute_asteroids(jd, lat, lon, ids, orb=3.0, aspects=False):
                 except Exception:
                     got = False
             if not got:
-                fn, folder = _file_for(num)
-                missing.append({'id': num, 'file': fn, 'folder': folder})
-                continue
+                hz = horizons_lonlat(num, jd)
+                if hz is None:
+                    fn, folder = _file_for(num)
+                    missing.append({'id': num, 'file': fn, 'folder': folder})
+                    continue
+                xx = [hz[0], hz[1], None, None]
+                src = 'horizons'
+        src = locals().get('src', 'swisseph')
         deg = xx[0] % 360.0
         si = int(deg // 30)
         hits = []
@@ -179,10 +242,12 @@ def compute_asteroids(jd, lat, lon, ids, orb=3.0, aspects=False):
             'element_ka': ELEMENT_KA[si % 4],
             'house': _house(deg, cusps),
             'speed': round(xx[3], 6) if len(xx) > 3 else 0.0,
-            'retrograde': bool(len(xx) > 3 and xx[3] < 0),
-            'distance_au': round(xx[2], 6) if len(xx) > 2 else None,
+            'retrograde': bool(len(xx) > 3 and xx[3] is not None and xx[3] < 0),
+            'distance_au': round(xx[2], 6) if len(xx) > 2 and xx[2] is not None else None,
+            'source': src,
             'contacts': hits,
         })
+        src = 'swisseph'
 
     return {'asteroids': out, 'unavailable': missing,
             'planets': {k: round(v, 4) for k, v in planets.items()},
