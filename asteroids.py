@@ -29,6 +29,7 @@ EPHE_DIR = os.environ.get('SE_EPHE_PATH') or os.path.join(
 # ephe/astN/, so no files have to be committed to the repo.
 FILE_SOURCES = [
     'https://www.astro.com/ftp/swisseph/ephe/{folder}{file}',
+    'https://www.astro.com/ftp/swisseph/ephe/{folder}{longfile}',
     'https://www.astro.com/ftp/swisseph/ephe/asteroids/{folder}{file}',
     'https://raw.githubusercontent.com/aloistr/swisseph/master/ephe/{folder}{file}',
 ]
@@ -56,8 +57,9 @@ def ensure_file(num):
         os.makedirs(dest_dir, exist_ok=True)
     except Exception:
         return False
+    longfn = fn.replace('s.se1', '.se1')      # full-precision variant
     for tpl in FILE_SOURCES:
-        url = tpl.format(folder=folder, file=fn)
+        url = tpl.format(folder=folder, file=fn, longfile=longfn)
         try:
             req = urllib.request.Request(url, headers={'User-Agent': 'magnus-astro/1.0'})
             with urllib.request.urlopen(req, timeout=25) as r:
@@ -83,6 +85,35 @@ def ensure_file(num):
 # ---------------------------------------------------------------
 HORIZONS = 'https://ssd.jpl.nasa.gov/api/horizons.api'
 _HZ_CACHE = {}
+_HZ_FILE = os.path.join(EPHE_DIR, 'horizons_cache.json')
+try:
+    import json as _json_hz
+    with open(_HZ_FILE) as _f:
+        for _k, _v in _json_hz.load(_f).items():
+            _id, _jd = _k.split('|')
+            _HZ_CACHE[(int(_id), float(_jd))] = tuple(_v)
+except Exception:
+    pass
+
+
+def _save_hz_cache():
+    try:
+        import json as _j
+        with open(_HZ_FILE, 'w') as f:
+            _j.dump({'%d|%s' % k: list(v) for k, v in _HZ_CACHE.items()}, f)
+    except Exception:
+        pass
+
+
+def horizons_many(nums, jd, workers=16):
+    """Fetch several asteroids from Horizons in parallel."""
+    from concurrent.futures import ThreadPoolExecutor
+    todo = [n for n in nums if (n, round(jd, 5)) not in _HZ_CACHE]
+    if todo:
+        with ThreadPoolExecutor(max_workers=workers) as ex:
+            list(ex.map(lambda n: horizons_lonlat(n, jd), todo))
+        _save_hz_cache()
+    return {n: _HZ_CACHE.get((n, round(jd, 5))) for n in nums}
 
 
 def horizons_lonlat(num, jd):
@@ -196,6 +227,18 @@ def compute_asteroids(jd, lat, lon, ids, orb=3.0, aspects=False):
     except Exception:
         cusps = [i * 30.0 for i in range(12)]
 
+    # which asteroids have no local file? resolve them together, in parallel
+    need = []
+    for num in ids:
+        if num in SPECIAL:
+            continue
+        try:
+            swe.calc_ut(jd, swe.AST_OFFSET + num)
+        except Exception:
+            need.append(num)
+    if need:
+        horizons_many(need, jd)
+
     out, missing = [], []
     for num in ids:
         pid = SPECIAL.get(num, swe.AST_OFFSET + num)
@@ -241,7 +284,7 @@ def compute_asteroids(jd, lat, lon, ids, orb=3.0, aspects=False):
             'deg_in_sign': round(deg % 30, 4),
             'element_ka': ELEMENT_KA[si % 4],
             'house': _house(deg, cusps),
-            'speed': round(xx[3], 6) if len(xx) > 3 else 0.0,
+            'speed': (round(xx[3], 6) if len(xx) > 3 and xx[3] is not None else None),
             'retrograde': bool(len(xx) > 3 and xx[3] is not None and xx[3] < 0),
             'distance_au': round(xx[2], 6) if len(xx) > 2 and xx[2] is not None else None,
             'source': src,
@@ -252,4 +295,3 @@ def compute_asteroids(jd, lat, lon, ids, orb=3.0, aspects=False):
     return {'asteroids': out, 'unavailable': missing,
             'planets': {k: round(v, 4) for k, v in planets.items()},
             'houses': [round(c, 4) for c in cusps], 'orb': orb}
- 
