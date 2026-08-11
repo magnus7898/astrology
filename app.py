@@ -978,6 +978,40 @@ def api_asteroids():
                                      aspects=bool(d.get('aspects'))))
 
 
+@app.route('/api/asteroids/diag')
+def api_asteroids_diag():
+    """Why asteroid files/positions fail. Open in a browser to inspect."""
+    import asteroids as _ast
+    swe.set_ephe_path(EPHE_PATH)
+    jd = swe.julday(2000, 1, 1, 12.0)
+    tests = {}
+    for num in (1, 433):
+        try:
+            tests[str(num)] = round(swe.calc_ut(jd, swe.AST_OFFSET + num)[0][0], 4)
+        except Exception as e:
+            tests[str(num)] = 'ERR: %s' % e
+    _ast.LAST_ERRORS.clear()
+    got = _ast.ensure_file(433)
+    hz = _ast.horizons_lonlat(433, jd)
+    listing = []
+    try:
+        for root, dirs, files in os.walk(EPHE_PATH):
+            for f in files[:12]:
+                listing.append(os.path.relpath(os.path.join(root, f), EPHE_PATH))
+            if len(listing) > 30:
+                break
+    except Exception as e:
+        listing = ['walk error: %s' % e]
+    return jsonify({
+        'ephe_path': EPHE_PATH,
+        'ephe_files': listing,
+        'direct_calc': tests,
+        'download_worked': got,
+        'horizons_result': hz,
+        'errors': _ast.LAST_ERRORS[-12:],
+    })
+
+
 @app.route('/lunar', methods=['POST'])
 def lunar():
     swe.set_ephe_path(EPHE_PATH)
@@ -1350,3 +1384,4 @@ def static_files(filename):
 if __name__ == '__main__':
     port = int(os.environ.get("PORT", 8080))
     app.run(host='0.0.0.0', port=port)
+
