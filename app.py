@@ -978,6 +978,19 @@ def api_asteroids():
                                      aspects=bool(d.get('aspects'))))
 
 
+@app.route('/api/asteroids/status')
+def api_asteroids_status():
+    """How many asteroid element tables are built and cached."""
+    import asteroids as _ast
+    return jsonify({
+        'tabulated': sorted(_ast._ELEMS.keys()),
+        'count': len(_ast._ELEMS),
+        'building_now': sorted(_ast._WARMING),
+        'positions_cached': len(_ast._HZ_CACHE),
+        'last_errors': _ast.LAST_ERRORS[-5:],
+    })
+
+
 @app.route('/api/asteroids/diag')
 def api_asteroids_diag():
     """Why asteroid files/positions fail. Open in a browser to inspect."""
