@@ -123,7 +123,7 @@ def horizons_lonlat(num, jd):
         return _HZ_CACHE[key]
     q = {
         'format': 'text',
-        'COMMAND': "'%d;'" % num,        # ';' = small-body lookup by number
+        'COMMAND': "'DES=%d;'" % num,     # DES= forces the small-body record
         'OBJ_DATA': 'NO',
         'MAKE_EPHEM': 'YES',
         'EPHEM_TYPE': 'OBSERVER',
@@ -277,7 +277,7 @@ def elements_lonlat(num, jd):
 
 def horizons_vectors(num, jd):
     """Heliocentric state vector from Horizons -> osculating elements."""
-    q = {'format': 'text', 'COMMAND': "'%d;'" % num, 'OBJ_DATA': 'NO',
+    q = {'format': 'text', 'COMMAND': "'DES=%d;'" % num, 'OBJ_DATA': 'NO',
          'MAKE_EPHEM': 'YES', 'EPHEM_TYPE': 'VECTORS',
          'CENTER': "'500@10'", 'VEC_TABLE': "'2'",
          'TLIST': '%.6f' % jd, 'CSV_FORMAT': 'YES', 'OUT_UNITS': "'AU-D'"}
