@@ -175,7 +175,8 @@ for n in range(1, 257):
     transform = f"translate({TX_ADJ},{TY_ADJ}) scale({sx:.6f},{sy:.6f}) translate({-ax:.4f},{-ay:.4f})"
     
     det_groups.append(
-        f'<g class="detail-part" data-detail="{n}" style="display:none">'
+        f'<g class="detail-part" data-detail="{n}" style="display:none" '
+        f'clip-path="url(#detail-clip)">'
         f'<g transform="{transform}">{cell_paths}</g>'
         f'</g>'
     )
@@ -220,7 +221,12 @@ for n in range(1, 257):
 css.append("</style>")
 
 # ── 10. Assemble ──────────────────────────────────────────────
-details_html = "\n<g id='details-layer'>\n" + "\n".join(det_groups) + "\n</g>"
+details_html = (
+    "\n<defs><clipPath id='detail-clip'>"
+    f"<rect x='{TX}' y='{TY}' width='{CW}' height='{CH}'/>"
+    "</clipPath></defs>\n"
+    "<g id='details-layer'>\n" + "\n".join(det_groups) + "\n</g>"
+)
 
 # Insert details BEFORE the first chakra (under chakras in z-order)
 first_chakra = svg.find('class="st126 chakra"')
