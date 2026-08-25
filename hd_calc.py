@@ -38,6 +38,13 @@ PLANET_DEFS: List[Tuple[str, Optional[int], str]] = [
     ("Pluto",       swe.PLUTO,      "♇"),
 ]
 
+# Chiron is NOT part of the official Human Design bodygraph: Ra's system
+# uses exactly the 13 activations above. It is offered as a separate layer
+# so the canonical chart (type, authority, channels, definition) is never
+# altered by it - see calc_chiron() and the "chiron" key in the result.
+CHIRON_DEF: Tuple[str, int, str] = ("Chiron", swe.CHIRON, "\u26b7")
+
+
 CENTER_GATES: Dict[str, List[int]] = {
     "Head":         [64, 61, 63],
     "Ajna":         [47, 24, 4, 17, 11, 43],
@@ -216,6 +223,22 @@ def calc_planets(jd_ut: float) -> List[Activation]:
         g, l, c, t, b = decompose(lon)
         results.append(Activation(name, glyph, lon, g, l, c, t, b))
     return results
+
+
+def calc_chiron(jd_ut: float) -> Optional[Activation]:
+    """Chiron's gate/line at this moment, as an extra activation.
+
+    Returned separately from calc_planets() so it can be displayed without
+    ever entering the gate sets that decide type, authority or channels.
+    """
+    name, pid, glyph = CHIRON_DEF
+    try:
+        data, _ = swe.calc_ut(jd_ut, pid, swe.FLG_SWIEPH | swe.FLG_SPEED)
+    except Exception:
+        return None
+    lon = data[0] % 360
+    g, l, c, t, b = decompose(lon)
+    return Activation(name, glyph, lon, g, l, c, t, b)
 
 
 def find_design_jd(birth_jd_ut: float) -> float:
@@ -861,6 +884,29 @@ def calculate_chart_from_coords(
     d_gate_set = {a.gate for a in design}
     integration = integration_condition(p_gate_set, d_gate_set)
 
+    # ── Chiron layer (optional, never changes the canonical chart) ──
+    ch_p = calc_chiron(jd_ut)
+    ch_d = calc_chiron(design_jd)
+    chiron_block = None
+    if ch_p and ch_d:
+        def _act(a):
+            return {"planet": a.planet, "glyph": a.glyph, "gate": a.gate,
+                    "line": a.line, "color": a.color, "tone": a.tone,
+                    "base": a.base, "longitude": round(a.longitude, 6)}
+        # which centre each Chiron gate belongs to, and whether that gate
+        # is already active from the standard 13
+        ch_gates = {ch_p.gate, ch_d.gate}
+        already = p_gate_set | d_gate_set
+        chiron_block = {
+            "personality": _act(ch_p),
+            "design": _act(ch_d),
+            "centers": sorted({GATE_TO_CENTER[g] for g in ch_gates
+                               if g in GATE_TO_CENTER}),
+            "new_gates": sorted(g for g in ch_gates if g not in already),
+            "note": ("Chiron is not part of the official Human Design "
+                     "bodygraph; shown as an additional layer only."),
+        }
+
     # Variable calculations
 # Variable calculations (PHS): base = color, arrow = tone (1-3 left, 4-6 right)
     def _arrow(tone: int) -> str:
@@ -910,6 +956,7 @@ def calculate_chart_from_coords(
         "personality": [asdict(a) for a in personality],
         "design":      [asdict(a) for a in design],
         "integration": integration,
+        "chiron": chiron_block,
         **analysis,
     }
 
