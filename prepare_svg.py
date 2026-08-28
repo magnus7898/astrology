@@ -210,6 +210,16 @@ for g, _, _ in GATE_RULES:
         f"svg.active-b-{g} [data-gate='{g}'][data-type='light'].gate-line{{fill:{D_PURP}!important;}}",
     ]
 for g in [g for g,_,_ in GATE_RULES] + [10, 20, 34, 57]:
+    # Chiron / Lilith are not part of the canonical bodygraph, so they get
+    # their own classes and colours instead of reusing the P/D ones.
+    css.append(f"svg.extra-ch-{g} [data-gate='{g}'].gate-line{{fill:#3E9E75!important;}}")
+    css.append(f"svg.extra-li-{g} [data-gate='{g}'].gate-line{{fill:#9B6BC4!important;}}")
+    css.append(f"svg.extra-both-{g} [data-gate='{g}'][data-type='dark'].gate-line{{fill:#3E9E75!important;}}")
+    css.append(f"svg.extra-both-{g} [data-gate='{g}'][data-type='light'].gate-line{{fill:#9B6BC4!important;}}")
+    for p in ("extra-ch-", "extra-li-", "extra-both-"):
+        css.append(f"svg.{p}{g} .gate-circle[data-gate='{g}']{{fill:#1a1a2e!important;}}")
+        css.append(f"svg.{p}{g} .gate-text[data-gate='{g}']{{fill:#FFFFFF!important;}}")
+
     for p in ("active-p-", "active-d-", "active-b-"):
         css.append(f"svg.{p}{g} .gate-circle[data-gate='{g}']{{fill:#1a1a2e!important;}}")
         css.append(f"svg.{p}{g} .gate-text[data-gate='{g}']{{fill:#FFFFFF!important;}}")
