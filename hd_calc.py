@@ -921,6 +921,33 @@ def calculate_chart_from_coords(
     chiron_block = _extra_block("chiron")
     lilith_block = _extra_block("lilith")
 
+    # Ascendant. Unlike the planets it is not a body but the point where the
+    # ecliptic meets the eastern horizon, so it depends on latitude and
+    # longitude. Human Design does not use it at all (that is why an HD chart
+    # is location-independent); offered here only as an optional layer.
+    def _asc_block():
+        try:
+            _, ascmc_b = swe.houses(jd_ut, lat, lon, b'P')
+            _, ascmc_d = swe.houses(design_jd, lat, lon, b'P')
+        except Exception:
+            return None
+        gp, lp, cp, tp, bp = decompose(float(ascmc_b[0]) % 360)
+        gd, ld, cd, td, bd = decompose(float(ascmc_d[0]) % 360)
+        ap = Activation("Ascendant", "AC", float(ascmc_b[0]) % 360, gp, lp, cp, tp, bp)
+        ad = Activation("Ascendant", "AC", float(ascmc_d[0]) % 360, gd, ld, cd, td, bd)
+        gates = {gp, gd}
+        return {
+            "personality": _act(ap),
+            "design": _act(ad),
+            "centers": sorted({GATE_TO_CENTER[g] for g in gates
+                               if g in GATE_TO_CENTER}),
+            "new_gates": sorted(g for g in gates if g not in already),
+            "note": ("The Ascendant is not part of Human Design; it depends on "
+                     "birth place, which an HD chart otherwise ignores."),
+        }
+
+    ascendant_block = _asc_block()
+
     # Variable calculations
 # Variable calculations (PHS): base = color, arrow = tone (1-3 left, 4-6 right)
     def _arrow(tone: int) -> str:
@@ -972,6 +999,7 @@ def calculate_chart_from_coords(
         "integration": integration,
         "chiron": chiron_block,
         "lilith": lilith_block,
+        "ascendant": ascendant_block,
         **analysis,
     }
 
