@@ -1,0 +1,134 @@
+# -*- coding: utf-8 -*-
+"""
+pastlife.py — past-life incarnation scanner (dragon chart method).
+
+Method: the draconic Pluto degree (natal Pluto shifted by the North Node,
+i.e. the "dragon chart" Pluto) is the karmic marker. Times in the past
+when transiting Pluto occupied that same zodiacal degree are taken as
+prior incarnation epochs. Pluto's ~248-year cycle gives up to ~8 passages
+per 2000 years; retrograde loops within one passage are grouped together.
+
+For each incarnation epoch the Sun-IC astrocartography meridian is
+computed: the geographic longitude where the Sun was exactly on the IC
+(4th house cusp — roots, homeland) at that moment. Uses the Moshier
+ephemeris so dates back to antiquity need no ephemeris files.
+"""
+
+import swisseph as swe
+
+SIGNS_KA = ["ვერძი", "კურო", "ტყუპები", "კირჩხიბი", "ლომი", "ქალწული",
+            "სასწორი", "მორიელი", "მშვილდოსანი", "თხის რქა",
+            "მერწყული", "თევზები"]
+MONTHS_KA = ["იანვარი", "თებერვალი", "მარტი", "აპრილი", "მაისი", "ივნისი",
+             "ივლისი", "აგვისტო", "სექტემბერი", "ოქტომბერი",
+             "ნოემბერი", "დეკემბერი"]
+
+GREGORIAN_START_JD = 2299160.5     # 1582-10-15
+
+
+def _norm(d):
+    d %= 360.0
+    return d + 360.0 if d < 0 else d
+
+
+def _norm180(d):
+    d = _norm(d)
+    return d - 360.0 if d > 180.0 else d
+
+
+def _sdiff(a, b):
+    """signed shortest angular difference a-b in (-180, 180]"""
+    d = (a - b) % 360.0
+    return d - 360.0 if d > 180.0 else d
+
+
+def _pluto(jd):
+    return swe.calc_ut(jd, swe.PLUTO, swe.FLG_MOSEPH)[0][0]
+
+
+def _date_of(jd):
+    cal = swe.GREG_CAL if jd >= GREGORIAN_START_JD else swe.JUL_CAL
+    y, m, d, _ = swe.revjul(jd, cal)
+    return {"year": y, "month": m, "day": d,
+            "label": f"{d} {MONTHS_KA[m - 1]}, {y}",
+            "julian_cal": jd < GREGORIAN_START_JD}
+
+
+def compute_pastlife(jd_birth, count=4, span_years=2000, step_days=30.0):
+    """Returns up to `count` most recent incarnation passages within
+    span_years before birth, each with its Sun-IC meridian."""
+    # ---- draconic Pluto target ----------------------------------------
+    pl = swe.calc_ut(jd_birth, swe.PLUTO, swe.FLG_MOSEPH)[0][0]
+    nn = swe.calc_ut(jd_birth, swe.MEAN_NODE, swe.FLG_MOSEPH)[0][0]
+    target = _norm(pl - nn)
+
+    # ---- scan for crossings -------------------------------------------
+    jd0 = jd_birth - span_years * 365.25
+    crossings = []
+    prev_jd = jd0
+    prev_diff = _sdiff(_pluto(jd0), target)
+    jd = jd0 + step_days
+    while jd < jd_birth:
+        diff = _sdiff(_pluto(jd), target)
+        if prev_diff == 0.0:
+            crossings.append(prev_jd)
+        elif diff == 0.0:
+            pass                                # handled next iteration
+        elif (prev_diff < 0 < diff or prev_diff > 0 > diff) \
+                and abs(diff - prev_diff) < 90.0:
+            a, b, fa = prev_jd, jd, prev_diff   # bisect to ~10 seconds:
+            for _ in range(48):                  # the Sun-IC meridian
+                m = (a + b) / 2.0                # rotates 360°/day, so the
+                fm = _sdiff(_pluto(m), target)   # crossing instant matters
+                if fm == 0.0 or (b - a) < 1.2e-4:
+                    a = b = m
+                    break
+                if (fa < 0 < fm) or (fa > 0 > fm):
+                    b = m
+                else:
+                    a, fa = m, fm
+            crossings.append((a + b) / 2.0)
+        prev_jd, prev_diff = jd, diff
+        jd += step_days
+
+    # ---- group crossings into passages (retro loops ~ within 4 years) --
+    passages = []
+    for c in crossings:
+        if passages and c - passages[-1][-1] < 1500.0:
+            passages[-1].append(c)
+        else:
+            passages.append([c])
+
+    recent = passages[-count:][::-1]            # newest first
+
+    # ---- per-passage data: date + Sun-IC meridian ----------------------
+    out = []
+    for grp in recent:
+        jdp = grp[len(grp) // 2]                # exact middle crossing
+        sun = swe.calc_ut(jdp, swe.SUN, swe.FLG_MOSEPH)[0][0]
+        ra = swe.calc_ut(jdp, swe.SUN,
+                         swe.FLG_MOSEPH | swe.FLG_EQUATORIAL)[0][0]
+        gst = swe.sidtime(jdp) * 15.0           # GMST in degrees
+        mc_lon = _norm180(ra - gst)             # Sun-on-MC meridian
+        ic_lon = _norm180(mc_lon + 180.0)       # Sun-on-IC meridian
+        si = int(sun // 30)
+        out.append({
+            "date": _date_of(jdp),
+            "jd": round(jdp, 6),
+            "years_ago": round((jd_birth - jdp) / 365.25),
+            "crossings": len(grp),
+            "span_days": int(grp[-1] - grp[0]),
+            "sun": {"lon": round(sun, 2), "sign": si + 1,
+                    "sign_ka": SIGNS_KA[si], "deg": round(sun % 30.0, 1)},
+            "ic_lon": round(ic_lon, 2),
+            "mc_lon": round(mc_lon, 2),
+        })
+
+    si = int(target // 30)
+    return {
+        "target": {"lon": round(target, 2), "sign": si + 1,
+                   "sign_ka": SIGNS_KA[si], "deg": round(target % 30.0, 1)},
+        "span_years": span_years,
+        "total_passages": len(passages),
+        "incarnations": out,
+    }
