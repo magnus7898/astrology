@@ -121,6 +121,28 @@ class User(db.Model):
     role = db.Column(db.String(10), default='user')          # user | admin
     created = db.Column(db.DateTime, server_default=db.func.now())
 
+class SiteCard(db.Model):
+    """A card on the index page, editable from the admin panel."""
+    id = db.Column(db.Integer, primary_key=True)
+    key = db.Column(db.String(40), unique=True, nullable=False)   # stable id
+    title = db.Column(db.String(80), default='')                  # ასტროლოგია
+    subtitle = db.Column(db.String(80), default='')               # Astrology
+    href = db.Column(db.String(120), default='')                  # astro.html
+    symbol = db.Column(db.String(16), default='')                 # ✷ or emoji
+    color = db.Column(db.String(20), default='#c9a84c')
+    position = db.Column(db.Integer, default=0)
+    visible = db.Column(db.Boolean, default=True)
+    note = db.Column(db.String(200), default='')                  # admin-only memo
+
+    def as_dict(self, admin=False):
+        d = {'key': self.key, 'title': self.title, 'subtitle': self.subtitle,
+             'href': self.href, 'symbol': self.symbol, 'color': self.color,
+             'position': self.position}
+        if admin:
+            d.update(id=self.id, visible=self.visible, note=self.note)
+        return d
+
+
 class Event(db.Model):
     id = db.Column(db.Integer, primary_key=True)
     user_id = db.Column(db.Integer, db.ForeignKey('user.id'), nullable=True)
@@ -1025,6 +1047,114 @@ def api_asteroids_diag():
     })
 
 
+# ---------------------------------------------------------------
+# SITE CARDS — index page tiles, managed from the admin panel
+# ---------------------------------------------------------------
+DEFAULT_CARDS = [
+    ('astro',        'ასტროლოგია',    'Astrology',      'astro.html',        '✷', '#a78bfa'),
+    ('vedic',        'ვედური',        'Vedic',          'vedic.html',        '☉', '#f0a04b'),
+    ('true_sidereal','ჭეშმარიტი ცა',  'True Sidereal',  'true_sidereal.html','✧', '#7ec8f0'),
+    ('hd',           'ჰიუმან დიზაინი','Human Design',   'hd.html',           '◈', '#30c890'),
+    ('matrix',       'ბედისწერის მატრიცა','Matrix',      'matrix.html',       '◆', '#c9a84c'),
+    ('pythagoras',   'პითაგორა',      'Pythagoras',     'pythagoras.html',   '△', '#e0c060'),
+    ('cards',        'ბედის კარტები', 'Destiny Cards',  'cards.html',        '♠', '#e05585'),
+    ('moon',         'მთვარე',        'Moon',           'moon.html',         '☽', '#c8d8f0'),
+    ('bio',          'ბიორითმები',    'Biorhythms',     'bio.html',          '∿', '#60c0e0'),
+    ('name',         'სახელი',        'Name',           'name.html',         '✎', '#d0a0e0'),
+    ('frequency',    'სიხშირეები',    'Frequencies',    'frequency.html',    '≈', '#30b0f0'),
+]
+
+
+def _seed_cards():
+    """First run: copy the current index tiles into the database."""
+    if SiteCard.query.first():
+        return
+    for i, (k, t, sub, href, sym, col) in enumerate(DEFAULT_CARDS):
+        db.session.add(SiteCard(key=k, title=t, subtitle=sub, href=href,
+                                symbol=sym, color=col, position=i, visible=True))
+    try:
+        db.session.commit()
+    except Exception:
+        db.session.rollback()
+
+
+@app.route('/api/cards', methods=['GET'])
+def api_cards():
+    """Public: the visible cards, in order. index.html renders from this."""
+    try:
+        _seed_cards()
+        rows = (SiteCard.query.filter_by(visible=True)
+                .order_by(SiteCard.position, SiteCard.id).all())
+        return jsonify({'cards': [r.as_dict() for r in rows]})
+    except Exception as e:
+        return jsonify({'cards': [], 'error': str(e)}), 200
+
+
+@app.route('/api/admin/cards', methods=['GET'])
+@admin_required
+def api_admin_cards():
+    _seed_cards()
+    rows = SiteCard.query.order_by(SiteCard.position, SiteCard.id).all()
+    return jsonify({'cards': [r.as_dict(admin=True) for r in rows]})
+
+
+@app.route('/api/admin/cards', methods=['POST'])
+@admin_required
+def api_admin_card_create():
+    d = request.json or {}
+    key = (d.get('key') or '').strip()
+    if not key:
+        return jsonify(error='key required'), 400
+    if SiteCard.query.filter_by(key=key).first():
+        return jsonify(error='key exists'), 400
+    last = db.session.query(db.func.max(SiteCard.position)).scalar() or 0
+    c = SiteCard(key=key, title=d.get('title', ''), subtitle=d.get('subtitle', ''),
+                 href=d.get('href', ''), symbol=d.get('symbol', ''),
+                 color=d.get('color', '#c9a84c'), note=d.get('note', ''),
+                 visible=bool(d.get('visible', True)), position=last + 1)
+    db.session.add(c)
+    db.session.commit()
+    return jsonify(c.as_dict(admin=True))
+
+
+@app.route('/api/admin/cards/<int:cid>', methods=['PUT'])
+@admin_required
+def api_admin_card_update(cid):
+    c = SiteCard.query.get_or_404(cid)
+    d = request.json or {}
+    for f in ('title', 'subtitle', 'href', 'symbol', 'color', 'note'):
+        if f in d:
+            setattr(c, f, d[f])
+    if 'visible' in d:
+        c.visible = bool(d['visible'])
+    if 'position' in d:
+        c.position = int(d['position'])
+    db.session.commit()
+    return jsonify(c.as_dict(admin=True))
+
+
+@app.route('/api/admin/cards/<int:cid>', methods=['DELETE'])
+@admin_required
+def api_admin_card_delete(cid):
+    c = SiteCard.query.get_or_404(cid)
+    db.session.delete(c)
+    db.session.commit()
+    return jsonify(ok=True)
+
+
+@app.route('/api/admin/cards/order', methods=['POST'])
+@admin_required
+def api_admin_card_order():
+    """Body: {order:[id,id,...]} — positions follow the array."""
+    ids = (request.json or {}).get('order') or []
+    for i, cid in enumerate(ids):
+        c = SiteCard.query.get(int(cid))
+        if c:
+            c.position = i
+    db.session.commit()
+    return jsonify(ok=True)
+
+
 @app.route('/lunar', methods=['POST'])
 def lunar():
     swe.set_ephe_path(EPHE_PATH)
@@ -1397,4 +1527,3 @@ def static_files(filename):
 if __name__ == '__main__':
     port = int(os.environ.get("PORT", 8080))
     app.run(host='0.0.0.0', port=port)
-
