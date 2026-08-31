@@ -128,8 +128,8 @@ class SiteCard(db.Model):
     title = db.Column(db.String(80), default='')                  # ასტროლოგია
     subtitle = db.Column(db.String(80), default='')               # Astrology
     href = db.Column(db.String(120), default='')                  # astro.html
-    symbol = db.Column(db.String(16), default='')                 # ✷ or emoji
-    color = db.Column(db.String(20), default='#c9a84c')
+    symbol = db.Column(db.String(2000), default='')               # optional inline SVG/char
+    color = db.Column(db.String(30), default='c-freq')            # css class of the tile
     position = db.Column(db.Integer, default=0)
     visible = db.Column(db.Boolean, default=True)
     note = db.Column(db.String(200), default='')                  # admin-only memo
@@ -1050,18 +1050,29 @@ def api_asteroids_diag():
 # ---------------------------------------------------------------
 # SITE CARDS — index page tiles, managed from the admin panel
 # ---------------------------------------------------------------
+# The 19 tiles exactly as they appear in index.html today. The icon is NOT
+# stored here: each card keeps its inline SVG in the page, matched by href,
+# so the artwork survives and the panel controls order/visibility/text.
 DEFAULT_CARDS = [
-    ('astro',        'ასტროლოგია',    'Astrology',      'astro.html',        '✷', '#a78bfa'),
-    ('vedic',        'ვედური',        'Vedic',          'vedic.html',        '☉', '#f0a04b'),
-    ('true_sidereal','ჭეშმარიტი ცა',  'True Sidereal',  'true_sidereal.html','✧', '#7ec8f0'),
-    ('hd',           'ჰიუმან დიზაინი','Human Design',   'hd.html',           '◈', '#30c890'),
-    ('matrix',       'ბედისწერის მატრიცა','Matrix',      'matrix.html',       '◆', '#c9a84c'),
-    ('pythagoras',   'პითაგორა',      'Pythagoras',     'pythagoras.html',   '△', '#e0c060'),
-    ('cards',        'ბედის კარტები', 'Destiny Cards',  'cards.html',        '♠', '#e05585'),
-    ('moon',         'მთვარე',        'Moon',           'moon.html',         '☽', '#c8d8f0'),
-    ('bio',          'ბიორითმები',    'Biorhythms',     'bio.html',          '∿', '#60c0e0'),
-    ('name',         'სახელი',        'Name',           'name.html',         '✎', '#d0a0e0'),
-    ('frequency',    'სიხშირეები',    'Frequencies',    'frequency.html',    '≈', '#30b0f0'),
+    ('astro', 'ასტროლოგია', 'Celestial Chart', 'astro.html', 'c-astro'),
+    ('vedic', 'ვედური ასტროლოგია', 'Jyotish · Sidereal', 'vedic.html', 'c-freq'),
+    ('true_sidereal', 'ნამდვილი სიდერიული', 'True Sidereal Astrology', 'true_sidereal.html', 'c-freq'),
+    ('matrix', 'ბედისწერის მატრიცა', 'Matrix of Destiny', 'matrix.html', 'c-matrix'),
+    ('pythagoras', 'პითაგორას კვადრატი', 'Pythagorean Square', 'pythagoras.html', 'c-pyth'),
+    ('name', 'სახელის ნუმეროლოგია', 'Name Numerology', 'name.html', 'c-name'),
+    ('frequency', 'სიხშირეები', 'Healing Frequencies', 'frequency.html', 'c-freq'),
+    ('bio', 'ბიორითმები', 'Biorhythms', 'bio.html', 'c-freq'),
+    ('moon', 'მთვარის ფაზები', 'Moon Phases', 'moon.html', 'c-freq'),
+    ('hd', 'ადამიანის დიზაინი', 'Human Design', 'hd.html', 'c-freq'),
+    ('cards', 'ბედის ბანქო', 'Destiny Cards', 'cards.html', 'c-freq'),
+    ('fengshui', 'ფენ-შუი', 'Wind & Water', 'fengshui.html', 'c-feng'),
+    ('stones', 'მინერალოგია', 'Gems & Crystals', 'stones.html', 'c-stone'),
+    ('calendar13', '13 თვიანი კალენდარი', 'Thirteen Month Calendar', 'calendar13.html', 'c-stone'),
+    ('mars', 'მარსის კალენდარი', 'Darian Calendar', 'mars.html', 'c-mars'),
+    ('planeta', 'პლანეტარული ასტროლოგია', 'Planetocentric Charts', 'planeta.html', 'c-mars'),
+    ('calendars', 'კალენდარული სისტემები', 'Calendar Systems', 'calendars.html', 'c-mars'),
+    ('sky', 'ცის რუკა', 'Live Sky Map', 'sky.html', 'c-freq'),
+    ('asteroid', 'ასტეროიდები', 'Asteroid Placements & Conjunctions', 'asteroid.html', 'c-freq'),
 ]
 
 
@@ -1069,9 +1080,9 @@ def _seed_cards():
     """First run: copy the current index tiles into the database."""
     if SiteCard.query.first():
         return
-    for i, (k, t, sub, href, sym, col) in enumerate(DEFAULT_CARDS):
+    for i, (k, t, sub, href, css) in enumerate(DEFAULT_CARDS):
         db.session.add(SiteCard(key=k, title=t, subtitle=sub, href=href,
-                                symbol=sym, color=col, position=i, visible=True))
+                                symbol='', color=css, position=i, visible=True))
     try:
         db.session.commit()
     except Exception:
