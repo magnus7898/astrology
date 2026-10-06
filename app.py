@@ -1048,6 +1048,33 @@ def api_asteroids_diag():
 
 
 # ---------------------------------------------------------------
+# TRUTINE OF HERMES  (birth-time rectification, prenatal epoch)
+# ---------------------------------------------------------------
+from trutine import compute_trutine
+
+@app.route('/api/trutine', methods=['POST'])
+def api_trutine():
+    """Same payload as /chart (+ optional window [min], mode bailey|classic).
+    Returns rectified birth-time candidates nearest the entered time."""
+    try:
+        swe.set_ephe_path(EPHE_PATH)
+        d = request.json or {}
+        year, month, day = int(d['year']), int(d['month']), int(d['day'])
+        hour = int(d.get('hour', 12)); minute = int(d.get('minute', 0))
+        second = int(d.get('second', 0))
+        lat, lon = float(d['lat']), float(d['lon'])
+        tz_name = d.get('tz_name', 'UTC')
+        window = int(d.get('window', 120))
+        if d.get('time_unknown'):
+            hour, minute, second, window = 12, 0, 0, 720
+        jd = to_jd(year, month, day, hour, minute, second, tz_name)
+        return jsonify(compute_trutine(jd, lat, lon, tz_name, window=window,
+                                       mode=d.get('mode', 'bailey')))
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
+
+# ---------------------------------------------------------------
 # SITE CARDS — index page tiles, managed from the admin panel
 # ---------------------------------------------------------------
 # The 19 tiles exactly as they appear in index.html today. The icon is NOT
