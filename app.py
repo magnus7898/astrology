@@ -1554,6 +1554,41 @@ def hd_chart():
 
 
 # ════════════════════════════════════════════════════════════════
+# HUMAN DESIGN — TRANSIT
+# ════════════════════════════════════════════════════════════════
+from hd_transit import compute_hd_transit
+
+@app.route('/api/hd_transit', methods=['POST'])
+def hd_transit():
+    """{natal:{date,time,lat,lon,tz_name}, transit:{date,time,tz_name},
+        days, moon}  ->  transit activations, channel status, the chart under
+    the transit, and the timeline of channels completed by transit bodies."""
+    try:
+        d = request.get_json(force=True) or {}
+        n, t = d.get('natal') or {}, d.get('transit') or {}
+        if not (n.get('date') and n.get('time') and n.get('lat') is not None
+                and n.get('lon') is not None):
+            return jsonify({'error': 'natal date, time, lat, lon required'}), 400
+        from hd_calc import calculate_chart_from_coords
+        natal = calculate_chart_from_coords(
+            n['date'], n['time'], float(n['lat']), float(n['lon']),
+            n.get('tz_name') or 'UTC', resolved_place=n.get('place', ''))
+        tz = t.get('tz_name') or n.get('tz_name') or 'UTC'
+        res = compute_hd_transit(natal, t.get('date') or n['date'],
+                                 t.get('time') or '12:00', tz,
+                                 days=int(d.get('days', 365)),
+                                 include_moon=bool(d.get('moon')))
+        res['natal'] = natal
+        return jsonify(res)
+    except ValueError as ve:
+        return jsonify({'error': str(ve)}), 400
+    except Exception as e:
+        import traceback
+        return jsonify({'error': f'{type(e).__name__}: {e}',
+                        'trace': traceback.format_exc()}), 500
+
+
+# ════════════════════════════════════════════════════════════════
 # STATIC
 # ════════════════════════════════════════════════════════════════
 
