@@ -18,9 +18,10 @@ Three things are computed:
      plus the chart "under the transit": natal gates + transit gates,
      with its centers, type, authority and definition.
 
-  2. timeline — for every hanging gate of the natal chart, the windows in
-     which a transit body stands in the missing partner gate: body, gate,
-     start, end, duration, and which centers become defined.
+  2. ingress table — for every body, every gate it occupies during the
+     period (entry, exit, retrograde). Any gate or channel question
+     ("when is 20 activated", "when does 10-20 open") is answered from it
+     on the page without another request.
 
   3. the transit sky's own chart (its channels and centers).
 
@@ -197,7 +198,43 @@ def status_at(natal_gates: Set[int], natal_centers: Set[str], jd: float) -> Dict
             "sky": classify(t_gates)}
 
 
-# ── 2. timeline of channel completions ──
+# ── 2. ingress table: every gate every body passes through in the period ──
+# scan step per body (days): max daily motion × step stays well under the
+# 5.625° gate width, so no gate can be skipped between two samples.
+# Verified against a fine brute-force scan over 10 years (see tests).
+STEP = {"Moon": 1.0 / 12, "Mercury": 0.25, "Sun": 0.5, "Earth": 0.5, "Venus": 0.5,
+        "Mars": 1.0, "North Node": 1.0, "South Node": 1.0, "Jupiter": 2.0,
+        "Saturn": 3.0, "Uranus": 4.0, "Neptune": 5.0, "Pluto": 5.0}
+
+
+def segments(jd0: float, days: float, include_moon: bool) -> Dict[str, List]:
+    """{body: [[gate, start_jd, end_jd, retro], ...]} covering [jd0, jd0+days]
+    without gaps. A retrograde loop simply produces the gate again."""
+    jd1 = jd0 + days
+    out: Dict[str, List] = {}
+    for body in BODY_ORDER:
+        if body == "Moon" and not include_moon:
+            continue
+        step = STEP.get(body, 0.25)
+        segs = []
+        j, g, s = jd0, _gate(body, jd0), jd0
+        while j < jd1:
+            jn = min(j + step, jd1)
+            gn = _gate(body, jn)
+            if gn != g:
+                t = _edge(body, j, jn, g)
+                segs.append([g, s, t])
+                g, s, j = _gate(body, t), t, t
+                continue
+            j = jn
+        segs.append([g, s, jd1])
+        nodes = body in ("North Node", "South Node")
+        out[body] = [[g, round(a, 5), round(e, 5),
+                      (not nodes) and _speed(body, (a + e) / 2) < 0]
+                     for g, a, e in segs]
+    return out
+
+
 def hanging_targets(natal_gates: Set[int]) -> Dict[int, List[Dict]]:
     """missing partner gate -> the channels it would complete."""
     out: Dict[int, List[Dict]] = {}
@@ -207,65 +244,6 @@ def hanging_targets(natal_gates: Set[int]) -> Dict[int, List[Dict]]:
                 out.setdefault(miss, []).append(
                     {"gate_a": a, "gate_b": b, "name": name, "natal_gate": have})
     return out
-
-
-# scan step per body (days): max daily motion × step stays well under the
-# 5.625° gate width, so no gate can be skipped between two samples.
-# Verified against a 30-min brute-force scan over 10 years (see tests).
-STEP = {"Moon": 1.0 / 12, "Mercury": 0.25, "Sun": 0.5, "Earth": 0.5, "Venus": 0.5,
-        "Mars": 1.0, "North Node": 1.0, "South Node": 1.0, "Jupiter": 2.0,
-        "Saturn": 3.0, "Uranus": 4.0, "Neptune": 5.0, "Pluto": 5.0}
-
-
-def timeline(natal_gates: Set[int], natal_centers: Set[str], jd0: float,
-             days: int, tz_name: str, include_moon: bool) -> Dict:
-    targets = hanging_targets(natal_gates)
-    bodies = [b for b in BODY_ORDER if include_moon or b != "Moon"]
-    jd1 = jd0 + days
-    wins = []
-    for body in bodies:
-        step = STEP.get(body, 0.25)
-        j = jd0
-        g = _gate(body, j)
-        start = jd0 if g in targets else None
-        start_open = start is not None
-        while j < jd1:
-            jn = min(j + step, jd1)
-            gn = _gate(body, jn)
-            if gn != g:
-                t = _edge(body, j, jn, g)
-                if start is not None:                       # leaving a target gate
-                    wins.append((body, g, start, t, start_open, False))
-                    start = None
-                g = _gate(body, t)
-                if g in targets:                            # entering one
-                    start, start_open = t, False
-                # the body may have crossed again before jn (rare): continue from t
-                j = t
-                continue
-            j = jn
-        if start is not None:
-            wins.append((body, g, start, jd1, start_open, True))
-
-    out = []
-    for body, gate, s, e, open_s, open_e in wins:
-        retro = _speed(body, (s + e) / 2) < 0 if body not in ("North Node", "South Node") else False
-        for ch in targets[gate]:
-            new_c = sorted({GATE_TO_CENTER[ch["gate_a"]], GATE_TO_CENTER[ch["gate_b"]]} - natal_centers)
-            out.append({
-                "planet": body, "glyph": GLYPH.get(body, ""),
-                "gate": gate, "natal_gate": ch["natal_gate"],
-                "gate_a": ch["gate_a"], "gate_b": ch["gate_b"], "name": ch["name"],
-                "start": _local(s, tz_name), "end": _local(e, tz_name),
-                "start_jd": round(s, 5), "end_jd": round(e, 5),
-                "days": round(e - s, 2),
-                "open_start": open_s, "open_end": open_e,
-                "retrograde": retro,
-                "new_centers": new_c,
-            })
-    out.sort(key=lambda w: (w["start_jd"], BODY_ORDER.index(w["planet"])))
-    return {"targets": {str(g): v for g, v in sorted(targets.items())},
-            "windows": out, "days": days, "moon": include_moon}
 
 
 # ── entry point used by the Flask route ──
@@ -278,14 +256,18 @@ def compute_hd_transit(natal_chart: Dict, t_date: str, t_time: str, tz_name: str
     if include_moon:
         days = min(days, 400)            # the Moon makes ~13 windows per gate a year
     st = status_at(natal_gates, natal_centers, jd)
-    tl = timeline(natal_gates, natal_centers, jd, days, tz_name, include_moon)
     return {
         "moment": {"date": t_date, "time": t_time, "tz": tz_name,
                    "utc": _local(jd, "UTC")},
         "natal_gates": sorted(natal_gates),
         "natal_centers": sorted(natal_centers),
         **st,
-        "timeline": tl,
+        "period": {"jd0": round(jd, 5), "jd1": round(jd + days, 5),
+                   "days": days, "moon": include_moon},
+        "segments": segments(jd, days, include_moon),
+        "channels_all": [{"gate_a": a, "gate_b": b, "name": n,
+                          "center_a": GATE_TO_CENTER[a], "center_b": GATE_TO_CENTER[b]}
+                         for a, b, n in CHANNELS],
         "note": ("ტრანზიტი = პლანეტების მიმდინარე პოზიციები (13 აქტივაცია). "
                  "88°-იანი წესი მხოლოდ ნატალური დიზაინისთვისაა და ტრანზიტზე არ ვრცელდება."),
     }
