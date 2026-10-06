@@ -1100,12 +1100,41 @@ DEFAULT_CARDS = [
     ('calendars', 'კალენდარული სისტემები', 'Calendar Systems', 'calendars.html', 'c-mars'),
     ('sky', 'ცის რუკა', 'Live Sky Map', 'sky.html', 'c-freq'),
     ('asteroid', 'ასტეროიდები', 'Asteroid Placements & Conjunctions', 'asteroid.html', 'c-freq'),
+    ('tarot', 'ტარო', 'Tarot Spreads', 'tarot.html', 'c-stone'),
 ]
 
 
+# Cards added to DEFAULT_CARDS after the database was first seeded. Each is
+# inserted ONCE into an existing database (an Event row marks it as done),
+# so deleting it later from the admin panel is respected.
+LATER_CARDS = ('tarot',)
+
+
+def _seed_later_cards():
+    done = {e.detail.get('key') for e in Event.query.filter_by(action='seed_card').all()
+            if isinstance(e.detail, dict)}
+    added = False
+    for k, t, sub, href, css in DEFAULT_CARDS:
+        if k not in LATER_CARDS or k in done:
+            continue
+        if not SiteCard.query.filter_by(key=k).first():
+            last = db.session.query(db.func.max(SiteCard.position)).scalar() or 0
+            db.session.add(SiteCard(key=k, title=t, subtitle=sub, href=href,
+                                    symbol='', color=css, position=last + 1, visible=True))
+        db.session.add(Event(user_id=None, action='seed_card', detail={'key': k}))
+        added = True
+    if added:
+        try:
+            db.session.commit()
+        except Exception:
+            db.session.rollback()
+
+
 def _seed_cards():
-    """First run: copy the current index tiles into the database."""
+    """First run: copy the current index tiles into the database.
+    Later runs: add any card from LATER_CARDS that was never seeded."""
     if SiteCard.query.first():
+        _seed_later_cards()
         return
     for i, (k, t, sub, href, css) in enumerate(DEFAULT_CARDS):
         db.session.add(SiteCard(key=k, title=t, subtitle=sub, href=href,
