@@ -111,7 +111,7 @@ def _jd_from_local(date_str, time_str, tz_name):
 
 def _local(jd, tz_name):
     y, m, d, h = swe.revjul(jd)
-    dt = datetime(y, m, d, tzinfo=pytz.UTC) + timedelta(hours=h)
+    dt = datetime(y, m, d, tzinfo=pytz.UTC) + timedelta(hours=h, seconds=30)  # nearest minute
     try:
         dt = dt.astimezone(pytz.timezone(tz_name))
     except Exception:
@@ -271,3 +271,191 @@ def compute_hd_transit(natal_chart: Dict, t_date: str, t_time: str, tz_name: str
         "note": ("ტრანზიტი = პლანეტების მიმდინარე პოზიციები (13 აქტივაცია). "
                  "88°-იანი წესი მხოლოდ ნატალური დიზაინისთვისაა და ტრანზიტზე არ ვრცელდება."),
     }
+
+
+# ══════════════════════════════════════════════════════════════════
+# 4. NEAREST-ACTIVATION SEARCH  (no fixed period: scans forward until found)
+#    planet_gate : when does <planet> enter <gate>?            (each pass)
+#    gate        : when is <gate> activated by any transit body?
+#    channel     : when is <a-b> open?
+#                  with natal   -> your own gate counts (hanging gate +
+#                                  transit in the partner)
+#                  transit only -> both gates held by transit bodies
+# ══════════════════════════════════════════════════════════════════
+JD_MAX = 2597641.0          # 2400-01-01, end of the sepl_18/semo_18 files
+
+
+def _segs(body, j0, days):
+    """[[gate, start, end], ...] for one body over [j0, j0+days]."""
+    j1 = min(j0 + days, JD_MAX)
+    step = STEP.get(body, 0.25)
+    out, j, g, s = [], j0, _gate(body, j0), j0
+    while j < j1:
+        jn = min(j + step, j1)
+        gn = _gate(body, jn)
+        if gn != g:
+            t = _edge(body, j, jn, g)
+            out.append([g, s, t])
+            g, s, j = _gate(body, t), t, t
+            continue
+        j = jn
+    out.append([g, s, j1])
+    return out
+
+
+def _entry_before(body, jd, g, max_days=36600):
+    """True start of the stay of `body` in gate g that contains jd."""
+    step = STEP.get(body, 0.25) * 4
+    j, back = jd, 0.0
+    while back < max_days:
+        jp = j - step
+        if _gate(body, jp) != g:
+            lo, hi = jp, j                       # gate changes in (lo, hi]
+            for _ in range(40):
+                if hi - lo < 1.0 / 1440:
+                    break
+                m = (lo + hi) / 2
+                if _gate(body, m) == g:
+                    hi = m
+                else:
+                    lo = m
+            return hi
+        j, back = jp, back + step
+    return jd - max_days
+
+
+def _merge(iv):
+    """Union of [s, e, {bodies}, retro] intervals."""
+    out = []
+    for s, e, b, r in sorted(iv, key=lambda x: x[0]):
+        if out and s <= out[-1][1] + 1e-6:
+            out[-1][1] = max(out[-1][1], e)
+            out[-1][2] |= b
+            out[-1][3] = out[-1][3] or r
+        else:
+            out.append([s, e, set(b), r])
+    return out
+
+
+def _intersect(A, B):
+    out, i, j = [], 0, 0
+    while i < len(A) and j < len(B):
+        s, e = max(A[i][0], B[j][0]), min(A[i][1], B[j][1])
+        if e > s + 1e-6:
+            out.append([s, e, A[i], B[j]])
+        if A[i][1] < B[j][1]:
+            i += 1
+        else:
+            j += 1
+    return out
+
+
+def search_nearest(kind: str, jd_from: float, count: int = 3, include_moon: bool = False,
+                   planet: str = None, gate: int = None, channel=None,
+                   natal_gates: Set[int] = None, tz_name: str = "UTC") -> Dict:
+    count = max(1, min(int(count), 12))
+    if kind == "planet_gate":
+        if planet not in BODY_ORDER:
+            raise ValueError("unknown planet")
+        bodies = [planet]
+        horizon = 300 * 365.25 if planet in ("Uranus", "Neptune", "Pluto") else 100 * 365.25
+        chunk = {"Pluto": 3650, "Neptune": 3650, "Uranus": 1825, "Saturn": 1095,
+                 "Jupiter": 730}.get(planet, 365)
+        gates = [int(gate)]
+    else:
+        bodies = [b for b in BODY_ORDER if include_moon or b != "Moon"]
+        horizon = 60 * 365.25
+        chunk = 60 if include_moon else 365
+        gates = [int(gate)] if kind == "gate" else [int(channel[0]), int(channel[1])]
+    for g in gates:
+        if not 1 <= g <= 64:
+            raise ValueError("gate must be 1-64")
+    if kind == "channel":
+        a, b = gates
+        ch = next(((x, y, n) for x, y, n in CHANNELS if {x, y} == {a, b}), None)
+        if not ch:
+            raise ValueError("no such channel")
+        gates = [ch[0], ch[1]]
+    natal = set(natal_gates or [])
+
+    # stays of the relevant bodies in the relevant gates, accumulated chunk by chunk
+    stays = {g: [] for g in gates}          # g -> [[s, e, body, retro], ...]
+    j, end = jd_from, min(jd_from + horizon, JD_MAX)
+    windows = []
+    while j < end:
+        days = min(chunk, end - j)
+        for body in bodies:
+            for g, s, e in _segs(body, j, days):
+                if g in stays:
+                    lst = stays[g]
+                    prev = next((x for x in reversed(lst) if x[2] == body), None)
+                    if prev and abs(prev[1] - s) < 1e-6:
+                        prev[1] = e                    # continues across chunks
+                    else:
+                        lst.append([s, e, body, False])
+        j += days
+
+        # windows found so far
+        if kind == "planet_gate":
+            windows = [[s, e, {bd}, r] for s, e, bd, r in stays[gates[0]]]
+        elif kind == "gate":
+            windows = _merge([[s, e, {bd}, False] for s, e, bd, _ in stays[gates[0]]])
+        else:
+            cov = []
+            for g in gates:
+                if g in natal:
+                    cov.append([[-1e12, 1e12, {"natal"}, False]])
+                else:
+                    cov.append(_merge([[s, e, {bd}, False] for s, e, bd, _ in stays[g]]))
+            windows = [[s, e, x[2] | y[2], False] for s, e, x, y in _intersect(cov[0], cov[1])]
+        closed = [w for w in windows if w[1] < j - 1e-6]
+        if len(closed) >= count:
+            break
+
+    # retrograde flag for single-planet passes, true start for "active now"
+    out = []
+    for s, e, bset, _ in windows[:count]:
+        ongoing = e >= j - 1e-6 and j >= end
+        start = s
+        if s <= jd_from + 1e-6:
+            per_gate = []
+            for g in gates:
+                if g in natal and kind == "channel":
+                    continue
+                st = [_entry_before(body, jd_from, g) for body in (bset - {"natal"})
+                      if body in bodies and _gate(body, jd_from) == g]
+                if st:
+                    per_gate.append(min(st))
+            if per_gate:
+                start = max(per_gate) if kind == "channel" else min(per_gate)
+        who = {}
+        for g in gates:
+            if g in natal and kind == "channel":
+                who[str(g)] = ["natal"]
+                continue
+            who[str(g)] = sorted({bd for ss, ee, bd, _ in stays[g] if ss < e - 1e-6 and ee > s + 1e-6},
+                                 key=BODY_ORDER.index)
+        retro = None
+        if kind == "planet_gate" and planet not in ("North Node", "South Node"):
+            retro = _speed(planet, start + 0.01) < 0      # entered moving retrograde
+        out.append({"start": round(start, 5), "end": None if ongoing else round(e, 5),
+                    "start_local": _local(start, tz_name),
+                    "end_local": None if ongoing else _local(e, tz_name),
+                    "days": None if ongoing else round(e - start, 3),
+                    "active_now": s <= jd_from + 1e-6,
+                    "who": who, "retro": retro})
+
+    res = {"kind": kind, "from": round(jd_from, 5), "from_local": _local(jd_from, tz_name),
+           "searched_to_local": _local(j, tz_name), "windows": out,
+           "gates": gates, "moon": include_moon, "natal_used": bool(natal)}
+    if kind == "channel":
+        res["channel"] = {"gate_a": gates[0], "gate_b": gates[1],
+                          "name": next(n for x, y, n in CHANNELS if x == gates[0] and y == gates[1]),
+                          "natal_gates": [g for g in gates if g in natal]}
+        if all(g in natal for g in gates):
+            res["note"] = "ეს არხი შენს ნატალურ რუქაში მუდმივად ღიაა."
+    if kind == "gate" and gates[0] in natal:
+        res["note"] = "ეს კარიბჭე შენს ნატალურ რუქაში უკვე აქტიურია — ქვემოთ ტრანზიტული გავლებია."
+    if not out:
+        res["note"] = "არ მოიძებნა %s-მდე." % _local(j, tz_name)[:4]
+    return res
