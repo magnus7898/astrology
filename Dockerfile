@@ -17,6 +17,11 @@ COPY . .
 
 CMD sh -c "gunicorn app:app --bind 0.0.0.0:$PORT --workers 1 --timeout 120"
 
+# asteroids: fetch one JPL state per asteroid and integrate 1900-2100
+# into the image (~1-2 min). If JPL is unreachable the server does it
+# itself at startup instead, so the build never fails because of this.
+RUN python -c "import asteroid_nbody as A; A.prebuild()" || true
+
 
 RUN python -c "import urllib.request,zipfile,io; \
 d=urllib.request.urlopen(urllib.request.Request('https://download.geonames.org/export/dump/cities500.zip',headers={'User-Agent':'magnus/1.0'}),timeout=300).read(); \
