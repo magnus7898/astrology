@@ -1,406 +1,300 @@
 # -*- coding: utf-8 -*-
 """
-moons.py — major natural satellites, seen FROM their own planet.
+asteroids.py — real asteroid positions + conjunctions to the natal chart.
 
-For planetocentric astrology: when the observer is Mars, its sky
-contains Phobos and Deimos; from Jupiter, the four Galileans, etc.
+Sources, in order:
+  1. Swiss Ephemeris file, when present (Ceres, Pallas, Juno, Vesta,
+     Chiron, Pholus are in seas_18.se1; any se#####s.se1 dropped into
+     ephe/astN/ is used automatically).
+  2. asteroid_nbody.py — free local numerical integration from one JPL
+     state vector per asteroid (fetched once, at Docker build time).
+     Accuracy < 1 arcmin 1900-2100, ~20 ms per chart for 80 asteroids.
 
-PyEphem supplies each satellite's offset from its planet in the
-plane of the sky (x = west, y = north, z = line of sight, all in
-planet radii, referred to the equator of date). That offset IS the planetocentric vector, so we
-rotate it from the sky frame into J2000 ecliptic coordinates and
-report ecliptic longitude/latitude, distance and phase angle.
-
-Triton (Neptune) and Charon (Pluto) are not in PyEphem's satellite
-set and are therefore reported as unavailable rather than guessed.
+Nothing is estimated: an asteroid with neither source is reported in
+`unavailable`.
 """
 
 import math
+import os
+import urllib.request
+import urllib.parse
+import swisseph as swe
 
-try:
-    import ephem
-    EPHEM_OK = True
-    EPHEM_ERR = ''
-except Exception as _e:            # library missing / failed to build
-    ephem = None
-    EPHEM_OK = False
-    EPHEM_ERR = str(_e)
+# Where the ephemeris lives (set by app.py; falls back to ./ephe)
+EPHE_DIR = os.environ.get('SE_EPHE_PATH') or os.path.join(
+    os.path.dirname(os.path.abspath(__file__)), 'ephe')
 
-D2R = math.pi / 180.0
-R2D = 180.0 / math.pi
-EPS = 23.4392911 * D2R          # J2000 obliquity
-
-# planet -> (ephem planet class, [(ephem moon class, key, Georgian name)])
-MOONS = {} if not EPHEM_OK else {
-    'mars': (ephem.Mars, [
-        (ephem.Phobos, 'phobos', 'ფობოსი'),
-        (ephem.Deimos, 'deimos', 'დეიმოსი'),
-    ]),
-    'jupiter': (ephem.Jupiter, [
-        (ephem.Io, 'io', 'იო'),
-        (ephem.Europa, 'europa', 'ევროპა'),
-        (ephem.Ganymede, 'ganymede', 'განიმედი'),
-        (ephem.Callisto, 'callisto', 'კალისტო'),
-    ]),
-    'saturn': (ephem.Saturn, [
-        (ephem.Mimas, 'mimas', 'მიმასი'),
-        (ephem.Enceladus, 'enceladus', 'ენცელადი'),
-        (ephem.Tethys, 'tethys', 'ტეთისი'),
-        (ephem.Dione, 'dione', 'დიონე'),
-        (ephem.Rhea, 'rhea', 'რეა'),
-        (ephem.Titan, 'titan', 'ტიტანი'),
-        (ephem.Hyperion, 'hyperion', 'ჰიპერიონი'),
-        (ephem.Iapetus, 'iapetus', 'იაპეტოსი'),
-    ]),
-    'uranus': (ephem.Uranus, [
-        (ephem.Miranda, 'miranda', 'მირანდა'),
-        (ephem.Ariel, 'ariel', 'არიელი'),
-        (ephem.Umbriel, 'umbriel', 'უმბრიელი'),
-        (ephem.Titania, 'titania', 'ტიტანია'),
-        (ephem.Oberon, 'oberon', 'ობერონი'),
-    ]),
-}
-
-# satellites with no analytic theory in PyEphem
-MISSING = {
-    'neptune': [('triton', 'ტრიტონი')],
-}
-
-# sidereal periods (days) — for the info line only
-PERIOD = {
-    'charon': 6.3872304,
-    'phobos': 0.31891, 'deimos': 1.26244,
-    'io': 1.769138, 'europa': 3.551181,
-    'ganymede': 7.154553, 'callisto': 16.689017,
-    'mimas': 0.942422, 'enceladus': 1.370218, 'tethys': 1.887802,
-    'dione': 2.736915, 'rhea': 4.518212, 'titan': 15.945421,
-    'hyperion': 21.276609, 'iapetus': 79.330183,
-    'miranda': 1.413479, 'ariel': 2.520379, 'umbriel': 4.144177,
-    'titania': 8.705872, 'oberon': 13.463239,
-}
+# Astrodienst mirrors (kept for /api/asteroids/diag only). NOTE: since
+# 2023 Astrodienst serves the asteroid files from Dropbox, these URLs
+# return 404 — the n-body engine replaces them in compute_asteroids.
+FILE_SOURCES = [
+    'https://www.astro.com/ftp/swisseph/ephe/{folder}{file}',
+    'https://www.astro.com/ftp/swisseph/ephe/{folder}{longfile}',
+    'https://www.astro.com/ftp/swisseph/ephe/asteroids/{folder}{file}',
+    'https://raw.githubusercontent.com/aloistr/swisseph/master/ephe/{folder}{file}',
+]
+_TRIED = set()
+LAST_ERRORS = []          # why downloads failed (see /api/asteroids/diag)
 
 
-# ---------------------------------------------------------------
-# FALLBACK ORBIT MODEL
-# PyEphem's Mars- and Uranus-satellite theories only return data for
-# roughly 1999-2040; outside that window they yield zeros. For those
-# moons we use a circular model in the planet's equatorial plane whose
-# mean motion and epoch phase were fitted to PyEphem inside its valid
-# window (periods reproduce published values to <2 s). Accuracy is a
-# degree or so — ample for chart work, and honest about its origin.
-# ---------------------------------------------------------------
-FIT = {
-    "phobos": {
-        "planet": "mars",
-        "n": 1128.8448886068713,
-        "th0": -16.81990579918701,
-        "r": 2.762694879404526,
-        "h": [
-            -0.02629941178926514,
-            -0.002608417744695551,
-            -0.0015486126123514373,
-            0.0010775285201453724
-        ]
-    },
-    "deimos": {
-        "planet": "mars",
-        "n": 285.16190845773224,
-        "th0": 35.03814736704776,
-        "r": 6.910833813941082,
-        "h": [
-            -0.010381852806910598,
-            0.0017757064757744157,
-            -0.006774008095466973,
-            0.001992829030788094
-        ]
-    },
-    "miranda": {
-        "planet": "uranus",
-        "n": -254.69082824377702,
-        "th0": 66.23969650351879,
-        "r": 5.418239063066301,
-        "h": [
-            0.031793143411164015,
-            0.011144220053952124,
-            0.010555869659645908,
-            0.011788093892575938
-        ]
-    },
-    "ariel": {
-        "planet": "uranus",
-        "n": -142.8357492468701,
-        "th0": 178.74823432550824,
-        "r": 7.991599455508346,
-        "h": [
-            0.002172589427767581,
-            0.030619965987449364,
-            0.0015992737144980443,
-            -0.00025965288240229227
-        ]
-    },
-    "umbriel": {
-        "planet": "uranus",
-        "n": -86.86892318598873,
-        "th0": 123.90095931865505,
-        "r": 11.132806546831452,
-        "h": [
-            0.28389869492371544,
-            0.21619140656551283,
-            0.0026170253826838094,
-            0.00038004588068035576
-        ]
-    },
-    "titania": {
-        "planet": "uranus",
-        "n": -41.35144110247323,
-        "th0": 88.28727117664442,
-        "r": 18.26154671231396,
-        "h": [
-            -0.09197399733498503,
-            -0.18566878727246522,
-            0.0009010582149317192,
-            0.001909815329865406
-        ]
-    },
-    "oberon": {
-        "planet": "uranus",
-        "n": -26.739504130523883,
-        "th0": 15.61523574709796,
-        "r": 24.421510456553126,
-        "h": [
-            -0.16673242411373954,
-            -0.015169806181940308,
-            0.002160110006895332,
-            -0.0003365564609925796
-        ]
-    }
-}
+def ensure_file(num):
+    """Fetch this asteroid's Swiss Ephemeris file if we don't have it.
 
-PLANET_POLE = {            # IAU pole (a0, d0) in degrees, J2000
-    'mars': (317.68143, 52.88650),
-    'uranus': (257.311, -15.175),
-}
-
-
-def _plane_basis(planet):
-    a0, d0 = PLANET_POLE[planet]
-    a, d = a0 * D2R, d0 * D2R
-    pe = (math.cos(d) * math.cos(a), math.cos(d) * math.sin(a), math.sin(d))
-    pole = (pe[0],
-            pe[1] * math.cos(EPS) + pe[2] * math.sin(EPS),
-            -pe[1] * math.sin(EPS) + pe[2] * math.cos(EPS))
-    n = math.sqrt(sum(c * c for c in pole))
-    pole = tuple(c / n for c in pole)
-    ref = (0.0, 0.0, 1.0) if abs(pole[2]) < 0.9 else (1.0, 0.0, 0.0)
-
-    def cross(p, q):
-        return (p[1]*q[2]-p[2]*q[1], p[2]*q[0]-p[0]*q[2], p[0]*q[1]-p[1]*q[0])
-
-    def unit(v):
-        m = math.sqrt(sum(c * c for c in v))
-        return tuple(c / m for c in v)
-
-    u = unit(cross(ref, pole))
-    v = unit(cross(pole, u))
-    return u, v
-
-
-def _fitted_position(key, jd):
-    """Planetocentric ecliptic vector from the fitted orbit.
-
-    Mean angle in the planet's equatorial plane plus harmonic terms
-    (eccentricity and plane effects). Typical accuracy vs PyEphem:
-    0.1-0.6 deg for the Uranian moons and Deimos, ~5 deg rms for
-    Phobos, which is the noise floor of PyEphem's own Mars theory.
+    Returns True when the file is present afterwards. Failures are
+    remembered so a missing asteroid is only attempted once per process.
     """
-    f = FIT[key]
-    u, v = _plane_basis(f['planet'])
-    t = jd - 2451545.0
-    mean = f['th0'] + f['n'] * t
-    m = mean * D2R
-    h = f.get('h', [0, 0, 0, 0])
-    th = (mean + h[0] * math.sin(m) + h[1] * math.cos(m)
-          + h[2] * math.sin(2 * m) + h[3] * math.cos(2 * m)) * D2R
-    c, sn = math.cos(th), math.sin(th)
-    r = f['r']
-    return tuple(r * (c * u[i] + sn * v[i]) for i in range(3))
-
-def _prec_to_j2000(v, jd):
-    """Equatorial vector referred to the mean equator/equinox of date
-    -> J2000 (IAU 1976 precession, transpose of the J2000->date matrix).
-    PyEphem's .ra/.dec and the satellites' sky-plane offsets are
-    referred to the equator OF DATE, so without this every moon was
-    rotated by the accumulated precession (0.14 deg in 1990, 1.4 deg
-    in 1900)."""
-    T = (jd - 2451545.0) / 36525.0
-    zeta = (2306.2181 * T + 0.30188 * T * T + 0.017998 * T ** 3) / 3600.0 * D2R
-    zz = (2306.2181 * T + 1.09468 * T * T + 0.018203 * T ** 3) / 3600.0 * D2R
-    th = (2004.3109 * T - 0.42665 * T * T - 0.041833 * T ** 3) / 3600.0 * D2R
-    cz, sz = math.cos(zeta), math.sin(zeta)
-    cZ, sZ = math.cos(zz), math.sin(zz)
-    ct, st = math.cos(th), math.sin(th)
-    P = ((cz * ct * cZ - sz * sZ, -sz * ct * cZ - cz * sZ, -st * cZ),
-         (cz * ct * sZ + sz * cZ, -sz * ct * sZ + cz * cZ, -st * sZ),
-         (cz * st, -sz * st, ct))
-    return tuple(P[0][i] * v[0] + P[1][i] * v[1] + P[2][i] * v[2] for i in range(3))
-
-
-def _sky_to_ecliptic(x, y, z, ra, dec, jd=2451545.0):
-    """PyEphem/Meeus satellite offset (x positive WEST, y north,
-    z away from Earth), at the planet's apparent (ra, dec) of date
-    -> J2000 ecliptic rectangular vector."""
-    x = -x                       # west -> east
-    sa, ca = math.sin(ra), math.cos(ra)
-    sd, cd = math.sin(dec), math.cos(dec)
-    east = (-sa, ca, 0.0)
-    north = (-sd * ca, -sd * sa, cd)
-    los = (cd * ca, cd * sa, sd)
-    eq = tuple(x * east[i] + y * north[i] + z * los[i] for i in range(3))
-    eq = _prec_to_j2000(eq, jd)  # equator of date -> J2000
-    # equatorial -> ecliptic
-    return (eq[0],
-            eq[1] * math.cos(EPS) + eq[2] * math.sin(EPS),
-            -eq[1] * math.sin(EPS) + eq[2] * math.cos(EPS))
-
-
-# ---------------------------------------------------------------
-# CHARON — derived exactly from Pluto's IAU rotation elements.
-# The IAU defines Pluto's prime meridian as the sub-Charon meridian
-# and the pair is doubly tidally locked, so the direction of Pluto's
-# rotating prime meridian IS the direction of Charon. The resulting
-# orbital period reproduces the published 6.3872304 d to 0.6 s.
-# ---------------------------------------------------------------
-PLUTO_ROT = (132.993, -6.163, 302.695, 56.3625225)   # a0, d0, W0, Wdot
-CHARON_R = 16.487                                    # 19591 km / 1188.3 km
-
-
-def charon_position(jd):
-    """Planetocentric ecliptic vector of Charon, in Pluto radii."""
-    a0, d0, W0, Wd = PLUTO_ROT
-    a, d = a0 * D2R, d0 * D2R
-    W = ((W0 + Wd * (jd - 2451545.0)) % 360.0) * D2R
-    z1, x1 = a + math.pi / 2, math.pi / 2 - d
-    p = (math.cos(W), math.sin(W), 0.0)
-    p = (p[0],
-         p[1] * math.cos(x1) - p[2] * math.sin(x1),
-         p[1] * math.sin(x1) + p[2] * math.cos(x1))
-    eq = (p[0] * math.cos(z1) - p[1] * math.sin(z1),
-          p[0] * math.sin(z1) + p[1] * math.cos(z1),
-          p[2])
-    ec = (eq[0],
-          eq[1] * math.cos(EPS) + eq[2] * math.sin(EPS),
-          -eq[1] * math.sin(EPS) + eq[2] * math.cos(EPS))
-    return tuple(CHARON_R * c for c in ec)
-
-
-def earth_moon_offset(date):
-    """Geocentric ecliptic rectangular offset of Earth's Moon, in AU.
-
-    Returned as a vector FROM Earth so the caller can add it to Earth's
-    own planetocentric vector and see the Moon from any planet.
-    """
-    if not EPHEM_OK:
-        return None
-    m = ephem.Moon()
-    m.compute(date)                         # default epoch = J2000
-    ra, dec = float(m.a_ra), float(m.a_dec)  # astrometric J2000 (not of date)
-    dist = float(m.earth_distance)          # AU
-    x = dist * math.cos(dec) * math.cos(ra)
-    y = dist * math.cos(dec) * math.sin(ra)
-    z = dist * math.sin(dec)
-    return (x,
-            y * math.cos(EPS) + z * math.sin(EPS),
-            -y * math.sin(EPS) + z * math.cos(EPS))
-
-
-def helio_vectors(jd_ut, ephe_path=None):
-    """Heliocentric J2000-ecliptic rectangular vectors (AU) of the nine
-    planets from the Swiss Ephemeris (geometric positions). The page
-    falls back to JPL Keplerian elements if this is missing."""
+    fn, folder = _file_for(num)
+    if folder.startswith('ephe/'):
+        folder = folder[5:]
+    dest_dir = os.path.join(EPHE_DIR, folder) if folder else EPHE_DIR
+    dest = os.path.join(dest_dir, fn)
+    if os.path.exists(dest) and os.path.getsize(dest) > 1000:
+        return True
+    if num in _TRIED:
+        return False
+    _TRIED.add(num)
     try:
-        import swisseph as swe
+        os.makedirs(dest_dir, exist_ok=True)
     except Exception:
-        return None
-    if ephe_path:
-        swe.set_ephe_path(ephe_path)
-    fl = (swe.FLG_SWIEPH | swe.FLG_HELCTR | swe.FLG_J2000 | swe.FLG_NONUT |
-          swe.FLG_TRUEPOS | swe.FLG_NOABERR | swe.FLG_NOGDEFL | swe.FLG_XYZ)
-    ids = {'mercury': swe.MERCURY, 'venus': swe.VENUS, 'earth': swe.EARTH,
-           'mars': swe.MARS, 'jupiter': swe.JUPITER, 'saturn': swe.SATURN,
-           'uranus': swe.URANUS, 'neptune': swe.NEPTUNE, 'pluto': swe.PLUTO}
-    out = {}
-    for k, b in ids.items():
+        return False
+    longfn = fn.replace('s.se1', '.se1')      # full-precision variant
+    for tpl in FILE_SOURCES:
+        url = tpl.format(folder=folder, file=fn, longfile=longfn)
         try:
-            xx = swe.calc_ut(jd_ut, b, fl)[0]
-            out[k] = [round(c, 10) for c in xx[:3]]
-        except Exception:
-            return None
-    return out
-
-
-def compute_moons(planet, year, month, day, hour=12, minute=0):
-    """Planetocentric ecliptic positions of `planet`'s major moons."""
-    planet = (planet or '').lower()
-    if not EPHEM_OK:
-        return {'planet': planet, 'moons': [], 'unavailable': [],
-                'error': 'ephem library not installed on the server: ' + EPHEM_ERR}
-    date = ephem.Date((int(year), int(month), int(day),
-                       int(hour), int(minute), 0))
-
-    em = earth_moon_offset(date)
-    earth_moon = None
-    if em:
-        earth_moon = {'key': 'moon', 'name_ka': 'მთვარე', 'offset_au': [round(c, 9) for c in em]}
-
-    if planet not in MOONS:
-        out = {'planet': planet, 'moons': [], 'unavailable': [],
-               'earth_moon': earth_moon}
-        if planet == 'pluto':
-            jd = float(date) + 2415020.0
-            v = charon_position(jd)
-            r = math.hypot(math.hypot(v[0], v[1]), v[2])
-            out['moons'].append({
-                'key': 'charon', 'name_ka': 'ქარონი',
-                'lon': round((math.atan2(v[1], v[0]) * R2D) % 360.0, 4),
-                'lat': round(math.asin(v[2] / r) * R2D, 4),
-                'radii': round(r, 3), 'period_days': PERIOD['charon'],
-                'behind': None, 'source': 'iau'})
-        for key, ka in MISSING.get(planet, []):
-            out['unavailable'].append({'key': key, 'name_ka': ka})
-        return out
-
-    pcls, sats = MOONS[planet]
-    p = pcls()
-    p.compute(date)
-    ra, dec = float(p.ra), float(p.dec)
-
-    jd = float(date) + 2415020.0        # ephem date -> Julian Day
-
-    moons = []
-    for cls, key, ka in sats:
-        m = cls()
-        m.compute(date)
-        source = 'ephem'
-        if m.x == 0 and m.y == 0 and m.z == 0:
-            # outside PyEphem's validity window -> fitted orbit model
-            if key not in FIT:
+            req = urllib.request.Request(url, headers={'User-Agent': 'magnus-astro/1.0'})
+            with urllib.request.urlopen(req, timeout=25) as r:
+                data = r.read()
+            if len(data) < 1000:          # not a real ephemeris file
+                LAST_ERRORS.append('%s -> only %d bytes' % (url, len(data)))
                 continue
-            v = _fitted_position(key, jd)
-            source = 'fit'
-        else:
-            v = _sky_to_ecliptic(m.x, m.y, m.z, ra, dec, jd)
-        r = math.hypot(math.hypot(v[0], v[1]), v[2])
-        if r == 0:
+            with open(dest, 'wb') as f:
+                f.write(data)
+            swe.set_ephe_path(EPHE_DIR)   # re-scan so the new file is seen
+            return True
+        except Exception as e:
+            LAST_ERRORS.append('%s -> %s' % (url, e))
             continue
-        lon = (math.atan2(v[1], v[0]) * R2D) % 360.0
-        lat = math.asin(max(-1.0, min(1.0, v[2] / r))) * R2D
-        moons.append({
-            'key': key, 'name_ka': ka,
-            'lon': round(lon, 4), 'lat': round(lat, 4),
-            'radii': round(r, 3),
-            'period_days': PERIOD.get(key),
-            'behind': bool(m.z > 0) if source == 'ephem' else None,
-            'source': source,
+    return False
+
+
+# ---------------------------------------------------------------
+# FILE-FREE FALLBACK: NASA/JPL Horizons
+# Astrodienst may refuse downloads from cloud IPs (the same problem
+# app.py documents for the geocoders). Horizons serves positions over
+# a plain HTTPS API and needs no local files at all.
+# ---------------------------------------------------------------
+HORIZONS = 'https://ssd.jpl.nasa.gov/api/horizons.api'
+_HZ_CACHE = {}
+_HZ_FILE = os.path.join(EPHE_DIR, 'horizons_cache.json')
+try:
+    import json as _json_hz
+    with open(_HZ_FILE) as _f:
+        for _k, _v in _json_hz.load(_f).items():
+            _id, _jd = _k.split('|')
+            _HZ_CACHE[(int(_id), float(_jd))] = tuple(_v)
+except Exception:
+    pass
+
+
+def _save_hz_cache():
+    try:
+        import json as _j
+        with open(_HZ_FILE, 'w') as f:
+            _j.dump({'%d|%s' % k: list(v) for k, v in _HZ_CACHE.items()}, f)
+    except Exception:
+        pass
+
+
+def horizons_many(nums, jd, workers=16):
+    """Fetch several asteroids from Horizons in parallel."""
+    from concurrent.futures import ThreadPoolExecutor
+    todo = [n for n in nums if (n, round(jd, 5)) not in _HZ_CACHE]
+    if todo:
+        with ThreadPoolExecutor(max_workers=workers) as ex:
+            list(ex.map(lambda n: horizons_lonlat(n, jd), todo))
+        _save_hz_cache()
+    return {n: _HZ_CACHE.get((n, round(jd, 5))) for n in nums}
+
+
+def horizons_lonlat(num, jd):
+    """Geocentric ecliptic longitude/latitude of asteroid `num` at jd."""
+    key = (num, round(jd, 5))
+    if key in _HZ_CACHE:
+        return _HZ_CACHE[key]
+    q = {
+        'format': 'text',
+        'COMMAND': "'DES=%d;'" % num,     # DES= forces the small-body record
+        'OBJ_DATA': 'NO',
+        'MAKE_EPHEM': 'YES',
+        'EPHEM_TYPE': 'OBSERVER',
+        'CENTER': "'500@399'",           # geocentric
+        'QUANTITIES': "'31'",            # observer ecliptic lon & lat
+        'TLIST': '%.6f' % jd,
+        'CSV_FORMAT': 'YES',
+    }
+    url = HORIZONS + '?' + urllib.parse.urlencode(q)
+    try:
+        req = urllib.request.Request(url, headers={'User-Agent': 'magnus-astro/1.0'})
+        with urllib.request.urlopen(req, timeout=30) as r:
+            txt = r.read().decode('utf-8', 'replace')
+    except Exception as e:
+        LAST_ERRORS.append('horizons %d -> %s' % (num, e))
+        return None
+    if '$$SOE' not in txt:
+        LAST_ERRORS.append('horizons %d -> no ephemeris block' % num)
+        return None
+    body = txt.split('$$SOE', 1)[1].split('$$EOE', 1)[0].strip()
+    line = body.splitlines()[0] if body.splitlines() else ''
+    parts = [p.strip() for p in line.split(',')]
+    nums = []
+    for p in parts:
+        try:
+            nums.append(float(p))
+        except ValueError:
+            pass
+    if len(nums) < 2:
+        LAST_ERRORS.append('horizons %d -> unparsed: %s' % (num, line[:80]))
+        return None
+    lon, lat = nums[-2], nums[-1]
+    _HZ_CACHE[key] = (lon % 360.0, lat)
+    return _HZ_CACHE[key]
+
+SIGNS_KA = ['ვერძი', 'კურო', 'ტყუპები', 'კირჩხიბი', 'ლომი', 'ქალწული',
+            'სასწორი', 'მორიელი', 'მშვილდოსანი', 'თხის რქა',
+            'მერწყული', 'თევზები']
+ELEMENT_KA = ['ცეცხლი', 'მიწა', 'ჰაერი', 'წყალი']
+
+# asteroids that live in the main-file set
+SPECIAL = {1: swe.CERES, 2: swe.PALLAS, 3: swe.JUNO, 4: swe.VESTA,
+           2060: swe.CHIRON, 5145: swe.PHOLUS}
+
+# natal bodies asteroids are checked against
+NATAL = [('მზე', swe.SUN), ('მთვარე', swe.MOON), ('მერკური', swe.MERCURY),
+         ('ვენერა', swe.VENUS), ('მარსი', swe.MARS), ('იუპიტერი', swe.JUPITER),
+         ('სატურნი', swe.SATURN), ('ურანი', swe.URANUS),
+         ('ნეპტუნი', swe.NEPTUNE), ('პლუტონი', swe.PLUTO)]
+
+ASPECTS = [(0.0, 'შეერთება', '☌'), (180.0, 'ოპოზიცია', '☍'),
+           (120.0, 'ტრინი', '△'), (90.0, 'კვადრატი', '□'),
+           (60.0, 'სექსტილი', '⚹')]
+
+
+def _house(deg, cusps):
+    for i in range(12):
+        a, b = cusps[i], cusps[(i + 1) % 12]
+        if a <= b:
+            if a <= deg < b:
+                return i + 1
+        else:
+            if deg >= a or deg < b:
+                return i + 1
+    return 1
+
+
+def _sep(a, b):
+    d = abs((a - b) % 360.0)
+    return d if d <= 180.0 else 360.0 - d
+
+
+def _file_for(num):
+    """Swiss Ephemeris file name / folder for a numbered asteroid."""
+    if num in SPECIAL:
+        return 'seas_18.se1', 'ephe/'
+    folder = 'ast%d/' % (num // 1000)
+    if num < 100000:
+        return 'se%05ds.se1' % num, 'ephe/' + folder
+    return 's%06ds.se1' % num, 'ephe/' + folder
+
+
+
+import asteroid_nbody as NB
+
+swe.set_ephe_path(EPHE_DIR)
+NB.warm(NB.DEFAULT_IDS)          # no-op when the Docker build prebuilt it
+
+
+def compute_asteroids(jd, lat, lon, ids, orb=3.0, aspects=False):
+    """Positions of the requested asteroids plus contacts to the chart.
+
+    The caller must have set the ephemeris path (app.py does this at
+    import time and in each route).
+    """
+    # natal planets + angles
+    planets = {}
+    for name, pid in NATAL:
+        try:
+            planets[name] = swe.calc_ut(jd, pid)[0][0]
+        except Exception:
+            pass
+    try:
+        cusps, ascmc = swe.houses(jd, lat, lon, b'P')
+        cusps = list(cusps[:12])
+        planets['ASC'] = float(ascmc[0])
+        planets['MC'] = float(ascmc[1])
+    except Exception:
+        cusps = [i * 30.0 for i in range(12)]
+
+    # 1) Swiss Ephemeris wherever a file exists
+    pos, need = {}, []
+    for num in ids:
+        pid = SPECIAL.get(num, swe.AST_OFFSET + num)
+        try:
+            xx = swe.calc_ut(jd, pid, swe.FLG_SWIEPH | swe.FLG_SPEED)[0]
+            pos[num] = (xx[0], xx[1], xx[2], xx[3], 'swisseph')
+        except Exception:
+            need.append(num)
+
+    # 2) everything else: local n-body integration
+    if need:
+        try:
+            no_state = [n for n in need if n not in NB._STATES]
+            if no_state:                     # first time ever: JPL, once
+                NB.ensure_states(no_state, deadline=40)
+            NB.warm(need)                    # background 1900-2100 table
+            for n, (l, b, d, sp) in NB.positions(need, jd).items():
+                pos[n] = (l, b, d, sp, 'nbody')
+        except Exception as e:
+            LAST_ERRORS.append('nbody: %s' % e)
+
+    out, missing = [], []
+    for num in ids:
+        if num not in pos:
+            fn, folder = _file_for(num)
+            missing.append({'id': num, 'file': fn, 'folder': folder})
+            continue
+        lon_, lat_, dist, speed, src = pos[num]
+        deg = lon_ % 360.0
+        si = int(deg // 30)
+        hits = []
+        for pname, plon in planets.items():
+            d = _sep(deg, plon)
+            if d <= orb:
+                hits.append({'planet': pname, 'aspect': 'შეერთება',
+                             'sym': '☌', 'orb': round(d, 2)})
+            elif aspects:
+                for ang, an, asym in ASPECTS[1:]:
+                    if abs(d - ang) <= orb:
+                        hits.append({'planet': pname, 'aspect': an,
+                                     'sym': asym, 'orb': round(abs(d - ang), 2)})
+                        break
+        hits.sort(key=lambda h: h['orb'])
+        out.append({
+            'id': num,
+            'lon': round(deg, 4),
+            'lat': round(lat_, 4),
+            'sign_idx': si,
+            'sign_ka': SIGNS_KA[si],
+            'deg_in_sign': round(deg % 30, 4),
+            'element_ka': ELEMENT_KA[si % 4],
+            'house': _house(deg, cusps),
+            'speed': round(speed, 6) if speed is not None else None,
+            'retrograde': bool(speed is not None and speed < 0),
+            'distance_au': round(dist, 6) if dist is not None else None,
+            'source': src,
+            'contacts': hits,
         })
-    return {'planet': planet, 'moons': moons, 'unavailable': [],
-            'earth_moon': earth_moon}
+
+    return {'asteroids': out, 'unavailable': missing,
+            'planets': {k: round(v, 4) for k, v in planets.items()},
+            'houses': [round(c, 4) for c in cusps], 'orb': orb,
+            'engine': NB.status() if need else None}
