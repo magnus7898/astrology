@@ -1012,49 +1012,41 @@ def api_asteroids():
 
 @app.route('/api/asteroids/status')
 def api_asteroids_status():
-    """How many asteroid element tables are built and cached."""
-    import asteroids as _ast
-    return jsonify({
-        'tabulated': sorted(_ast._ELEMS.keys()),
-        'count': len(_ast._ELEMS),
-        'building_now': sorted(_ast._WARMING),
-        'positions_cached': len(_ast._HZ_CACHE),
-        'last_errors': _ast.LAST_ERRORS[-5:],
-    })
+    """Asteroid engine: how many states / table rows are ready."""
+    import asteroid_nbody as _nb
+    return jsonify(_nb.status())
+
+
+@app.route('/api/asteroids/state.json')
+def api_asteroids_state():
+    """Download the epoch state vectors. Commit this file as
+    ephe/asteroid_state.json and the server never needs JPL again."""
+    import asteroid_nbody as _nb
+    return jsonify({'epoch': _nb.EPOCH,
+                    'frame': 'heliocentric ecliptic J2000, AU, AU/day, TDB',
+                    'source': 'JPL Horizons / SBDB',
+                    'states': {str(k): v for k, v in sorted(_nb._STATES.items())}})
 
 
 @app.route('/api/asteroids/diag')
 def api_asteroids_diag():
-    """Why asteroid files/positions fail. Open in a browser to inspect."""
-    import asteroids as _ast
+    """Check the asteroid engine against the Swiss Ephemeris (Ceres)."""
+    import asteroid_nbody as _nb
     swe.set_ephe_path(EPHE_PATH)
-    jd = swe.julday(2000, 1, 1, 12.0)
-    tests = {}
-    for num in (1, 433):
-        try:
-            tests[str(num)] = round(swe.calc_ut(jd, swe.AST_OFFSET + num)[0][0], 4)
-        except Exception as e:
-            tests[str(num)] = 'ERR: %s' % e
-    _ast.LAST_ERRORS.clear()
-    got = _ast.ensure_file(433)
-    hz = _ast.horizons_lonlat(433, jd)
-    listing = []
+    jd = swe.julday(1990, 1, 1, 12.0)
+    ref = swe.calc_ut(jd, swe.CERES)[0][0]
+    t0 = jd + swe.deltat(jd)
+    fl = _nb.FL | swe.FLG_SPEED
+    st = list(swe.calc(_nb.EPOCH, swe.CERES, fl)[0])
     try:
-        for root, dirs, files in os.walk(EPHE_PATH):
-            for f in files[:12]:
-                listing.append(os.path.relpath(os.path.join(root, f), EPHE_PATH))
-            if len(listing) > 30:
-                break
+        y = _nb._integrate(__import__('numpy').array([st]), _nb.EPOCH, t0, [1])
+        lon = _nb.apparent(y[0], t0)[0]
+        err = round(abs(((lon - ref) + 180) % 360 - 180) * 3600, 1)
     except Exception as e:
-        listing = ['walk error: %s' % e]
-    return jsonify({
-        'ephe_path': EPHE_PATH,
-        'ephe_files': listing,
-        'direct_calc': tests,
-        'download_worked': got,
-        'horizons_result': hz,
-        'errors': _ast.LAST_ERRORS[-12:],
-    })
+        lon, err = None, 'ERR: %s' % e
+    return jsonify({'ceres_swisseph': round(ref, 5),
+                    'ceres_nbody_from_2025': None if lon is None else round(lon, 5),
+                    'error_arcsec': err, 'engine': _nb.status()})
 
 
 # ---------------------------------------------------------------
