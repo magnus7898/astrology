@@ -1383,31 +1383,44 @@ def vedic():
 # TRUE SIDEREAL
 # ════════════════════════════════════════════════════════════════
 
-# IAU boundaries are star-fixed; their tropical longitude grows ~50.29″/yr.
-# Table below is calibrated to J2000 — shift per birth year.
-PRECESSION_DEG_PER_YEAR = 50.2879 / 3600.0   # ≈ 0.0139689°/yr
-
-def true_con_shift(year: int) -> float:
-    return (year - 2000) * PRECESSION_DEG_PER_YEAR
-
+# IAU constellation boundaries where they cross the ecliptic, in J2000
+# ecliptic longitude. Computed from the IAU (Delporte 1930 / Roman 1987)
+# boundary table with PyEphem: the instant the Sun's astrometric position
+# changes constellation, converted to its J2000 ecliptic longitude
+# (cross-checked by scanning the J2000 ecliptic directly, < 0.01°).
+# Boundaries are star-fixed, so for a given moment the table is moved into
+# the tropical frame of date by the exact precession+nutation at that JD.
 TRUE_CONSTELLATIONS = [
-    {'name':'Aries',       'ka':'ვერძი',       'sym':'♈',  'start': 29.0, 'end': 53.5},
-    {'name':'Taurus',      'ka':'კურო',        'sym':'♉',  'start': 53.5, 'end': 90.0},
-    {'name':'Gemini',      'ka':'ტყუპები',     'sym':'♊',  'start': 90.0, 'end':118.5},
-    {'name':'Cancer',      'ka':'კირჩხიბი',    'sym':'♋',  'start':118.5, 'end':138.5},
-    {'name':'Leo',         'ka':'ლომი',        'sym':'♌',  'start':138.5, 'end':174.0},
-    {'name':'Virgo',       'ka':'ქალწული',     'sym':'♍',  'start':174.0, 'end':217.5},
-    {'name':'Libra',       'ka':'სასწორი',     'sym':'♎',  'start':217.5, 'end':241.0},
-    {'name':'Scorpius',    'ka':'მორიელი',     'sym':'♏',  'start':241.0, 'end':247.5},
-    {'name':'Ophiuchus',   'ka':'გველმჭერი',  'sym':'⛎',  'start':247.5, 'end':266.5},    
-    {'name':'Sagittarius', 'ka':'მშვილდოსანი', 'sym':'♐',  'start':266.5, 'end':299.7},
-    {'name':'Capricornus', 'ka':'თხის რქა',   'sym':'♑',  'start':299.7, 'end':327.0},
-    {'name':'Aquarius',    'ka':'მერწყული',    'sym':'♒',  'start':327.0, 'end':351.5},
-    {'name':'Pisces',      'ka':'თევზები',     'sym':'♓',  'start':351.5, 'end':389.0},
+    {'name':'Aries',       'ka':'ვერძი',       'sym':'♈',  'start': 28.69, 'end': 53.42},
+    {'name':'Taurus',      'ka':'კურო',        'sym':'♉',  'start': 53.42, 'end': 90.14},
+    {'name':'Gemini',      'ka':'ტყუპები',     'sym':'♊',  'start': 90.14, 'end':117.99},
+    {'name':'Cancer',      'ka':'კირჩხიბი',    'sym':'♋',  'start':117.99, 'end':138.04},
+    {'name':'Leo',         'ka':'ლომი',        'sym':'♌',  'start':138.04, 'end':173.85},
+    {'name':'Virgo',       'ka':'ქალწული',     'sym':'♍',  'start':173.85, 'end':217.81},
+    {'name':'Libra',       'ka':'სასწორი',     'sym':'♎',  'start':217.81, 'end':241.05},
+    {'name':'Scorpius',    'ka':'მორიელი',     'sym':'♏',  'start':241.05, 'end':247.64},
+    {'name':'Ophiuchus',   'ka':'გველმჭერი',   'sym':'⛎',  'start':247.64, 'end':266.24},
+    {'name':'Sagittarius', 'ka':'მშვილდოსანი', 'sym':'♐',  'start':266.24, 'end':299.66},
+    {'name':'Capricornus', 'ka':'თხის რქა',    'sym':'♑',  'start':299.66, 'end':327.49},
+    {'name':'Aquarius',    'ka':'მერწყული',    'sym':'♒',  'start':327.49, 'end':351.65},
+    {'name':'Pisces',      'ka':'თევზები',     'sym':'♓',  'start':351.65, 'end':388.69},
 ]
 
+def true_con_shift_jd(jd: float) -> float:
+    """Exact offset tropical-of-date − J2000 ecliptic longitude at this JD
+    (general precession + nutation), measured on the Sun."""
+    try:
+        a = swe.calc_ut(jd, swe.SUN, swe.FLG_SWIEPH)[0][0]
+        j = swe.calc_ut(jd, swe.SUN, swe.FLG_SWIEPH | swe.FLG_J2000 | swe.FLG_NONUT)[0][0]
+        return ((a - j + 540) % 360) - 180
+    except Exception:
+        return (jd - 2451545.0) / 365.25 * (50.2879 / 3600.0)
+
+def true_con_shift(year: int) -> float:          # kept for older callers
+    return (year - 2000) * (50.2879 / 3600.0)
+
 def get_true_constellation(trop_deg, shift=0.0):
-    deg = (trop_deg - shift) % 360   # move planet into J2000 frame of the table
+    deg = (trop_deg - shift) % 360   # tropical of date → J2000 frame of the table
     for con in TRUE_CONSTELLATIONS:
         s = con['start'] % 360
         e = con['end'] % 360
@@ -1417,13 +1430,22 @@ def get_true_constellation(trop_deg, shift=0.0):
         else:
             if deg >= s or deg < e:
                 return con, round((deg - s) % 360, 4)
-    return TRUE_CONSTELLATIONS[0], round(deg - 29.0, 4)
-    
+    return TRUE_CONSTELLATIONS[0], round((deg - TRUE_CONSTELLATIONS[0]['start']) % 360, 4)
+
 def true_sid_fmtDMS(con, pos_in_con):
     d = int(pos_in_con)
     m = int((pos_in_con - d) * 60)
     s = int(((pos_in_con - d) * 60 - m) * 60)
     return str(d) + chr(176) + str(m).zfill(2) + "'" + str(s).zfill(2) + '"'
+
+def _ts_body(trop, shift, retro, house=None):
+    con, pic = get_true_constellation(trop, shift)
+    span = (con['end'] - con['start']) % 360 or 360
+    return {'tropical': round(trop, 4), 'constellation': con['name'],
+            'constellation_ka': con['ka'], 'sym': con['sym'],
+            'pos_in_con': round(pic, 4), 'dms': true_sid_fmtDMS(con, pic),
+            'span': round(span, 2), 'pct': round(pic / span * 100, 1),
+            'retrograde': bool(retro), 'house': house}
 
 @app.route('/true_sidereal', methods=['POST'])
 def true_sidereal():
@@ -1433,89 +1455,57 @@ def true_sidereal():
     hour,minute,second = int(d['hour']),int(d['minute']),int(d['second'])
     lat,lon = float(d['lat']),float(d['lon'])
     tz_name = d.get('tz_name','UTC')
-    time_unknown = d.get('time_unknown', False)
+    time_unknown = bool(d.get('time_unknown', False))
     try:
         jd = to_jd(year,month,day,hour,minute,second,tz_name)
-        shift = true_con_shift(year)
-        planets = {}
-        MAIN = {
-            'Sun':swe.SUN,'Moon':swe.MOON,'Mercury':swe.MERCURY,'Venus':swe.VENUS,
-            'Mars':swe.MARS,'Jupiter':swe.JUPITER,'Saturn':swe.SATURN,
-            'Uranus':swe.URANUS,'Neptune':swe.NEPTUNE,'Pluto':swe.PLUTO,
-        }
+        shift = true_con_shift_jd(jd)
         FLAGS = swe.FLG_SWIEPH | swe.FLG_SPEED
-        for name, pid in MAIN.items():
-            pos,_ = swe.calc_ut(jd, pid, FLAGS)
-            trop  = pos[0]
-            con, pic = get_true_constellation(trop, shift)
-            span = (con['end'] - con['start']) % 360 or 360
-            planets[name] = {
-                'tropical':round(trop,4),'':con['name'],
-                '_ka':con['ka'],'sym':con['sym'],
-                'pos_in_con':round(pic,4),'dms':true_sid_fmtDMS(con,pic),
-                'span':round(span,1),'pct':round(pic/span*100,1),'retrograde':pos[3]<0,
-            }
-        for name,pid in [('Chiron',swe.CHIRON),('Lilith',swe.MEAN_APOG)]:
+        planets = {}
+        BODIES = [('Sun',swe.SUN),('Moon',swe.MOON),('Mercury',swe.MERCURY),('Venus',swe.VENUS),
+                  ('Mars',swe.MARS),('Jupiter',swe.JUPITER),('Saturn',swe.SATURN),
+                  ('Uranus',swe.URANUS),('Neptune',swe.NEPTUNE),('Pluto',swe.PLUTO),
+                  ('Chiron',swe.CHIRON),('Lilith',swe.MEAN_APOG),
+                  # Selena = White Moon (Swiss Ephemeris fictitious body 56).
+                  # Not asteroid 1181 — that is the asteroid (1181) Lilith.
+                  ('Selena',56),
+                  # Juno from the main-asteroid file (seas_*.se1), not AST_OFFSET+3
+                  ('Juno',swe.JUNO)]
+        for name, pid in BODIES:
             try:
-                pos,_ = swe.calc_ut(jd,pid,FLAGS); trop=pos[0]
-                con,pic = get_true_constellation(trop, shift)
-                span=(con['end']-con['start'])%360 or 360
-                planets[name]={'tropical':round(trop,4),'':con['name'],
-                    '_ka':con['ka'],'sym':con['sym'],'pos_in_con':round(pic,4),
-                    'dms':true_sid_fmtDMS(con,pic),'span':round(span,1),'pct':round(pic/span*100,1),'retrograde':pos[3]<0}
-            except: pass
-        for ast_name,ast_id in [('Selena',swe.AST_OFFSET+1181),('Juno',swe.AST_OFFSET+3)]:
-            try:
-                pos,_ = swe.calc_ut(jd,ast_id,FLAGS); trop=pos[0]
-                con,pic = get_true_constellation(trop, shift)
-                span=(con['end']-con['start'])%360 or 360
-                planets[ast_name]={'tropical':round(trop,4),'':con['name'],
-                    '_ka':con['ka'],'sym':con['sym'],'pos_in_con':round(pic,4),
-                    'dms':true_sid_fmtDMS(con,pic),'span':round(span,1),'pct':round(pic/span*100,1),'retrograde':bool(pos[3]<0)}
-            except: pass
+                pos,_ = swe.calc_ut(jd, pid, FLAGS)
+                planets[name] = _ts_body(pos[0], shift, pos[3] < 0 and name not in ('Selena','Lilith'))
+            except Exception:
+                pass
         try:
-            pos,_ = swe.calc_ut(jd,swe.MEAN_NODE,FLAGS); trop=pos[0]
-            con,pic = get_true_constellation(trop, shift)
-            span=(con['end']-con['start'])%360 or 360
-            planets['North Node']={'tropical':round(trop,4),'':con['name'],
-                '_ka':con['ka'],'sym':con['sym'],'pos_in_con':round(pic,4),
-                'dms':true_sid_fmtDMS(con,pic),'span':round(span,1),'pct':round(pic/span*100,1),'retrograde':True}
-            trop2=(trop+180)%360; con2,pic2=get_true_constellation(trop2)
-            span2=(con2['end']-con2['start'])%360 or 360
-            planets['South Node']={'tropical':round(trop2,4),'':con2['name'],
-                '_ka':con2['ka'],'sym':con2['sym'],'pos_in_con':round(pic2,4),
-                'dms':true_sid_fmtDMS(con2,pic2),'span':round(span2,1),'pct':round(pic2/span2*100,1),'retrograde':True}
-        except: pass
+            pos,_ = swe.calc_ut(jd, swe.MEAN_NODE, FLAGS); nn = pos[0]
+            planets['North Node'] = _ts_body(nn, shift, True)
+            planets['South Node'] = _ts_body((nn + 180) % 360, shift, True)
+        except Exception:
+            pass
+
         cusps,ascmc = swe.houses(jd,lat,lon,b'P')
         asc_trop=float(ascmc[0]); mc_trop=float(ascmc[1])
-        asc_con,asc_pic=get_true_constellation(asc_trop)
-        mc_con,mc_pic=get_true_constellation(mc_trop)
+        asc_con,_ = get_true_constellation(asc_trop, shift)
+        mc_con,_  = get_true_constellation(mc_trop, shift)
+        # without a birth time houses are meaningless: no house numbers
         for name in planets:
-            planets[name]['house']=get_house(planets[name]['tropical'],cusps)
+            planets[name]['house'] = None if time_unknown else get_house(planets[name]['tropical'],cusps)
         if not time_unknown:
             try:
-                vx=float(ascmc[3]); con,pic=get_true_constellation(vx)
-                span=(con['end']-con['start'])%360 or 360
-                planets['Vertex']={'tropical':round(vx,4),'':con['name'],
-                    '_ka':con['ka'],'sym':con['sym'],'pos_in_con':round(pic,4),
-                    'dms':true_sid_fmtDMS(con,pic),'span':round(span,1),'pct':round(pic/span*100,1),
-                    'retrograde':False,'house':get_house(vx,cusps)}
-            except: pass
+                vx=float(ascmc[3])
+                planets['Vertex'] = _ts_body(vx, shift, False, get_house(vx,cusps))
+            except Exception: pass
             try:
                 f=(asc_trop+planets['Moon']['tropical']-planets['Sun']['tropical'])%360
-                con,pic=get_true_constellation(f); span=(con['end']-con['start'])%360 or 360
-                planets['Fortune']={'tropical':round(f,4),'constellation':con['name'],
-                    'constellation_ka':con['ka'],'sym':con['sym'],'pos_in_con':round(pic,4),
-                    'dms':true_sid_fmtDMS(con,pic),'span':round(span,1),'pct':round(pic/span*100,1),
-                    'retrograde':False,'house':get_house(f,cusps)}
-            except: pass
+                planets['Fortune'] = _ts_body(f, shift, False, get_house(f,cusps))
+            except Exception: pass
         try: lunar=calc_lunar_day(jd)
-        except: lunar=None
+        except Exception: lunar=None
         ENG_TO_KA={'Sun':'მზე','Moon':'მთვარე','Mercury':'მერკური','Venus':'ვენერა',
             'Mars':'მარსი','Jupiter':'იუპიტერი','Saturn':'სატურნი','Uranus':'ურანი',
             'Neptune':'ნეპტუნი','Pluto':'პლუტონი','Chiron':'ქირონი','North Node':'ჩრდ. კვანძი'}
         KA_TO_ENG={v:k for k,v in ENG_TO_KA.items()}
-        trop_planets={ENG_TO_KA.get(n,n):{'degree':p['tropical']} for n,p in planets.items() if 'tropical' in p}
+        trop_planets={ENG_TO_KA.get(n,n):{'degree':p['tropical']} for n,p in planets.items()}
         aspects=calc_aspects(trop_planets)
         for asp in aspects:
             asp['p1']=KA_TO_ENG.get(asp['p1'],asp['p1'])
@@ -1523,11 +1513,13 @@ def true_sidereal():
         return jsonify({
             'planets':planets,'houses':[round(x,4) for x in cusps],
             'asc':round(asc_trop,4),'mc':round(mc_trop,4),
-            'asc_con':asc_con['name'],'asc_con_ka':asc_con['ka'],'mc_con':mc_con['name'],
+            'asc_con':asc_con['name'],'asc_con_ka':asc_con['ka'],
+            'mc_con':mc_con['name'],'mc_con_ka':mc_con['ka'],
+            'shift':round(shift,4),'time_unknown':time_unknown,
             'lunar':lunar,'aspects':aspects,'lat':lat,'lon':lon,'tz_name':tz_name,
             'constellations':[{'name':x['name'],'ka':x['ka'],'sym':x['sym'],
                 'start':round(x['start']+shift,2),'end':round(x['end']+shift,2),
-                'span':round((x['end']-x['start'])%360 or 360,1)}
+                'span':round((x['end']-x['start'])%360 or 360,2)}
                 for x in TRUE_CONSTELLATIONS],
         })
     except Exception as e:
