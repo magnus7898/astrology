@@ -6,8 +6,8 @@ For planetocentric astrology: when the observer is Mars, its sky
 contains Phobos and Deimos; from Jupiter, the four Galileans, etc.
 
 PyEphem supplies each satellite's offset from its planet in the
-plane of the sky (x = east, y = north, z = line of sight, all in
-planet radii). That offset IS the planetocentric vector, so we
+plane of the sky (x = west, y = north, z = line of sight, all in
+planet radii, referred to the equator of date). That offset IS the planetocentric vector, so we
 rotate it from the sky frame into J2000 ecliptic coordinates and
 report ecliptic longitude/latitude, distance and phase angle.
 
@@ -225,9 +225,29 @@ def _fitted_position(key, jd):
     r = f['r']
     return tuple(r * (c * u[i] + sn * v[i]) for i in range(3))
 
-def _sky_to_ecliptic(x, y, z, ra, dec):
+def _prec_to_j2000(v, jd):
+    """Equatorial vector referred to the mean equator/equinox of date
+    -> J2000 (IAU 1976 precession, transpose of the J2000->date matrix).
+    PyEphem's .ra/.dec and the satellites' sky-plane offsets are
+    referred to the equator OF DATE, so without this every moon was
+    rotated by the accumulated precession (0.14 deg in 1990, 1.4 deg
+    in 1900)."""
+    T = (jd - 2451545.0) / 36525.0
+    zeta = (2306.2181 * T + 0.30188 * T * T + 0.017998 * T ** 3) / 3600.0 * D2R
+    zz = (2306.2181 * T + 1.09468 * T * T + 0.018203 * T ** 3) / 3600.0 * D2R
+    th = (2004.3109 * T - 0.42665 * T * T - 0.041833 * T ** 3) / 3600.0 * D2R
+    cz, sz = math.cos(zeta), math.sin(zeta)
+    cZ, sZ = math.cos(zz), math.sin(zz)
+    ct, st = math.cos(th), math.sin(th)
+    P = ((cz * ct * cZ - sz * sZ, -sz * ct * cZ - cz * sZ, -st * cZ),
+         (cz * ct * sZ + sz * cZ, -sz * ct * sZ + cz * cZ, -st * sZ),
+         (cz * st, -sz * st, ct))
+    return tuple(P[0][i] * v[0] + P[1][i] * v[1] + P[2][i] * v[2] for i in range(3))
+
+
+def _sky_to_ecliptic(x, y, z, ra, dec, jd=2451545.0):
     """PyEphem/Meeus satellite offset (x positive WEST, y north,
-    z away from Earth), at the planet's (ra, dec)
+    z away from Earth), at the planet's apparent (ra, dec) of date
     -> J2000 ecliptic rectangular vector."""
     x = -x                       # west -> east
     sa, ca = math.sin(ra), math.cos(ra)
@@ -236,6 +256,7 @@ def _sky_to_ecliptic(x, y, z, ra, dec):
     north = (-sd * ca, -sd * sa, cd)
     los = (cd * ca, cd * sa, sd)
     eq = tuple(x * east[i] + y * north[i] + z * los[i] for i in range(3))
+    eq = _prec_to_j2000(eq, jd)  # equator of date -> J2000
     # equatorial -> ecliptic
     return (eq[0],
             eq[1] * math.cos(EPS) + eq[2] * math.sin(EPS),
@@ -281,8 +302,8 @@ def earth_moon_offset(date):
     if not EPHEM_OK:
         return None
     m = ephem.Moon()
-    m.compute(date)
-    ra, dec = float(m.ra), float(m.dec)
+    m.compute(date)                         # default epoch = J2000
+    ra, dec = float(m.a_ra), float(m.a_dec)  # astrometric J2000 (not of date)
     dist = float(m.earth_distance)          # AU
     x = dist * math.cos(dec) * math.cos(ra)
     y = dist * math.cos(dec) * math.sin(ra)
@@ -290,6 +311,31 @@ def earth_moon_offset(date):
     return (x,
             y * math.cos(EPS) + z * math.sin(EPS),
             -y * math.sin(EPS) + z * math.cos(EPS))
+
+
+def helio_vectors(jd_ut, ephe_path=None):
+    """Heliocentric J2000-ecliptic rectangular vectors (AU) of the nine
+    planets from the Swiss Ephemeris (geometric positions). The page
+    falls back to JPL Keplerian elements if this is missing."""
+    try:
+        import swisseph as swe
+    except Exception:
+        return None
+    if ephe_path:
+        swe.set_ephe_path(ephe_path)
+    fl = (swe.FLG_SWIEPH | swe.FLG_HELCTR | swe.FLG_J2000 | swe.FLG_NONUT |
+          swe.FLG_TRUEPOS | swe.FLG_NOABERR | swe.FLG_NOGDEFL | swe.FLG_XYZ)
+    ids = {'mercury': swe.MERCURY, 'venus': swe.VENUS, 'earth': swe.EARTH,
+           'mars': swe.MARS, 'jupiter': swe.JUPITER, 'saturn': swe.SATURN,
+           'uranus': swe.URANUS, 'neptune': swe.NEPTUNE, 'pluto': swe.PLUTO}
+    out = {}
+    for k, b in ids.items():
+        try:
+            xx = swe.calc_ut(jd_ut, b, fl)[0]
+            out[k] = [round(c, 10) for c in xx[:3]]
+        except Exception:
+            return None
+    return out
 
 
 def compute_moons(planet, year, month, day, hour=12, minute=0):
@@ -342,7 +388,7 @@ def compute_moons(planet, year, month, day, hour=12, minute=0):
             v = _fitted_position(key, jd)
             source = 'fit'
         else:
-            v = _sky_to_ecliptic(m.x, m.y, m.z, ra, dec)
+            v = _sky_to_ecliptic(m.x, m.y, m.z, ra, dec, jd)
         r = math.hypot(math.hypot(v[0], v[1]), v[2])
         if r == 0:
             continue
