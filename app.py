@@ -169,6 +169,20 @@ class MatrixCombo(db.Model):
     first_seen = db.Column(db.DateTime, server_default=db.func.now())
 
 
+class TarotDaily(db.Model):
+    """Once-a-day tarot spreads, per ACCOUNT: the same cards on every
+    device (PC, phone, tablet) until the user's local midnight."""
+    __table_args__ = (db.UniqueConstraint('user_id', 'spread', 'day', name='uq_tarot_day'),)
+    id = db.Column(db.Integer, primary_key=True)
+    user_id = db.Column(db.Integer, db.ForeignKey('user.id'), nullable=False, index=True)
+    spread = db.Column(db.String(30), nullable=False)
+    day = db.Column(db.String(10), nullable=False)          # YYYY-MM-DD in the user's zone
+    tz = db.Column(db.String(64), default='UTC')
+    cards = db.Column(db.JSON)                              # [{id, rev, up}]
+    question = db.Column(db.String(300), default='')
+    created = db.Column(db.DateTime, server_default=db.func.now())
+
+
 with app.app_context():
     try:
         db.create_all()
@@ -233,6 +247,93 @@ def api_me():
     if not u:
         return jsonify(error='not found'), 404
     return jsonify(email=u.email, name=u.name, role=u.role, created=str(u.created))
+
+# ── TAROT: once-a-day spreads, enforced on the server per account ──
+TAROT_ONCE = {'daily': 1}                 # spread id -> number of cards
+TAROT_DECK = (['M%d' % i for i in range(22)] +
+              ['%s%d' % (s, r) for s in ('wands', 'cups', 'swords', 'pentacles')
+               for r in range(1, 15)])
+
+
+def _tarot_day(uid, tz_req):
+    """(today, tz, next_reset_ms) for this user. The zone of the user's
+    first daily draw is kept, so switching the device zone cannot win
+    an extra spread."""
+    import pytz
+    from datetime import datetime as _dt, timedelta as _td
+    last = (TarotDaily.query.filter_by(user_id=uid)
+            .order_by(TarotDaily.id.desc()).first())
+    tzn = (last.tz if last and last.tz else None) or tz_req or 'UTC'
+    try:
+        tz = pytz.timezone(tzn)
+    except Exception:
+        tz, tzn = pytz.UTC, 'UTC'
+    now = _dt.now(tz)
+    nxt = tz.normalize(tz.localize(_dt(now.year, now.month, now.day) + _td(days=1)))
+    return now.strftime('%Y-%m-%d'), tzn, int(nxt.timestamp() * 1000)
+
+
+def _tarot_out(row, nxt, existing):
+    return jsonify(exists=True, existing=existing, spread=row.spread, day=row.day,
+                   tz=row.tz, cards=row.cards, question=row.question or '',
+                   next_reset=nxt)
+
+
+@app.route('/api/tarot/daily', methods=['GET', 'POST'])
+@jwt_required()
+def api_tarot_daily():
+    """GET  ?spread=daily&tz=Asia/Tbilisi -> today's spread or {exists:false}
+       POST {spread, tz, rev, question}    -> draws ONCE per local day; a
+            second POST (from any device) returns the same cards."""
+    import secrets
+    uid = int(get_jwt_identity())
+    d = request.get_json(silent=True) or {}
+    spread = request.args.get('spread') or d.get('spread') or 'daily'
+    if spread not in TAROT_ONCE:
+        return jsonify(error='unknown spread'), 400
+    day, tzn, nxt = _tarot_day(uid, request.args.get('tz') or d.get('tz'))
+    row = TarotDaily.query.filter_by(user_id=uid, spread=spread, day=day).first()
+    if request.method == 'GET':
+        return _tarot_out(row, nxt, True) if row else jsonify(exists=False, day=day, tz=tzn, next_reset=nxt)
+    if row:
+        return _tarot_out(row, nxt, True)
+    rng = secrets.SystemRandom()
+    use_rev = d.get('rev', True) is not False
+    cards = [{'id': c, 'rev': bool(use_rev and rng.random() < 0.5), 'up': False}
+             for c in rng.sample(TAROT_DECK, TAROT_ONCE[spread])]
+    row = TarotDaily(user_id=uid, spread=spread, day=day, tz=tzn, cards=cards,
+                     question=(d.get('question') or '')[:300])
+    db.session.add(row)
+    try:
+        db.session.commit()
+    except Exception:                       # two devices at the same second
+        db.session.rollback()
+        row = TarotDaily.query.filter_by(user_id=uid, spread=spread, day=day).first()
+        if not row:
+            return jsonify(error='could not save'), 500
+        return _tarot_out(row, nxt, True)
+    db.session.add(Event(user_id=uid, action='tarot_daily', detail={'spread': spread, 'day': day},
+                         ip=request.remote_addr))
+    db.session.commit()
+    return _tarot_out(row, nxt, False)
+
+
+@app.route('/api/tarot/daily/flip', methods=['POST'])
+@jwt_required()
+def api_tarot_daily_flip():
+    """Remember which cards are turned face up (seen on the other devices)."""
+    uid = int(get_jwt_identity())
+    d = request.get_json(silent=True) or {}
+    day, _, _ = _tarot_day(uid, d.get('tz'))
+    row = TarotDaily.query.filter_by(user_id=uid, spread=d.get('spread', 'daily'), day=day).first()
+    if not row:
+        return jsonify(error='no spread today'), 404
+    up = list(d.get('up') or [])
+    row.cards = [dict(c, up=bool(c.get('up')) or (i < len(up) and bool(up[i])))
+                 for i, c in enumerate(row.cards or [])]
+    db.session.commit()
+    return jsonify(ok=True)
+
 
 # ── ADMIN ──
 @app.route('/api/admin/stats')
@@ -673,7 +774,9 @@ def chart():
                 'sign_degree':dv,'centesimal':c,'retrograde':bool(pos[3]<0) if len(pos)>3 else False}
         except: pass
 
-    for ast_id in [swe.AST_OFFSET+1181, 56]:
+    # White Moon (Selena) = fictitious body 56. NOT AST_OFFSET+1181, which
+    # is the asteroid (1181) Lilith and would win whenever its file exists.
+    for ast_id in [56]:
         try:
             pos,_ = swe.calc_ut(jd,ast_id); deg=pos[0]; dv,c=deg_to_display(deg)
             planets['თეთრი მთვარე']={'degree':round(deg,4),'sign':trop_sign(deg),
@@ -689,7 +792,7 @@ def chart():
     except: pass
 
     try:
-        pos,_ = swe.calc_ut(jd,swe.AST_OFFSET+3); deg=pos[0]; dv,c=deg_to_display(deg)
+        pos,_ = swe.calc_ut(jd,swe.JUNO); deg=pos[0]; dv,c=deg_to_display(deg)   # seas_18.se1 (AST_OFFSET+3 needs a separate file)
         planets['იუნო']={'degree':round(deg,4),'sign':trop_sign(deg),'sign_degree':dv,'centesimal':c,'retrograde':bool(pos[3]<0) if len(pos)>3 else False}
     except: pass
 
