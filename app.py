@@ -961,7 +961,7 @@ def combo_export():
 # ---------------------------------------------------------------
 # PLANETARY MOONS  (planetocentric satellite positions)
 # ---------------------------------------------------------------
-from moons import compute_moons
+from moons import compute_moons, helio_vectors
 
 @app.route('/api/moons', methods=['POST'])
 def api_moons():
@@ -969,10 +969,20 @@ def api_moons():
     Payload: {planet, year, month, day, hour, minute}
     Returns J2000 ecliptic lon/lat and distance in planet radii."""
     d = request.json or {}
-    return jsonify(compute_moons(
-        d.get('planet', 'mars'),
-        int(d.get('year', 2000)), int(d.get('month', 1)), int(d.get('day', 1)),
-        int(d.get('hour', 12)), int(d.get('minute', 0))))
+    y, mo, dy = int(d.get('year', 2000)), int(d.get('month', 1)), int(d.get('day', 1))
+    h, mi = int(d.get('hour', 12)), int(d.get('minute', 0))
+    out = compute_moons(d.get('planet', 'mars'), y, mo, dy, h, mi)
+    # accurate planet positions (Swiss Ephemeris) for the planetocentric
+    # chart: now and one day later (for retrograde detection). All UTC.
+    try:
+        jd = swe.julday(y, mo, dy, h + mi / 60.0)
+        hv, hv2 = helio_vectors(jd, EPHE_PATH), helio_vectors(jd + 1.0, EPHE_PATH)
+        if hv and hv2:
+            out['helio'], out['helio_next'] = hv, hv2
+            out['helio_source'] = 'swisseph'
+    except Exception as e:
+        out['helio_error'] = str(e)
+    return jsonify(out)
 
 
 # ---------------------------------------------------------------
