@@ -8,6 +8,8 @@ Looks forward ("next") or backward ("prev") from a moment for the times when
   environment  design North Node color (+ arrow)
   motivation   personality Sun color (+ arrow)
   perspective  personality North Node color (+ arrow)
+  type         Manifestor / Generator / Manifesting Generator / Projector /
+               Reflector — full chart (13 + 13 activations) every 15 min
       -> a person born then would have it (the sky's own chart)
 
   center       a center is defined —
@@ -28,7 +30,8 @@ from typing import Dict, List, Optional, Set
 import swisseph as swe
 
 from hd_calc import (CHANNELS, GATE_TO_CENTER, PROFILE_NAMES, DIGESTION, ENVIRONMENT,
-                     MOTIVATION, PERSPECTIVE, decompose, find_design_jd)
+                     MOTIVATION, PERSPECTIVE, analyze, calc_planets, decompose,
+                     find_design_jd)
 from hd_transit import BODY_ORDER, JD_MAX, _local, _segs
 
 FLAGS = swe.FLG_SWIEPH | swe.FLG_SPEED
@@ -37,6 +40,9 @@ JD_MIN = 2268923.5            # 1500-01-01, start of the sepl_18/semo_18 files
 CENTER_KA = {"Head": "თავი", "Ajna": "აჯნა", "Throat": "ყელი", "G": "G · მე",
              "Heart": "გული · ეგო", "Solar Plexus": "მზის წნული", "Spleen": "ელენთა",
              "Sacral": "საკრალი", "Root": "ფესვი"}
+TYPE_KA = {"Manifestor": "მანიფესტორი", "Generator": "გენერატორი",
+           "Manifesting Generator": "მანიფესტირებადი გენერატორი",
+           "Projector": "პროექტორი", "Reflector": "რეფლექტორი"}
 
 
 def _sun(jd):
@@ -53,6 +59,8 @@ def _arrow(tone):
 
 # ── value of a variable at a moment ──
 def _value(kind, jd):
+    if kind == "type":
+        return analyze(calc_planets(jd), calc_planets(find_design_jd(jd)))["type"]
     if kind == "profile":
         s = _sun(jd)
         return (decompose(s)[1], decompose(s - 88.0)[1])
@@ -71,15 +79,17 @@ def _value(kind, jd):
     raise ValueError("unknown kind")
 
 
-STEP = {"profile": 1 / 72, "digestion": 1 / 72, "motivation": 1 / 72,
+STEP = {"type": 1 / 96, "profile": 1 / 72, "digestion": 1 / 72, "motivation": 1 / 72,
         "environment": 1 / 24, "perspective": 1 / 24}
-HORIZON = {"profile": 800, "digestion": 120, "motivation": 120,
+HORIZON = {"type": 400, "profile": 800, "digestion": 120, "motivation": 120,
            "environment": 3 * 365.25, "perspective": 3 * 365.25}
 TABLE = {"digestion": DIGESTION, "environment": ENVIRONMENT,
          "motivation": MOTIVATION, "perspective": PERSPECTIVE}
 
 
 def _label(kind, target):
+    if kind == "type":
+        return "ტიპი · " + TYPE_KA.get(target, target)
     if kind == "profile":
         k = "%d/%d" % target
         return PROFILE_NAMES.get(k, k)
@@ -106,10 +116,10 @@ def _edge(f, a, b):
 
 def _scan(kind, target, jd_from, direction, count):
     """Windows [start, end] in which the variable equals target."""
-    side = target[1] if kind != "profile" else True
+    side = target[1] if kind not in ("profile", "type") else True
     def ok(jd):
         v = _value(kind, jd)
-        if kind == "profile":
+        if kind in ("profile", "type"):
             return v == target
         return v[0] == target[0] and (not side or v[1] == side)
 
@@ -261,7 +271,11 @@ def find(kind: str, jd_from: float, direction: str = "next", count: int = 5,
 
     if kind not in STEP:
         raise ValueError("unknown kind")
-    if kind == "profile":
+    if kind == "type":
+        if value not in TYPE_KA:
+            raise ValueError("unknown type")
+        target = value
+    elif kind == "profile":
         try:
             a, b = (int(x) for x in str(value).split("/"))
         except Exception:
