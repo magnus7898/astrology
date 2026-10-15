@@ -1753,6 +1753,46 @@ def hd_transit_search():
                         'trace': traceback.format_exc()}), 500
 
 
+@app.route('/api/hd_find', methods=['POST'])
+def hd_find_route():
+    """Past / future moments for a Human Design variable (hd_find.py).
+    {kind: 'profile'|'digestion'|'environment'|'motivation'|'perspective'|'center',
+     value: '4/6' | color 1-6 | center name, side: 'left'|'right'|null,
+     direction: 'next'|'prev', count, moon,
+     from:{date,time,tz_name}, natal:{date,time,lat,lon,tz_name} (center only, optional)}"""
+    try:
+        d = request.get_json(force=True) or {}
+        f = d.get('from') or {}
+        tz = f.get('tz_name') or 'UTC'
+        from hd_transit import _jd_from_local
+        if f.get('date'):
+            jd = _jd_from_local(f['date'], f.get('time') or '00:00', tz)
+        else:
+            from datetime import datetime as _dt
+            u = _dt.utcnow()
+            jd = swe.julday(u.year, u.month, u.day, u.hour + u.minute / 60.0)
+        ng = nc = None
+        n = d.get('natal')
+        if d.get('kind') == 'center' and n and n.get('date') and n.get('lat') is not None and n.get('lon') is not None:
+            from hd_calc import calculate_chart_from_coords
+            ch = calculate_chart_from_coords(n['date'], n.get('time') or '12:00',
+                                             float(n['lat']), float(n['lon']),
+                                             n.get('tz_name') or 'UTC')
+            ng = {int(g) for g in ch['gate_sources']}
+            nc = set(ch['defined_centers'])
+        from hd_find import find as _hd_find
+        return jsonify(_hd_find(d.get('kind', 'profile'), jd, d.get('direction', 'next'),
+                                int(d.get('count', 5)), d.get('value'), d.get('side'),
+                                natal_gates=ng, natal_centers=nc,
+                                include_moon=bool(d.get('moon')), tz_name=tz))
+    except ValueError as ve:
+        return jsonify({'error': str(ve)}), 400
+    except Exception as e:
+        import traceback
+        return jsonify({'error': f'{type(e).__name__}: {e}',
+                        'trace': traceback.format_exc()}), 500
+
+
 # ════════════════════════════════════════════════════════════════
 # STATIC
 # ════════════════════════════════════════════════════════════════
