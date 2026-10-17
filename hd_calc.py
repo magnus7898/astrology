@@ -536,40 +536,118 @@ def _normalize(s: str) -> str:
     return unicodedata.normalize('NFD', s).encode('ascii', 'ignore').decode().lower().strip()
 
 
+def _fold(s: str) -> str:
+    """lower-case + drop accents but KEEP non-Latin letters (Georgian, Cyrillic…)."""
+    s = unicodedata.normalize('NFD', s.strip().lower())
+    return ''.join(ch for ch in s if unicodedata.category(ch) != 'Mn')
+
+
+def _alt_ok(name: str, pop: int) -> bool:
+    """Which alternate names to index (keeps memory small on Railway)."""
+    for ch in name:
+        o = ord(ch)
+        if 0x10A0 <= o <= 0x10FF or 0x1C90 <= o <= 0x1CBF:   # Georgian
+            return True
+        if 0x0400 <= o <= 0x04FF:                           # Cyrillic
+            return pop >= 1000
+    return pop >= 50000                                     # Latin & others: big cities only
+
+
+# rows: (lat, lon, display, tz, population)
+_GEO_ROWS: List[tuple] = []
+_GEO_KEYS: List[str] = []      # sorted search keys
+_GEO_IDX: List[int] = []       # row index parallel to _GEO_KEYS
+
+
 def _load_geonames() -> dict:
+    """Exact-name dict (best = most populous) + sorted prefix index."""
     path = Path(__file__).parent / "cities500.txt"
     if not path.exists():
         return {}
     print("[geonames] loading cities500.txt ...", flush=True)
-    db = {}
+    db: Dict[str, tuple] = {}
+    best_pop: Dict[str, int] = {}
+    pairs = []
     with open(path, encoding='utf-8') as f:
         for line in f:
             row = line.rstrip('\n').split('\t')
             if len(row) < 18:
                 continue
             try:
-                name       = row[1]
-                ascii_name = row[2]
-                lat        = float(row[4])
-                lon        = float(row[5])
-                country    = row[8]
-                tz         = row[17]
-                if not tz or not name:
-                    continue
-                val = (lat, lon, f"{name}, {country}", tz)
-                for key in {
-                    name.lower(),
-                    ascii_name.lower(),
-                    _normalize(name),
-                    f"{name.lower()}, {country.lower()}",
-                    f"{ascii_name.lower()}, {country.lower()}",
-                }:
-                    if key and key not in db:
-                        db[key] = val
+                name, ascii_name = row[1], row[2]
+                lat, lon = float(row[4]), float(row[5])
+                country, tz = row[8], row[17]
+                pop = int(row[14] or 0)
             except (ValueError, IndexError):
                 continue
-    print(f"[geonames] {len(db)} keys loaded", flush=True)
+            if not tz or not name:
+                continue
+            val = (lat, lon, f"{name}, {country}", tz)
+            i = len(_GEO_ROWS)
+            _GEO_ROWS.append((lat, lon, f"{name}, {country}", tz, pop))
+            cc = country.lower()
+            prim = set()
+            for n in (name, ascii_name):
+                for k in (n.lower().strip(), _fold(n), _normalize(n)):
+                    if k:
+                        prim.add(k)
+            alts = set()
+            for a in row[3].split(','):
+                a = a.strip()
+                if a and len(a) <= 60 and _alt_ok(a, pop):
+                    for k in (a.lower(), _fold(a)):
+                        if k and k not in prim:
+                            alts.add(k)
+            for k in list(prim) + [f"{k}, {cc}" for k in prim] + list(alts):
+                if pop > best_pop.get(k, -1):
+                    best_pop[k] = pop
+                    db[k] = val
+            pairs.extend((k, i * 2) for k in prim)       # even = primary name
+            pairs.extend((k, i * 2 + 1) for k in alts)   # odd  = alternate name
+    pairs.sort()
+    _GEO_KEYS.extend(k for k, _ in pairs)
+    _GEO_IDX.extend(i for _, i in pairs)
+    del pairs
+    print(f"[geonames] {len(_GEO_ROWS)} places, {len(db)} exact keys, {len(_GEO_KEYS)} search keys", flush=True)
     return db
+
+
+def search_cities(query: str, limit: int = 8) -> List[dict]:
+    """Prefix search over names + alternate names, most populous first.
+    'tbil', 'თბილ', 'Тбил', 'santiago, cl' all work."""
+    import bisect
+    q = _fold(query)
+    if not q or not _GEO_KEYS:
+        return []
+    cc = None
+    if ',' in q:
+        q, cc = [x.strip() for x in q.split(',', 1)]
+        cc = cc or None
+    variants = {q, _normalize(query.split(',')[0])} - {''}
+    hits: Dict[int, int] = {}          # row -> rank (0 exact, 1 prefix)
+    for v in variants:
+        j = bisect.bisect_left(_GEO_KEYS, v)
+        n = 0
+        while j < len(_GEO_KEYS) and _GEO_KEYS[j].startswith(v) and n < 3000:
+            r, alt = divmod(_GEO_IDX[j], 2)
+            # 0 exact name · 1 exact alt name · 2 name prefix · 3 alt prefix
+            rank = (0 if _GEO_KEYS[j] == v else 2) + alt
+            if rank < hits.get(r, 9):
+                hits[r] = rank
+            j += 1
+            n += 1
+    out = []
+    for r, rank in hits.items():
+        lat, lon, display, tz, pop = _GEO_ROWS[r]
+        if cc and not display.lower().endswith(', ' + cc):
+            continue
+        out.append((rank, -pop, r))
+    out.sort()
+    res = []
+    for rank, negpop, r in out[:limit]:
+        lat, lon, display, tz, pop = _GEO_ROWS[r]
+        res.append({'lat': lat, 'lon': lon, 'tz_name': tz, 'display': display, 'pop': pop})
+    return res
 
 
 _GEONAMES_DB: Dict[str, tuple] = _load_geonames()
@@ -609,9 +687,13 @@ def geocode(place: str) -> Tuple[float, float, str, str]:
     norm_city = _normalize(city_only)
 
     # 1. GeoNames database
-    for k in (key, norm_key, city_only, norm_city):
+    for k in (key, _fold(place), norm_key, city_only, _fold(city_only), norm_city):
         if k in _GEONAMES_DB:
             return _GEONAMES_DB[k]
+    _hit = search_cities(place, 1)
+    if _hit:
+        h = _hit[0]
+        return h['lat'], h['lon'], h['display'], h['tz_name']
 
     # 2. Fallback cache
     for k in (key, city_only):

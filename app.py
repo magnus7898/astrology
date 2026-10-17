@@ -625,6 +625,28 @@ def page_hd():
 # GEOCODE
 # ════════════════════════════════════════════════════════════════
 
+@app.route('/geocode/search', methods=['POST', 'GET'])
+def geocode_search():
+    """City suggestions for the autocomplete list: [{lat,lon,tz_name,display,pop}]."""
+    try:
+        q = (request.get_json(silent=True) or {}).get('q') or request.args.get('q', '')
+        q = str(q).strip()
+        if len(q) < 2:
+            return jsonify({'results': []})
+        from hd_calc import search_cities, _CITY_CACHE
+        res = search_cities(q, 8)
+        if not res:                      # cities500 missing → small built-in cache
+            ql = q.lower()
+            seen = set()
+            for k, (lat, lon, display, tz) in _CITY_CACHE.items():
+                if k.startswith(ql) and display not in seen:
+                    seen.add(display)
+                    res.append({'lat': lat, 'lon': lon, 'tz_name': tz, 'display': display, 'pop': 0})
+        return jsonify({'results': res[:8]})
+    except Exception as e:
+        return jsonify({'error': str(e), 'results': []}), 500
+
+
 @app.route('/geocode', methods=['POST'])
 def geocode():
     """Geocode a city name to (lat, lon, tz_name).
@@ -646,10 +668,15 @@ def geocode():
         key = city.lower()
         city_only = key.split(",")[0].strip()
         
-        for k in (key, city_only):
+        from hd_calc import _fold, search_cities
+        for k in (key, _fold(city), city_only, _fold(city_only)):
             if k in _GEONAMES_DB:
                 lat, lon, display, tz = _GEONAMES_DB[k]
                 return jsonify({'lat': lat, 'lon': lon, 'tz_name': tz, 'display': display})
+        _hit = search_cities(city, 1)
+        if _hit:
+            h = _hit[0]
+            return jsonify({'lat': h['lat'], 'lon': h['lon'], 'tz_name': h['tz_name'], 'display': h['display']})
         
         for k in (key, city_only):
             if k in _CITY_CACHE:
