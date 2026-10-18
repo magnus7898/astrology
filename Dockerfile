@@ -26,3 +26,7 @@ RUN python -c "import asteroid_nbody as A; A.prebuild()" || true
 RUN python -c "import urllib.request,zipfile,io; \
 d=urllib.request.urlopen(urllib.request.Request('https://download.geonames.org/export/dump/cities500.zip',headers={'User-Agent':'magnus/1.0'}),timeout=300).read(); \
 zipfile.ZipFile(io.BytesIO(d)).extract('cities500.txt','/app')"
+
+# province (admin1) and country names for the city list: "London, Ontario, Canada"
+RUN python -c "import urllib.request as u; \
+[open('/app/'+f,'wb').write(u.urlopen(u.Request('https://download.geonames.org/export/dump/'+f,headers={'User-Agent':'magnus/1.0'}),timeout=120).read()) for f in ('admin1CodesASCII.txt','countryInfo.txt')]" || true

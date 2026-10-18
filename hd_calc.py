@@ -560,6 +560,33 @@ import sys as _sys
 from array import array as _array
 _G_LAT = _array('f'); _G_LON = _array('f'); _G_POP = _array('i')
 _G_DISP: List[str] = []; _G_TZ: List[str] = []
+_G_WHERE: List[str] = []           # folded "cc|province|country" for ', ontario' style filters
+_G_REGION: Dict[str, list] = {}    # folded province / country name -> biggest places in it
+
+
+def _load_names() -> tuple:
+    """Province (admin1) and country names, if the GeoNames files are present."""
+    here = Path(__file__).parent
+    adm, cn = {}, {}
+    try:
+        with open(here / "admin1CodesASCII.txt", encoding='utf-8') as f:
+            for line in f:
+                r = line.rstrip('\n').split('\t')
+                if len(r) >= 2 and r[0]:
+                    adm[r[0]] = _sys.intern(r[1])
+    except OSError:
+        pass
+    try:
+        with open(here / "countryInfo.txt", encoding='utf-8') as f:
+            for line in f:
+                if line.startswith('#'):
+                    continue
+                r = line.rstrip('\n').split('\t')
+                if len(r) >= 5 and r[0]:
+                    cn[r[0]] = _sys.intern(r[4])
+    except OSError:
+        pass
+    return adm, cn
 _GEO_KEYS: List[str] = []          # sorted
 _GEO_IDX = _array('i')             # row*2 + (1 if alternate name)
 
@@ -569,6 +596,7 @@ def _load_geonames() -> None:
     if not path.exists():
         return
     print("[geonames] loading cities500.txt ...", flush=True)
+    ADM, CN = _load_names()
     pairs = []
     with open(path, encoding='utf-8') as f:
         for line in f:
@@ -586,7 +614,11 @@ def _load_geonames() -> None:
                 continue
             i = len(_G_DISP)
             _G_LAT.append(lat); _G_LON.append(lon); _G_POP.append(pop)
-            _G_DISP.append(f"{name}, {country}"); _G_TZ.append(_sys.intern(tz))
+            prov = ADM.get(f"{country}.{row[10]}", '') if len(row) > 10 else ''
+            cname = CN.get(country, country)
+            _G_DISP.append(f"{name}, {prov}, {cname}" if prov and prov != name else f"{name}, {cname}")
+            _G_TZ.append(_sys.intern(tz))
+            _G_WHERE.append(_sys.intern(f"{country.lower()}|{_fold(prov)}|{_fold(cname)}"))
             prim = set()
             for n in (name, ascii_name):
                 for k in (n.lower().strip(), _fold(n), _normalize(n)):
@@ -600,6 +632,17 @@ def _load_geonames() -> None:
                     for k in {a.lower(), _fold(a)}:
                         if k and k not in prim:
                             pairs.append((_sys.intern(k), i * 2 + 1))
+    import heapq
+    for i, w in enumerate(_G_WHERE):
+        _, prov, cname = w.split('|')
+        for reg in {prov, cname} - {''}:
+            h = _G_REGION.setdefault(reg, [])
+            if len(h) < 8:
+                heapq.heappush(h, (_G_POP[i], i))
+            elif _G_POP[i] > h[0][0]:
+                heapq.heapreplace(h, (_G_POP[i], i))
+    for reg in _G_REGION:
+        _G_REGION[reg] = [i for _, i in sorted(_G_REGION[reg], reverse=True)]
     pairs.sort()
     _GEO_KEYS.extend(k for k, _ in pairs)
     _GEO_IDX.extend(j for _, j in pairs)
@@ -609,6 +652,14 @@ def _load_geonames() -> None:
 
 def _row(r: int) -> tuple:
     return (round(_G_LAT[r], 5), round(_G_LON[r], 5), _G_DISP[r], _G_TZ[r])
+
+
+def _where_ok(r: int, cc) -> bool:
+    """'london, ca' / 'london, canada' / 'london, ontario' / 'london, ont'."""
+    if not cc:
+        return True
+    code, prov, country = _G_WHERE[r].split('|')
+    return cc == code or (len(cc) >= 3 and (prov.startswith(cc) or country.startswith(cc)))
 
 
 def _cc_split(q: str):
@@ -628,7 +679,7 @@ class _GeoExact:
         j = bisect.bisect_left(_GEO_KEYS, q)
         while j < len(_GEO_KEYS) and _GEO_KEYS[j] == q:
             r, alt = divmod(_GEO_IDX[j], 2)
-            if not alt and (not cc or _G_DISP[r].lower().endswith(', ' + cc)) and _G_POP[r] > bp:
+            if not alt and _where_ok(r, cc) and _G_POP[r] > bp:
                 best, bp = r, _G_POP[r]
             j += 1
         return best
@@ -663,6 +714,10 @@ def search_cities(query: str, limit: int = 8) -> List[dict]:
                 hits[r] = rank
             j += 1
             n += 1
+    # a province / country typed on its own ("ontario") → its biggest cities too
+    for r in _G_REGION.get(q, []):
+        if r not in hits:
+            hits[r] = 6
     if not hits and len(q) >= 4:
         # typo tolerance ("torotno" → Toronto): same first two letters, close spelling
         import difflib
@@ -681,7 +736,7 @@ def search_cities(query: str, limit: int = 8) -> List[dict]:
             n += 1
     out = []
     for r, rank in hits.items():
-        if cc and not _G_DISP[r].lower().endswith(', ' + cc):
+        if not _where_ok(r, cc):
             continue
         out.append((rank, -_G_POP[r], r))
     out.sort()
