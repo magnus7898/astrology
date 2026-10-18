@@ -553,20 +553,22 @@ def _alt_ok(name: str, pop: int) -> bool:
     return pop >= 50000                                     # Latin & others: big cities only
 
 
-# rows: (lat, lon, display, tz, population)
-_GEO_ROWS: List[tuple] = []
-_GEO_KEYS: List[str] = []      # sorted search keys
-_GEO_IDX: List[int] = []       # row index parallel to _GEO_KEYS
+# Lean city index (~same RAM as the old dict): parallel arrays per place
+# and ONE sorted key list (names + selected alternate names) for both exact
+# and prefix lookups. Ties on a name go to the most populous place.
+import sys as _sys
+from array import array as _array
+_G_LAT = _array('f'); _G_LON = _array('f'); _G_POP = _array('i')
+_G_DISP: List[str] = []; _G_TZ: List[str] = []
+_GEO_KEYS: List[str] = []          # sorted
+_GEO_IDX = _array('i')             # row*2 + (1 if alternate name)
 
 
-def _load_geonames() -> dict:
-    """Exact-name dict (best = most populous) + sorted prefix index."""
+def _load_geonames() -> None:
     path = Path(__file__).parent / "cities500.txt"
     if not path.exists():
-        return {}
+        return
     print("[geonames] loading cities500.txt ...", flush=True)
-    db: Dict[str, tuple] = {}
-    best_pop: Dict[str, int] = {}
     pairs = []
     with open(path, encoding='utf-8') as f:
         for line in f:
@@ -582,53 +584,78 @@ def _load_geonames() -> dict:
                 continue
             if not tz or not name:
                 continue
-            val = (lat, lon, f"{name}, {country}", tz)
-            i = len(_GEO_ROWS)
-            _GEO_ROWS.append((lat, lon, f"{name}, {country}", tz, pop))
-            cc = country.lower()
+            i = len(_G_DISP)
+            _G_LAT.append(lat); _G_LON.append(lon); _G_POP.append(pop)
+            _G_DISP.append(f"{name}, {country}"); _G_TZ.append(_sys.intern(tz))
             prim = set()
             for n in (name, ascii_name):
                 for k in (n.lower().strip(), _fold(n), _normalize(n)):
                     if k:
                         prim.add(k)
-            alts = set()
+            for k in prim:
+                pairs.append((_sys.intern(k), i * 2))
             for a in row[3].split(','):
                 a = a.strip()
                 if a and len(a) <= 60 and _alt_ok(a, pop):
-                    for k in (a.lower(), _fold(a)):
+                    for k in {a.lower(), _fold(a)}:
                         if k and k not in prim:
-                            alts.add(k)
-            for k in list(prim) + [f"{k}, {cc}" for k in prim] + list(alts):
-                if pop > best_pop.get(k, -1):
-                    best_pop[k] = pop
-                    db[k] = val
-            pairs.extend((k, i * 2) for k in prim)       # even = primary name
-            pairs.extend((k, i * 2 + 1) for k in alts)   # odd  = alternate name
+                            pairs.append((_sys.intern(k), i * 2 + 1))
     pairs.sort()
     _GEO_KEYS.extend(k for k, _ in pairs)
-    _GEO_IDX.extend(i for _, i in pairs)
+    _GEO_IDX.extend(j for _, j in pairs)
     del pairs
-    print(f"[geonames] {len(_GEO_ROWS)} places, {len(db)} exact keys, {len(_GEO_KEYS)} search keys", flush=True)
-    return db
+    print(f"[geonames] {len(_G_DISP)} places, {len(_GEO_KEYS)} name keys", flush=True)
+
+
+def _row(r: int) -> tuple:
+    return (round(_G_LAT[r], 5), round(_G_LON[r], 5), _G_DISP[r], _G_TZ[r])
+
+
+def _cc_split(q: str):
+    if ',' in q:
+        a, b = [x.strip() for x in q.split(',', 1)]
+        return a, (b or None)
+    return q, None
+
+
+class _GeoExact:
+    """dict-like: key -> (lat, lon, display, tz) of the most populous place
+    whose own name (not an alternate) matches exactly. 'city, cc' works."""
+    def _find(self, key):
+        import bisect
+        q, cc = _cc_split(_fold(key))
+        best, bp = None, -1
+        j = bisect.bisect_left(_GEO_KEYS, q)
+        while j < len(_GEO_KEYS) and _GEO_KEYS[j] == q:
+            r, alt = divmod(_GEO_IDX[j], 2)
+            if not alt and (not cc or _G_DISP[r].lower().endswith(', ' + cc)) and _G_POP[r] > bp:
+                best, bp = r, _G_POP[r]
+            j += 1
+        return best
+    def __contains__(self, key):
+        return bool(_GEO_KEYS) and self._find(key) is not None
+    def __getitem__(self, key):
+        r = self._find(key)
+        if r is None:
+            raise KeyError(key)
+        return _row(r)
+    def __len__(self):
+        return len(_G_DISP)
 
 
 def search_cities(query: str, limit: int = 8) -> List[dict]:
     """Prefix search over names + alternate names, most populous first.
-    'tbil', 'თბილ', 'Тбил', 'santiago, cl' all work."""
+    'tbil', 'თბილ', 'Тбил', 'toronto, ca' all work."""
     import bisect
-    q = _fold(query)
+    q, cc = _cc_split(_fold(query))
     if not q or not _GEO_KEYS:
         return []
-    cc = None
-    if ',' in q:
-        q, cc = [x.strip() for x in q.split(',', 1)]
-        cc = cc or None
     variants = {q, _normalize(query.split(',')[0])} - {''}
-    hits: Dict[int, int] = {}          # row -> rank (0 exact, 1 prefix)
+    hits: Dict[int, int] = {}
     for v in variants:
         j = bisect.bisect_left(_GEO_KEYS, v)
         n = 0
-        while j < len(_GEO_KEYS) and _GEO_KEYS[j].startswith(v) and n < 3000:
+        while j < len(_GEO_KEYS) and _GEO_KEYS[j].startswith(v) and n < 4000:
             r, alt = divmod(_GEO_IDX[j], 2)
             # 0 exact name · 1 exact alt name · 2 name prefix · 3 alt prefix
             rank = (0 if _GEO_KEYS[j] == v else 2) + alt
@@ -636,21 +663,37 @@ def search_cities(query: str, limit: int = 8) -> List[dict]:
                 hits[r] = rank
             j += 1
             n += 1
+    if not hits and len(q) >= 4:
+        # typo tolerance ("torotno" → Toronto): same first two letters, close spelling
+        import difflib
+        j = bisect.bisect_left(_GEO_KEYS, q[:2])
+        n = 0
+        while j < len(_GEO_KEYS) and _GEO_KEYS[j].startswith(q[:2]) and n < 60000:
+            k = _GEO_KEYS[j]
+            if abs(len(k) - len(q)) <= 2:
+                ratio = difflib.SequenceMatcher(None, q, k).ratio()
+                if ratio >= 0.8:
+                    r, alt = divmod(_GEO_IDX[j], 2)
+                    rank = 4 if ratio >= 0.9 else 5
+                    if rank < hits.get(r, 9):
+                        hits[r] = rank
+            j += 1
+            n += 1
     out = []
     for r, rank in hits.items():
-        lat, lon, display, tz, pop = _GEO_ROWS[r]
-        if cc and not display.lower().endswith(', ' + cc):
+        if cc and not _G_DISP[r].lower().endswith(', ' + cc):
             continue
-        out.append((rank, -pop, r))
+        out.append((rank, -_G_POP[r], r))
     out.sort()
     res = []
     for rank, negpop, r in out[:limit]:
-        lat, lon, display, tz, pop = _GEO_ROWS[r]
-        res.append({'lat': lat, 'lon': lon, 'tz_name': tz, 'display': display, 'pop': pop})
+        lat, lon, display, tz = _row(r)
+        res.append({'lat': lat, 'lon': lon, 'tz_name': tz, 'display': display, 'pop': _G_POP[r]})
     return res
 
 
-_GEONAMES_DB: Dict[str, tuple] = _load_geonames()
+_load_geonames()
+_GEONAMES_DB = _GeoExact()
 
 _CITY_CACHE = {
     "tbilisi": (41.7151, 44.8271, "Tbilisi, Georgia", "Asia/Tbilisi"),
