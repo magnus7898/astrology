@@ -422,6 +422,37 @@ def trop_sign(deg): return TROPICAL_SIGNS[int(deg/30)%12]
 def ved_sign(deg):  return VEDIC_SIGNS[int(deg/30)%12]
 def ved_si(deg):    return int(deg/30)%12
 
+# ════════════════════════════════════════════════════════════════
+# HOUSE SYSTEMS — payload 'hsys' (Swiss Ephemeris code), default Placidus
+# ════════════════════════════════════════════════════════════════
+HOUSE_SYSTEMS = {
+    'P': 'პლაციდუსი', 'K': 'კოხი', 'O': 'პორფირიუსი', 'R': 'რეგიომონტანუსი',
+    'C': 'კამპანუსი', 'E': 'თანაბარი (ASC-დან)', 'D': 'თანაბარი (MC-დან)',
+    'W': 'მთლიანი ნიშნები (Whole Sign)', 'V': 'ფელოვი (თანაბარი, ASC სახლის შუაში)',
+    'N': 'თანაბარი 0° ვერძიდან', 'B': 'ალკაბიციუსი', 'M': 'მორინუსი',
+    'T': 'ტოპოცენტრული (პოლიხ-პეიჯი)', 'X': 'მერიდიანული (აქსიალური)',
+    'H': 'ჰორიზონტული (აზიმუტი)', 'U': 'კრუშინსკი-პიზა', 'Y': 'APC',
+    'L': 'პალენი — სინუსოიდური დელტა', 'Q': 'პალენი — სინუსოიდური ფარდობა',
+    'S': 'შრიპატი', 'I': 'სანშაინი (მაკრო)', 'J': 'სავარდი-A',
+}
+
+def calc_houses(jd, lat, lon, d=None):
+    """cusps, ascmc, used code, fell_back. Placidus / Koch (and a few others) have no
+    solution inside the polar circles — there Porphyry is used and reported."""
+    code = str((d or {}).get('hsys') or 'P')[:1].upper()
+    if code not in HOUSE_SYSTEMS:
+        code = 'P'
+    try:
+        cusps, ascmc = swe.houses(jd, lat, lon, code.encode())
+        return cusps, ascmc, code, False
+    except Exception:
+        cusps, ascmc = swe.houses(jd, lat, lon, b'O')
+        return cusps, ascmc, 'O', code != 'O'
+
+@app.route('/house_systems')
+def house_systems():
+    return jsonify([{'code': k, 'name': v} for k, v in HOUSE_SYSTEMS.items()])
+
 def get_house(degree, cusps):
     for i in range(12):
         s, e = cusps[i], cusps[(i+1)%12]
@@ -823,7 +854,7 @@ def chart():
         planets['იუნო']={'degree':round(deg,4),'sign':trop_sign(deg),'sign_degree':dv,'centesimal':c,'retrograde':bool(pos[3]<0) if len(pos)>3 else False}
     except: pass
 
-    cusps,ascmc = swe.houses(jd,lat,lon,b'P')
+    cusps,ascmc,hsys,hfb = calc_houses(jd,lat,lon,d)
     asc=float(ascmc[0]); mc=float(ascmc[1])
 
     if not time_unknown:
@@ -855,7 +886,8 @@ def chart():
         'asc':round(asc,4),'mc':round(mc,4),
         'asc_sign':trop_sign(asc),'mc_sign':trop_sign(mc),
         'aspects':calc_aspects(planets),'lunar':lunar,
-        'lat':lat,'lon':lon,'tz_name':tz_name
+        'lat':lat,'lon':lon,'tz_name':tz_name,
+        'hsys':hsys,'hsys_name':HOUSE_SYSTEMS[hsys],'hsys_fallback':hfb
     })
 
 # ---------------------------------------------------------------
@@ -890,7 +922,7 @@ def api_dominants():
             retro[k] = len(xx) > 3 and xx[3] < 0
         except Exception:
             pass
-    cusps, ascmc = swe.houses(jd, lat, lon, b'P')
+    cusps, ascmc, _, _ = calc_houses(jd, lat, lon, d)
     positions['asc'] = float(ascmc[0]); positions['mc'] = float(ascmc[1])
     return jsonify(compute_dominants(positions, list(cusps[:12]), retro=retro))
 
@@ -1615,7 +1647,7 @@ def true_sidereal():
         except Exception:
             pass
 
-        cusps,ascmc = swe.houses(jd,lat,lon,b'P')
+        cusps,ascmc,_,_ = calc_houses(jd,lat,lon,d)
         asc_trop=float(ascmc[0]); mc_trop=float(ascmc[1])
         asc_con,_ = get_true_constellation(asc_trop, shift)
         mc_con,_  = get_true_constellation(mc_trop, shift)
