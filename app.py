@@ -209,19 +209,26 @@ with app.app_context():
 def _ensure_env_admin():
     """Admin recovery: set ADMIN_EMAIL and ADMIN_PASSWORD in Railway → Variables. On start the
     account is created (or its password reset) and given the admin role. Only someone with
-    access to the Railway project can do this. Remove the variables after logging in."""
-    em = (os.environ.get('ADMIN_EMAIL') or '').strip().lower()
-    pw = os.environ.get('ADMIN_PASSWORD') or ''
+    access to the Railway project can do this. Remove the variables after logging in.
+    Surrounding spaces and quote marks in the variable values are ignored; every stored row whose
+    email matches (any letter case) gets the new password, so an old capitalised copy cannot win."""
+    em = (os.environ.get('ADMIN_EMAIL') or '').strip().strip('"\'').strip().lower()
+    pw = (os.environ.get('ADMIN_PASSWORD') or '').strip().strip('"\'').strip()
     if not em or len(pw) < 6:
+        if em:
+            print('[admin] ADMIN_PASSWORD missing or shorter than 6 characters', flush=True)
         return
     try:
-        u = User.query.filter(db.func.lower(User.email) == em).first()
-        if not u:
-            u = User(email=em, name='admin'); db.session.add(u)
-        u.pw_hash = generate_password_hash(pw)
-        u.role = 'admin'
+        rows = User.query.filter(db.func.lower(db.func.trim(User.email)) == em).all()
+        if not rows:
+            rows = [User(email=em, name='admin')]
+            db.session.add(rows[0])
+        for u in rows:
+            u.email = em if len(rows) == 1 else u.email
+            u.pw_hash = generate_password_hash(pw)
+            u.role = 'admin'
         db.session.commit()
-        print('[admin] account ready:', em, flush=True)
+        print(f'[admin] account ready: {em} (rows: {len(rows)}, password length: {len(pw)})', flush=True)
     except Exception as e:
         db.session.rollback()
         print('[admin] reset failed:', e, flush=True)
@@ -261,8 +268,12 @@ def api_register():
 @app.route('/api/login', methods=['POST'])
 def api_login():
     d = request.json or {}
-    u = User.query.filter_by(email=(d.get('email') or '').strip().lower()).first()
-    if not u or not check_password_hash(u.pw_hash, d.get('password') or ''):
+    em = (d.get('email') or '').strip().lower()
+    pw = d.get('password') or ''
+    # any stored row with this email in any letter case; the first whose password matches wins
+    u = next((x for x in User.query.filter(db.func.lower(db.func.trim(User.email)) == em).all()
+              if check_password_hash(x.pw_hash, pw) or (pw.strip() != pw and check_password_hash(x.pw_hash, pw.strip()))), None)
+    if not u:
         return jsonify(error='არასწორი ელფოსტა ან პაროლი'), 401
     db.session.add(Event(user_id=u.id, action='login', detail=None, ip=request.remote_addr))
     db.session.commit()
