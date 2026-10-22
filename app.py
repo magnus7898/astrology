@@ -185,7 +185,7 @@ class TarotDaily(db.Model):
 
 class Article(db.Model):
     """Interpretation texts edited in admin_articles.html — one per (system, key).
-    system: matrix | pyth | astro | hd.  key examples:
+    system: matrix | pyth | astro | hd | lunar (day:1..30).  key examples:
       matrix  persona|c|1-8-7 (zone combo) · l3|s|5 (single energy in a position)
       pyth    cell:1:3 · line:money:5 · empty:2
       astro   sign:Sun:4 · house:Moon:7 · asp:Sun:Moon:90 · cusp:10:9 · ruler:2:10
@@ -1167,7 +1167,7 @@ import re as _re_art
 from html.parser import HTMLParser as _HTMLParser
 from html import escape as _esc_html
 
-ART_SYSTEMS = {'matrix', 'pyth', 'astro', 'hd'}
+ART_SYSTEMS = {'matrix', 'pyth', 'astro', 'hd', 'lunar'}
 _ART_KEY = _re_art.compile(r'^[A-Za-z0-9_:.|\-]{1,80}$')
 _ART_TAGS = {'p', 'br', 'b', 'strong', 'i', 'em', 'u', 's', 'strike', 'sub', 'sup', 'h1', 'h2', 'h3', 'h4',
              'ul', 'ol', 'li', 'blockquote', 'a', 'span', 'div', 'font', 'hr', 'small', 'mark',
@@ -1219,7 +1219,7 @@ def articles_list():
     """Every written article of one system: {key: {t, h, u}} (public, for the site pages)."""
     system = request.args.get('system', '')
     if system not in ART_SYSTEMS:
-        return jsonify(error='system: matrix | pyth | astro | hd'), 400
+        return jsonify(error='system: matrix | pyth | astro | hd | lunar'), 400
     rows = Article.query.filter_by(system=system).all()
     resp = jsonify({a.key: _art_dict(a) for a in rows})
     resp.headers['Cache-Control'] = 'public, max-age=60'
