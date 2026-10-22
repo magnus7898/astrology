@@ -183,6 +183,23 @@ class TarotDaily(db.Model):
     created = db.Column(db.DateTime, server_default=db.func.now())
 
 
+class Article(db.Model):
+    """Interpretation texts edited in admin_articles.html — one per (system, key).
+    system: matrix | pyth | astro | hd.  key examples:
+      matrix  persona|c|1-8-7 (zone combo) · l3|s|5 (single energy in a position)
+      pyth    cell:1:3 · line:money:5 · empty:2
+      astro   sign:Sun:4 · house:Moon:7 · asp:Sun:Moon:90 · cusp:10:9 · ruler:2:10
+      hd      type:Projector · channel:34-57 · gate:51 · line:51.3 · center:Spleen:open"""
+    __table_args__ = (db.UniqueConstraint('system', 'key', name='uq_article_key'),)
+    id = db.Column(db.Integer, primary_key=True)
+    system = db.Column(db.String(12), nullable=False, index=True)
+    key = db.Column(db.String(80), nullable=False)
+    title = db.Column(db.String(200), default='')
+    html = db.Column(db.Text, default='')
+    editor_id = db.Column(db.Integer, nullable=True)
+    updated = db.Column(db.DateTime, server_default=db.func.now(), onupdate=db.func.now())
+
+
 with app.app_context():
     try:
         db.create_all()
@@ -1118,6 +1135,149 @@ def combo_export():
     if legacy:
         body += '\n/* legacy flat keys: ' + ', '.join(legacy) + ' */\n'
     return app.response_class(body, mimetype='text/plain; charset=utf-8')
+
+
+# ---------------------------------------------------------------
+# ARTICLES — interpretation texts for every combination (admin editor)
+# ---------------------------------------------------------------
+import re as _re_art
+from html.parser import HTMLParser as _HTMLParser
+from html import escape as _esc_html
+
+ART_SYSTEMS = {'matrix', 'pyth', 'astro', 'hd'}
+_ART_KEY = _re_art.compile(r'^[A-Za-z0-9_:.|\-]{1,80}$')
+_ART_TAGS = {'p', 'br', 'b', 'strong', 'i', 'em', 'u', 's', 'strike', 'sub', 'sup', 'h1', 'h2', 'h3', 'h4',
+             'ul', 'ol', 'li', 'blockquote', 'a', 'span', 'div', 'font', 'hr', 'small', 'mark',
+             'table', 'thead', 'tbody', 'tr', 'td', 'th'}
+_ART_VOID = {'br', 'hr'}
+_ART_STYLE = _re_art.compile(r'^\s*(color|background-color|text-align|font-weight|font-style|text-decoration)\s*:\s*[#\w\s(),.%-]{1,40}\s*$', _re_art.I)
+
+class _ArtClean(_HTMLParser):
+    """Allow-list sanitizer: keeps formatting tags, drops scripts, events and foreign attributes."""
+    def __init__(self):
+        super().__init__(convert_charrefs=True); self.out = []; self.skip = 0
+    def handle_starttag(self, tag, attrs):
+        if tag in ('script', 'style', 'iframe', 'object', 'embed'):
+            self.skip += 1; return
+        if self.skip or tag not in _ART_TAGS: return
+        keep = []
+        for k, v in attrs:
+            v = v or ''
+            if k == 'href' and tag == 'a' and _re_art.match(r'^(https?:|mailto:|/|#)', v.strip(), _re_art.I):
+                keep.append('href="%s" target="_blank" rel="noopener"' % _esc_html(v.strip(), quote=True))
+            elif k == 'color' and tag == 'font' and _re_art.match(r'^#?[\w]{1,20}$', v):
+                keep.append('color="%s"' % _esc_html(v, quote=True))
+            elif k == 'style':
+                st = ';'.join(x.strip() for x in v.split(';') if _ART_STYLE.match(x))
+                if st: keep.append('style="%s"' % _esc_html(st, quote=True))
+            elif k in ('colspan', 'rowspan') and v.isdigit():
+                keep.append('%s="%s"' % (k, v))
+        self.out.append('<%s%s>' % (tag, (' ' + ' '.join(keep)) if keep else ''))
+    def handle_endtag(self, tag):
+        if tag in ('script', 'style', 'iframe', 'object', 'embed'):
+            self.skip = max(0, self.skip - 1); return
+        if self.skip or tag not in _ART_TAGS or tag in _ART_VOID: return
+        self.out.append('</%s>' % tag)
+    def handle_data(self, data):
+        if not self.skip: self.out.append(_esc_html(data, quote=False))
+
+def _art_clean(html):
+    c = _ArtClean(); c.feed(str(html or '')[:300000]); c.close()
+    return ''.join(c.out).strip()
+
+def _art_ok(system, key):
+    return system in ART_SYSTEMS and bool(_ART_KEY.match(key or ''))
+
+def _art_dict(a):
+    return {'t': a.title or '', 'h': a.html or '', 'u': a.updated.isoformat() if a.updated else ''}
+
+@app.route('/api/articles', methods=['GET'])
+def articles_list():
+    """Every written article of one system: {key: {t, h, u}} (public, for the site pages)."""
+    system = request.args.get('system', '')
+    if system not in ART_SYSTEMS:
+        return jsonify(error='system: matrix | pyth | astro | hd'), 400
+    rows = Article.query.filter_by(system=system).all()
+    resp = jsonify({a.key: _art_dict(a) for a in rows})
+    resp.headers['Cache-Control'] = 'public, max-age=60'
+    return resp
+
+@app.route('/api/articles/stats', methods=['GET'])
+def articles_stats():
+    out = {s: 0 for s in ART_SYSTEMS}
+    for system, n in db.session.query(Article.system, db.func.count(Article.id)).group_by(Article.system).all():
+        out[system] = n
+    return jsonify(out)
+
+@app.route('/api/articles/<system>/<path:key>', methods=['GET'])
+def article_get(system, key):
+    if not _art_ok(system, key):
+        return jsonify(error='bad key'), 400
+    a = Article.query.filter_by(system=system, key=key).first()
+    return (jsonify(_art_dict(a)) if a else (jsonify(error='not found'), 404))
+
+@app.route('/api/admin/articles/<system>/<path:key>', methods=['PUT'])
+@admin_required
+def article_put(system, key):
+    if not _art_ok(system, key):
+        return jsonify(error='bad key'), 400
+    d = request.json or {}
+    title = str(d.get('title') or '')[:200].strip()
+    html = _art_clean(d.get('html') or '')
+    a = Article.query.filter_by(system=system, key=key).first()
+    if not title and not _re_art.sub(r'<[^>]+>|&nbsp;|\s', '', html):
+        if a:
+            db.session.delete(a); db.session.commit()
+        return jsonify(deleted=True)
+    if not a:
+        a = Article(system=system, key=key); db.session.add(a)
+    a.title, a.html = title, html
+    try:
+        a.editor_id = int(get_jwt_identity())
+    except Exception:
+        pass
+    db.session.commit()
+    return jsonify({'key': key, **_art_dict(a)})
+
+@app.route('/api/admin/articles/<system>/<path:key>', methods=['DELETE'])
+@admin_required
+def article_delete(system, key):
+    if not _art_ok(system, key):
+        return jsonify(error='bad key'), 400
+    a = Article.query.filter_by(system=system, key=key).first()
+    if a:
+        db.session.delete(a); db.session.commit()
+    return jsonify(deleted=bool(a))
+
+@app.route('/api/admin/articles/export', methods=['GET'])
+@admin_required
+def articles_export():
+    rows = Article.query.order_by(Article.system, Article.key).all()
+    return jsonify({'articles': [{'system': a.system, 'key': a.key, 'title': a.title or '', 'html': a.html or '',
+                                  'updated': a.updated.isoformat() if a.updated else ''} for a in rows]})
+
+@app.route('/api/admin/articles/import', methods=['POST'])
+@admin_required
+def articles_import():
+    """{articles:[{system,key,title,html}], overwrite:false} — backup restore / bulk load."""
+    d = request.json or {}
+    over = bool(d.get('overwrite'))
+    added = updated = skipped = 0
+    for it in (d.get('articles') or [])[:20000]:
+        system, key = str(it.get('system', '')), str(it.get('key', ''))
+        if not _art_ok(system, key):
+            skipped += 1; continue
+        a = Article.query.filter_by(system=system, key=key).first()
+        if a and not over:
+            skipped += 1; continue
+        if not a:
+            a = Article(system=system, key=key); db.session.add(a); added += 1
+        else:
+            updated += 1
+        a.title = str(it.get('title') or '')[:200]
+        a.html = _art_clean(it.get('html') or '')
+    db.session.commit()
+    return jsonify(added=added, updated=updated, skipped=skipped)
 
 
 # ---------------------------------------------------------------
