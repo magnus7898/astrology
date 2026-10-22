@@ -206,6 +206,29 @@ with app.app_context():
     except Exception as _e:
         print('DB init warning:', _e)
 
+def _ensure_env_admin():
+    """Admin recovery: set ADMIN_EMAIL and ADMIN_PASSWORD in Railway → Variables. On start the
+    account is created (or its password reset) and given the admin role. Only someone with
+    access to the Railway project can do this. Remove the variables after logging in."""
+    em = (os.environ.get('ADMIN_EMAIL') or '').strip().lower()
+    pw = os.environ.get('ADMIN_PASSWORD') or ''
+    if not em or len(pw) < 6:
+        return
+    try:
+        u = User.query.filter(db.func.lower(User.email) == em).first()
+        if not u:
+            u = User(email=em, name='admin'); db.session.add(u)
+        u.pw_hash = generate_password_hash(pw)
+        u.role = 'admin'
+        db.session.commit()
+        print('[admin] account ready:', em, flush=True)
+    except Exception as e:
+        db.session.rollback()
+        print('[admin] reset failed:', e, flush=True)
+
+with app.app_context():
+    _ensure_env_admin()
+
 def admin_required(fn):
     @wraps(fn)
     @jwt_required()
