@@ -274,6 +274,15 @@ def api_login():
     u = next((x for x in User.query.filter(db.func.lower(db.func.trim(User.email)) == em).all()
               if check_password_hash(x.pw_hash, pw) or (pw.strip() != pw and check_password_hash(x.pw_hash, pw.strip()))), None)
     if not u:
+        # diagnostics for the Railway logs while the recovery variables are set (never the password itself)
+        try:
+            rows = User.query.filter(db.func.lower(db.func.trim(User.email)) == em).all()
+            env = (os.environ.get('ADMIN_PASSWORD') or '').strip().strip('"\'').strip()
+            diff = next((i + 1 for i in range(max(len(env), len(pw))) if i >= len(env) or i >= len(pw) or env[i] != pw[i]), 0) if env else None
+            print(f'[login] failed for {em!r}: accounts found {len(rows)}, typed length {len(pw)}'
+                  + (f', ADMIN_PASSWORD length {len(env)}, first different character at position {diff}' if env else ''), flush=True)
+        except Exception as _e:
+            print('[login] diagnostics error:', _e, flush=True)
         return jsonify(error='არასწორი ელფოსტა ან პაროლი'), 401
     db.session.add(Event(user_id=u.id, action='login', detail=None, ip=request.remote_addr))
     db.session.commit()
