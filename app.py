@@ -200,6 +200,9 @@ class Article(db.Model):
     updated = db.Column(db.DateTime, server_default=db.func.now(), onupdate=db.func.now())
 
 
+from tarot_ai import init_tarot_ai   # AI tarot reading; key only in env ANTHROPIC_API_KEY
+TarotAICall = init_tarot_ai(app, db)
+
 with app.app_context():
     try:
         db.create_all()
