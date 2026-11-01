@@ -250,7 +250,9 @@ def init_accounts(app, db, User, Event, Payment, admin_required):
         db.session.flush()
         m = meta(u.id)
         claim_device(u.id, d.get('device'))
-        db.session.add(Event(user_id=u.id, action='register', detail={'email': email}, ip=request.remote_addr))
+        db.session.add(Event(user_id=u.id, action='register', ip=request.remote_addr,
+                             detail={'email': email, 'accepted_terms': bool(d.get('accepted_terms')),
+                                     'terms_version': '2026-11-02'}))
         db.session.commit()
         if smtp_on():
             send_verify(u)
@@ -507,8 +509,23 @@ def init_accounts(app, db, User, Event, Payment, admin_required):
         return jsonify(ok=bool(n))
 
     # ───────────────────────── activity tracking ─────────────────────────
+    # privacy policy: activity is kept at most 24 months — pruned on start and every ~500 track calls
+    ACTIVITY_DAYS = 730
+    _prune = {'n': 0}
+
+    def prune_activity():
+        try:
+            Activity.query.filter(Activity.created < datetime.utcnow() - timedelta(days=ACTIVITY_DAYS)).delete()
+            db.session.commit()
+        except Exception as e:
+            db.session.rollback()
+            print('[activity] prune failed:', e, flush=True)
+
     @app.route('/api/track', methods=['POST'])
     def track():
+        _prune['n'] += 1
+        if _prune['n'] % 500 == 1:
+            prune_activity()
         import json
         d = request.get_json(silent=True) or {}
         u, m = current_user()
@@ -666,6 +683,13 @@ def init_accounts(app, db, User, Event, Payment, admin_required):
         n = PlanFeature.query.filter_by(id=fid).delete()
         db.session.commit()
         return jsonify(ok=bool(n))
+
+    with app.app_context():
+        try:
+            db.create_all()
+            prune_activity()
+        except Exception as e:
+            print('[accounts] start-up prune skipped:', e, flush=True)
 
     return dict(AccountMeta=AccountMeta, Person=Person, SavedItem=SavedItem, Activity=Activity,
                 PlanFeature=PlanFeature, plan_of=plan_of, current_user=current_user)
