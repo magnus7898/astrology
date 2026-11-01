@@ -251,6 +251,8 @@ def admin_required(fn):
 # ── ACCOUNTS: saved people/results, activity tracking, plans (accounts.py) ──
 from accounts import init_accounts
 ACC = init_accounts(app, db, User, Event, Payment, admin_required)
+from numcalc import init_numcalc          # Matrix of Destiny + Pythagorean square on the server
+init_numcalc(app, ACC)
 with app.app_context():
     try:
         db.create_all()
