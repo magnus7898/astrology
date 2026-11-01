@@ -248,6 +248,15 @@ def admin_required(fn):
         return fn(*a, **k)
     return wrapper
 
+# ── ACCOUNTS: saved people/results, activity tracking, plans (accounts.py) ──
+from accounts import init_accounts
+ACC = init_accounts(app, db, User, Event, Payment, admin_required)
+with app.app_context():
+    try:
+        db.create_all()
+    except Exception as _e:
+        print('DB init warning (accounts):', _e)
+
 @app.route('/api/register', methods=['POST'])
 def api_register():
     d = request.json or {}
