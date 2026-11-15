@@ -876,6 +876,32 @@ def calc_aspects(planets):
     aspects.sort(key=lambda x: x['orb'])
     return aspects
 
+
+# Stationary planets: a station (speed changes sign) within ±N days of the moment.
+# Window per planet ~ how long it visibly "stands still" (traditional orbs of days).
+STATION_DAYS = {swe.MERCURY:1, swe.VENUS:2, swe.MARS:3, swe.JUPITER:5, swe.SATURN:6,
+                swe.URANUS:7, swe.NEPTUNE:7, swe.PLUTO:7}
+def station_info(jd, pid, v0):
+    n = STATION_DAYS.get(pid)
+    if not n: return None
+    try:
+        best = None
+        for k in range(1, n+1):
+            for sgn in (-1, 1):
+                v = swe.calc_ut(jd + sgn*k, pid)[0][3]
+                if (v < 0) != (v0 < 0):
+                    # earlier side retro→now direct or later side flips: decide direction of the station
+                    before = v if sgn < 0 else v0
+                    after = v0 if sgn < 0 else v
+                    kind = 'SR' if before > 0 and after < 0 else 'SD'
+                    if best is None or k < best[0]: best = (k*sgn, kind)
+            if best: break
+        if not best: return None
+        return {'stationary': True, 'station': best[1], 'station_days': best[0]}
+    except Exception:
+        return None
+
+
 @app.route('/chart', methods=['POST'])
 def chart():
     swe.set_ephe_path(EPHE_PATH)
@@ -897,7 +923,10 @@ def chart():
         pos,_ = swe.calc_ut(jd,pid)
         deg = pos[0]; dv,c = deg_to_display(deg)
         planets[name] = {'degree':round(deg,4),'sign':trop_sign(deg),
-            'sign_degree':dv,'centesimal':c,'retrograde':bool(pos[3]<0) if len(pos)>3 else False}
+            'sign_degree':dv,'centesimal':c,'retrograde':bool(pos[3]<0) if len(pos)>3 else False,
+            'speed':round(pos[3],5),'distance':round(pos[2],6)}
+        st = station_info(jd,pid,pos[3])
+        if st: planets[name].update(st)
 
     for name,pid in [('ქირონი',swe.CHIRON),('ლილიტი',swe.MEAN_APOG)]:
         try:
