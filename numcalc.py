@@ -498,6 +498,80 @@ def pyth_stats(y0, y1, mode, conds):
     return out
 
 
+@lru_cache(maxsize=1)
+def _dm_days():
+    D, M = [], []
+    for m in range(1, 13):
+        for d in range(1, _DIM_LEAP[m - 1] + 1):
+            D.append(d); M.append(m)
+    return np.array(D, np.int32), np.array(M, np.int32)
+
+
+def _vsumd(v):
+    v = np.abs(v)
+    return v // 100 + (v // 10) % 10 + v % 10
+
+
+def pyth_search(y0, y1, mode, conds, frm=None, offset=0, limit=200):
+    """Every date of y0..y1 whose square (and working numbers) meet all conditions.
+    conds: {t:'d', d:1..9} digit count · {t:'l', d:0..7} line total · {t:'e'} empty cells ·
+           {t:'w', d:1..4} working number — each with op '=', '≥', '≤' and k.
+    Returns the total, matches per year, the first match on/after frm (y,m,d) and a page of matches."""
+    CC, S, F, L = _dm_tables()
+    T = _ex_table(mode)
+    DD, MM = _dm_days()
+    years = np.arange(y0, y1 + 1)
+    leap = (years % 4 == 0) & ((years % 100 != 0) | (years % 400 == 0))
+    keep = ~L[None, :] | leap[:, None]
+    yi, di = np.nonzero(keep)                                # ordered by year, then month/day → chronological
+    y = years[yi]
+    YC = np.array([_digit_counts(int(v)) for v in years], np.int16)[yi]
+    YS = np.array([_sumd(int(v)) for v in years], np.int32)[yi]
+    A = S[di] + YS
+    fd = F[di]
+    x = (y >= 2000).astype(np.int32)
+    c = CC[di] + YC + T[A, fd, x]
+    if mode == 'classic':
+        Cn = np.abs(A - 2 * fd); W = [A, _vsumd(A), Cn, _vsumd(Cn)]
+    elif mode == 'corrected':
+        Cn = np.where(x == 1, A + 19, A - 2); W = [A, np.where(x == 1, 19, -2), Cn, _vsumd(Cn)]
+    else:
+        kA = np.abs(A - 9); kC = np.abs(kA - 2 * fd); W = [kA, _vsumd(kA), kC, _vsumd(kC)]
+    empt = (c[:, 1:10] == 0).sum(1)
+    mask = np.ones(len(y), bool)
+    for q in conds or []:
+        t, op = q.get('t'), q.get('op')
+        try:
+            k, d = int(q.get('k', 0)), int(q.get('d', 0))
+        except (TypeError, ValueError):
+            continue
+        if t == 'd' and 1 <= d <= 9:
+            v = c[:, d]
+        elif t == 'l' and 0 <= d <= 7:
+            a, b, e = LINE_DIG[d]; v = c[:, a] + c[:, b] + c[:, e]
+        elif t == 'e':
+            v = empt
+        elif t == 'w' and 1 <= d <= 4:
+            v = W[d - 1]
+        else:
+            continue
+        mask &= (v == k) if op == '=' else (v >= k) if op == '≥' else (v <= k)
+    idx = np.nonzero(mask)[0]
+    ny = y1 - y0 + 1
+    per_year = np.bincount(yi[idx], minlength=ny)[:ny]
+    nxt = None
+    if frm and len(idx):
+        fy, fm, fdd = frm
+        key = y[idx] * 10000 + MM[di[idx]] * 100 + DD[di[idx]]
+        j = int(np.searchsorted(key, fy * 10000 + fm * 100 + fdd))
+        if j < len(idx):
+            nxt = j
+    page = idx[offset:offset + limit]
+    rows = [[int(y[i]), int(MM[di[i]]), int(DD[di[i]]), [int(w[i]) for w in W], c[i, 1:10].astype(int).tolist()] for i in page]
+    return {'y0': y0, 'y1': y1, 'mode': mode, 'N': int(len(y)), 'NC': int(len(idx)), 'next': nxt,
+            'offset': offset, 'rows': rows, 'perYear': per_year.astype(int).tolist()}
+
+
 # ── Matrix statistics (mirrors matrix_stats.js): year-type tables ──
 def m1_ext(dd, mm, R3):
     L3, T3 = r22(dd), r22(mm)
@@ -660,6 +734,24 @@ def init_numcalc_stats(app, pro_block):
         y0, y1 = max(1, min(y0, y1)), min(9999, max(y0, y1))
         conds = [q for q in (d.get('conds') or [])[:12] if isinstance(q, dict) and q.get('t') in ('d', 'l', 'e')]
         return _gz(pyth_stats(y0, y1, mode, conds))
+
+    @app.route('/api/pythagoras/search', methods=['POST'])
+    def api_pyth_search():
+        blk = pro_block('pythagoras.html')
+        if blk:
+            return blk
+        d = request.get_json(silent=True) or {}
+        y0, y1 = _int(d.get('y0')), _int(d.get('y1'))
+        mode = d.get('mode') if d.get('mode') in MODES else 'classic'
+        if y0 is None or y1 is None:
+            return jsonify(error='y0, y1'), 400
+        y0, y1 = max(1, min(y0, y1)), min(9999, max(y0, y1))
+        conds = [q for q in (d.get('conds') or [])[:24] if isinstance(q, dict) and q.get('t') in ('d', 'l', 'e', 'w')]
+        frm = d.get('from')
+        frm = tuple(int(v) for v in frm[:3]) if isinstance(frm, list) and len(frm) >= 3 and all(isinstance(v, int) for v in frm[:3]) else None
+        off = max(0, _int(d.get('offset')) or 0)
+        lim = min(500, max(1, _int(d.get('limit')) or 200))
+        return _gz(pyth_search(y0, y1, mode, conds, frm, off, lim))
 
     @app.route('/api/matrix/stats', methods=['POST'])
     def api_mx_stats():
