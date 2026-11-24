@@ -952,10 +952,12 @@ def chart():
         planets['სამხ. კვანძი']={'degree':round(sn,4),'sign':trop_sign(sn),'sign_degree':dv,'centesimal':c,'retrograde':True}
     except: pass
 
-    try:
-        pos,_ = swe.calc_ut(jd,swe.JUNO); deg=pos[0]; dv,c=deg_to_display(deg)   # seas_18.se1 (AST_OFFSET+3 needs a separate file)
-        planets['იუნო']={'degree':round(deg,4),'sign':trop_sign(deg),'sign_degree':dv,'centesimal':c,'retrograde':bool(pos[3]<0) if len(pos)>3 else False}
-    except: pass
+    # main asteroids from seas_*.se1 (not AST_OFFSET+n, which needs separate files)
+    for name,pid in [('იუნო',swe.JUNO),('ცერერა',swe.CERES),('პალადა',swe.PALLAS),('ვესტა',swe.VESTA)]:
+        try:
+            pos,_ = swe.calc_ut(jd,pid,swe.FLG_SWIEPH|swe.FLG_SPEED); deg=pos[0]; dv,c=deg_to_display(deg)
+            planets[name]={'degree':round(deg,4),'sign':trop_sign(deg),'sign_degree':dv,'centesimal':c,'retrograde':bool(pos[3]<0)}
+        except: pass
 
     cusps,ascmc,hsys,hfb = calc_houses(jd,lat,lon,d)
     asc=float(ascmc[0]); mc=float(ascmc[1])
@@ -1879,7 +1881,7 @@ def true_sidereal():
                   # Not asteroid 1181 — that is the asteroid (1181) Lilith.
                   ('Selena',56),
                   # Juno from the main-asteroid file (seas_*.se1), not AST_OFFSET+3
-                  ('Juno',swe.JUNO)]
+                  ('Juno',swe.JUNO),('Ceres',swe.CERES),('Pallas',swe.PALLAS),('Vesta',swe.VESTA)]
         for name, pid in BODIES:
             try:
                 pos,_ = swe.calc_ut(jd, pid, FLAGS)
